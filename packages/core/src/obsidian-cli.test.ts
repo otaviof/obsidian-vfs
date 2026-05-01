@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { ObsidianCLIImpl } from "../obsidian-cli.js";
+import { ObsidianCLIImpl } from "./obsidian-cli.js";
 
-vi.mock("../exec.js", () => ({
+vi.mock("./exec.js", () => ({
   execCLI: vi.fn(),
 }));
 
-const { execCLI } = await import("../exec.js");
+const { execCLI } = await import("./exec.js");
 const execCLIMock = vi.mocked(execCLI);
 
 describe("ObsidianCLIImpl", () => {

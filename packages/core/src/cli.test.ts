@@ -1,6 +1,6 @@
 import { describe, expectTypeOf, it } from "vitest";
 
-import type { BacklinkEntry, ErrorCode, ObsidianCLI, SearchMatch, VFSResult } from "../index.js";
+import type { BacklinkEntry, ErrorCode, ObsidianCLI, SearchMatch, VFSResult } from "./index.js";
 
 describe("CLI type definitions", () => {
   it("SearchMatch.file is string", () => {

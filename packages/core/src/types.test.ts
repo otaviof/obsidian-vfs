@@ -1,6 +1,6 @@
 import { describe, expectTypeOf, it } from "vitest";
 
-import type { ErrorCode, ResolutionResult, VaultContext, VFSError, VFSResult } from "../index.js";
+import type { ErrorCode, ResolutionResult, VaultContext, VFSError, VFSResult } from "./index.js";
 
 describe("core type definitions", () => {
   it("VFSResult<string> with ok:true narrows to { value: string }", () => {

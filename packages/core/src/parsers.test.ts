@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { BacklinkEntry, SearchMatch } from "../cli.js";
+import type { BacklinkEntry, SearchMatch } from "./cli.js";
 import {
   detectCLIError,
   parseBacklinksJSON,
@@ -8,7 +8,7 @@ import {
   parseSearchFiles,
   parseSearchJSON,
   parseSingleValue,
-} from "../parsers.js";
+} from "./parsers.js";
 
 describe("parsers", () => {
   describe("detectCLIError", () => {

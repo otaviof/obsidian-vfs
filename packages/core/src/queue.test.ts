@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { AsyncQueue } from "../queue.js";
+import { AsyncQueue } from "./queue.js";
 
 describe("AsyncQueue", () => {
   let queue: AsyncQueue;

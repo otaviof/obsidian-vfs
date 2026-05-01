@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { CLIExecOptions } from "../exec.js";
-import { execCLI } from "../exec.js";
+import type { CLIExecOptions } from "./exec.js";
+import { execCLI } from "./exec.js";
 
 vi.mock("node:child_process", () => ({
   execFile: vi.fn(),

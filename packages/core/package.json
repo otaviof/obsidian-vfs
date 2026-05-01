@@ -13,7 +13,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -b",
-    "clean": "tsc -b --clean"
+    "build": "pnpm exec tsc -b",
+    "clean": "pnpm exec tsc -b --clean"
   }
 }
