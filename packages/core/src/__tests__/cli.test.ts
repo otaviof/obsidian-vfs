@@ -47,4 +47,16 @@ describe("CLI type definitions", () => {
     expectTypeOf<Extract<ErrorCode, "CLI_UNAVAILABLE">>().toEqualTypeOf<"CLI_UNAVAILABLE">();
     expectTypeOf<Extract<ErrorCode, "TIMEOUT">>().toEqualTypeOf<"TIMEOUT">();
   });
+
+  it("search opts accepts path, limit, and contextLength", () => {
+    expectTypeOf<Parameters<ObsidianCLI["search"]>[1]>().toEqualTypeOf<
+      { path?: string; limit?: number; contextLength?: number } | undefined
+    >();
+  });
+
+  it("searchContext opts accepts path, limit, and contextLength", () => {
+    expectTypeOf<Parameters<ObsidianCLI["searchContext"]>[1]>().toEqualTypeOf<
+      { path?: string; limit?: number; contextLength?: number } | undefined
+    >();
+  });
 });

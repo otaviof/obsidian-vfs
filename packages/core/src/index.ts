@@ -14,3 +14,9 @@ export type {
   VFSError,
   VFSResult,
 } from "./types.js";
+
+/**
+ * Concrete implementations — CLI wrapper and async queue.
+ */
+export { ObsidianCLIImpl } from "./obsidian-cli.js";
+export { AsyncQueue } from "./queue.js";

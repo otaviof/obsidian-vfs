@@ -29,10 +29,16 @@ export interface ObsidianCLI {
   vaultName(): Promise<VFSResult<string>>;
 
   /** Full-text search returning matching file paths. */
-  search(query: string, opts?: { contextLength?: number }): Promise<VFSResult<string[]>>;
+  search(
+    query: string,
+    opts?: { path?: string; limit?: number; contextLength?: number },
+  ): Promise<VFSResult<string[]>>;
 
   /** Full-text search returning matches with per-line context. */
-  searchContext(query: string, opts?: { contextLength?: number }): Promise<VFSResult<SearchMatch[]>>;
+  searchContext(
+    query: string,
+    opts?: { path?: string; limit?: number; contextLength?: number },
+  ): Promise<VFSResult<SearchMatch[]>>;
 
   /** List files, optionally scoped to a folder. */
   files(folder?: string): Promise<VFSResult<string[]>>;

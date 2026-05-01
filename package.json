@@ -15,7 +15,8 @@
     "format:check": "prettier --check .",
     "test": "vitest run",
     "ci": "pnpm lint && pnpm build && pnpm test",
-    "audit": "pnpm audit"
+    "audit": "pnpm audit",
+    "reset": "pnpm -r run clean && rm -rf node_modules packages/*/node_modules && pnpm install"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
