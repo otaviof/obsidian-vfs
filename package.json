@@ -1,0 +1,30 @@
+{
+  "name": "obsidian-vfs",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.0.0",
+  "engines": {
+    "node": ">=22.0.0"
+  },
+  "scripts": {
+    "build": "pnpm -r run build",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "ci": "pnpm lint && pnpm build && pnpm test",
+    "audit": "pnpm audit"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.0",
+    "@types/node": "^22.19.0",
+    "eslint": "^10.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "jiti": "^2.6.0",
+    "prettier": "^3.8.3",
+    "typescript": "^6.0.0",
+    "typescript-eslint": "^8.59.0",
+    "vitest": "^4.0.0"
+  }
+}
