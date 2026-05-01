@@ -33,4 +33,17 @@ describe("core type definitions", () => {
       "file" | "agent" | "skill" | "search"
     >();
   });
+
+  it("ErrorCode includes CLI_UNAVAILABLE and TIMEOUT alongside existing codes", () => {
+    expectTypeOf<ErrorCode>().toEqualTypeOf<
+      | "VAULT_NOT_FOUND"
+      | "FILE_NOT_FOUND"
+      | "PARSE_ERROR"
+      | "CLI_ERROR"
+      | "CLI_UNAVAILABLE"
+      | "TIMEOUT"
+      | "PERMISSION_DENIED"
+      | "INVALID_URI"
+    >();
+  });
 });

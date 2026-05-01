@@ -6,6 +6,8 @@ export type ErrorCode =
   | "FILE_NOT_FOUND"
   | "PARSE_ERROR"
   | "CLI_ERROR"
+  | "CLI_UNAVAILABLE"
+  | "TIMEOUT"
   | "PERMISSION_DENIED"
   | "INVALID_URI";
 
