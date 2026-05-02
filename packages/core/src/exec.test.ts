@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CLIExecOptions } from "./exec.js";
-import { execCLI } from "./exec.js";
+import { execCLI, resolveExecConfig } from "./exec.js";
 
 vi.mock("node:child_process", () => ({
   execFile: vi.fn(),
@@ -120,5 +120,42 @@ describe("execCLI", () => {
     await execCLI(["vault", "info=path"], baseOptions);
 
     expect(capturedSignal).toBeInstanceOf(AbortSignal);
+  });
+});
+
+describe("resolveExecConfig", () => {
+  it("uses default CLI path when not set", () => {
+    const config = resolveExecConfig({});
+    expect(config.cliPath).toBe("obsidian");
+  });
+
+  it("uses custom CLI path from environment", () => {
+    const config = resolveExecConfig({ OBSIDIAN_VFS_CLI_PATH: "/usr/bin/obs" });
+    expect(config.cliPath).toBe("/usr/bin/obs");
+  });
+
+  it("uses default timeout when not set", () => {
+    const config = resolveExecConfig({});
+    expect(config.timeoutMs).toBe(10_000);
+  });
+
+  it("uses custom timeout from environment", () => {
+    const config = resolveExecConfig({ OBSIDIAN_VFS_TIMEOUT_MS: "5000" });
+    expect(config.timeoutMs).toBe(5000);
+  });
+
+  it("falls back to default on invalid timeout", () => {
+    const config = resolveExecConfig({ OBSIDIAN_VFS_TIMEOUT_MS: "abc" });
+    expect(config.timeoutMs).toBe(10_000);
+  });
+
+  it("falls back to default on zero timeout", () => {
+    const config = resolveExecConfig({ OBSIDIAN_VFS_TIMEOUT_MS: "0" });
+    expect(config.timeoutMs).toBe(10_000);
+  });
+
+  it("falls back to default on negative timeout", () => {
+    const config = resolveExecConfig({ OBSIDIAN_VFS_TIMEOUT_MS: "-1" });
+    expect(config.timeoutMs).toBe(10_000);
   });
 });

@@ -51,6 +51,12 @@ export type { ResolveWikilinkOptions } from "./resolve-wikilink.js";
 export type { FileChangeEvent, FileChangeListener, FileChangeType } from "./file-watcher.js";
 
 /**
+ * CLI execution defaults and options.
+ */
+export { DEFAULT_CLI_PATH, DEFAULT_TIMEOUT_MS, resolveExecConfig } from "./exec.js";
+export type { CLIExecOptions } from "./exec.js";
+
+/**
  * Concrete implementations — CLI wrapper and async queue.
  */
 export { ObsidianCLIImpl } from "./obsidian-cli.js";
@@ -69,7 +75,7 @@ export { LocalIndexTracker } from "./local-index-tracker.js";
  * Modules: resolution, content processing, watching, enumeration.
  */
 export { resolveWikilink } from "./resolve-wikilink.js";
-export { resolveResource } from "./resolve-resource.js";
+export { resolveResource, resolveSkillResource } from "./resolve-resource.js";
 export { sliceContent, scrubWikilinks, processContent } from "./content-slice.js";
 export { VaultFileWatcher } from "./file-watcher.js";
 export { readDirectory, statVirtualFile } from "./fs-enumeration.js";

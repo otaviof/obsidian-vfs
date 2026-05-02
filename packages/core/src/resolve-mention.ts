@@ -1,7 +1,7 @@
 import type { LocalIndexTracker } from "./local-index-tracker.js";
 import type { MentionResult, VFSResult } from "./types.js";
 import { processContent } from "./content-slice.js";
-import { resolveResource } from "./resolve-resource.js";
+import { resolveResource, resolveSkillResource } from "./resolve-resource.js";
 import { resolveWikilink } from "./resolve-wikilink.js";
 
 async function resolveNonAgent(
@@ -10,7 +10,7 @@ async function resolveNonAgent(
   securityOptions: { vaultRoot: string; allowedFolders: readonly string[] },
 ): Promise<VFSResult<{ targetType: "file" | "skill"; resolvedPath: string }>> {
   if (tracker.context.vfsConfig.skillsDirs.length > 0) {
-    const skillResult = await resolveResource(
+    const skillResult = await resolveSkillResource(
       namePart,
       tracker.context.vfsConfig.skillsDirs,
       securityOptions,

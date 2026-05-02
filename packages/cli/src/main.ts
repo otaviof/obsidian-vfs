@@ -2,17 +2,13 @@
 
 import { parseArgs } from "node:util";
 
+import { DEFAULT_CLI_PATH, DEFAULT_TIMEOUT_MS } from "@obsidian-vfs/core";
+
 import type { CLIOptions, InspectArgs, ResolveArgs } from "./types.js";
 import { EXIT_ERROR, EXIT_SUCCESS, EXIT_USAGE } from "./types.js";
 import { run as runInspect } from "./cmd-inspect.js";
 import { run as runResolve } from "./cmd-resolve.js";
 import { formatHelp, formatUsageError, writeStderr, writeStdout } from "./formatters.js";
-
-/** Default path to the Obsidian CLI binary. */
-const DEFAULT_CLI_PATH = "obsidian";
-
-/** Default timeout for CLI operations in milliseconds. */
-const DEFAULT_TIMEOUT_MS = 10_000;
 
 /** Valid command names for dispatch. */
 const VALID_COMMANDS = new Set(["inspect", "resolve", "help"]);

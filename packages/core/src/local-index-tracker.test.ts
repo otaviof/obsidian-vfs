@@ -319,7 +319,7 @@ describe("LocalIndexTracker", () => {
       if (!result.ok) return;
 
       const resolved = await result.value.resolveSkill("my-skill");
-      expect(resolved).toEqual({ ok: true, value: "skills/my-skill.md" });
+      expect(resolved).toEqual({ ok: true, value: "skills/my-skill/SKILL.md" });
     });
   });
 

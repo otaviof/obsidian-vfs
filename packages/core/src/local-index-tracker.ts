@@ -19,7 +19,7 @@ import { validateVFSConfig } from "./vfs-config.js";
 import { canonicalizePath } from "./path-security.js";
 import { readVirtualFile } from "./read-file.js";
 import { resolveWikilink as resolveWikilinkFn } from "./resolve-wikilink.js";
-import { resolveResource } from "./resolve-resource.js";
+import { resolveResource, resolveSkillResource } from "./resolve-resource.js";
 import { resolveMention as resolveMentionFn } from "./resolve-mention.js";
 import { readDirectory as readDirectoryFn, statVirtualFile } from "./fs-enumeration.js";
 import { VaultFileWatcher } from "./file-watcher.js";
@@ -180,9 +180,9 @@ export class LocalIndexTracker {
     return resolveResource(name, this.context.vfsConfig.agentsDirs, this.#securityOptions);
   }
 
-  /** Resolve a skill by name from configured skillsDirs. */
+  /** Resolve a skill by name as a directory containing SKILL.md from configured skillsDirs. */
   async resolveSkill(name: string): Promise<VFSResult<string>> {
-    return resolveResource(name, this.context.vfsConfig.skillsDirs, this.#securityOptions);
+    return resolveSkillResource(name, this.context.vfsConfig.skillsDirs, this.#securityOptions);
   }
 
   /** Parse and resolve an `@obs:` mention to a full MentionResult. */

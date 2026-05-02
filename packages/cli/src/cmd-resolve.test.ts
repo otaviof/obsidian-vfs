@@ -1,4 +1,9 @@
-import type { LocalIndexTracker, VFSResult, WikilinkResolution } from "@obsidian-vfs/core";
+import type {
+  LocalIndexTracker,
+  MentionResult,
+  VFSResult,
+  WikilinkResolution,
+} from "@obsidian-vfs/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ResolveArgs } from "./types.js";
@@ -59,8 +64,32 @@ function makeTracker(resolveResult: VFSResult<WikilinkResolution>) {
   const tracker = {
     context: { physicalPath: "/Users/me/vault" },
     resolveWikilink,
+    resolveMention: vi.fn(),
   } as unknown as LocalIndexTracker;
   return { tracker, resolveWikilink };
+}
+
+function makeMentionTracker(mentionResult: VFSResult<MentionResult>) {
+  const resolveMention = vi.fn<LocalIndexTracker["resolveMention"]>();
+  resolveMention.mockResolvedValue(mentionResult);
+  const tracker = {
+    context: { physicalPath: "/Users/me/vault" },
+    resolveWikilink: vi.fn(),
+    resolveMention,
+  } as unknown as LocalIndexTracker;
+  return { tracker, resolveMention };
+}
+
+function makeSkillTracker(skillResult: VFSResult<string>) {
+  const resolveSkill = vi.fn<LocalIndexTracker["resolveSkill"]>();
+  resolveSkill.mockResolvedValue(skillResult);
+  const tracker = {
+    context: { physicalPath: "/Users/me/vault" },
+    resolveWikilink: vi.fn(),
+    resolveMention: vi.fn(),
+    resolveSkill,
+  } as unknown as LocalIndexTracker;
+  return { tracker, resolveSkill };
 }
 
 describe("cmd-resolve", () => {
@@ -263,5 +292,169 @@ describe("cmd-resolve", () => {
     };
     expect(call.ok).toBe(true);
     expect(call.data?.candidates).toEqual(candidates);
+  });
+
+  it("resolves @obs: mention via resolveMention", async () => {
+    const { tracker, resolveMention } = makeMentionTracker({
+      ok: true,
+      value: {
+        targetType: "agent",
+        resolvedPath: "30-resources/ai/staff/architect.md",
+        vaultName: "Vault",
+        content: "Agent content",
+        section: undefined,
+      },
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    const code = await run(makeArgs({ wikilink: "@obs:architect" }));
+
+    expect(code).toBe(EXIT_SUCCESS);
+    expect(resolveMention).toHaveBeenCalledWith("@obs:architect");
+    expect(mockFormatResolveResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        resolvedPath: "30-resources/ai/staff/architect.md",
+        physicalPath: "/Users/me/vault/30-resources/ai/staff/architect.md",
+        candidates: [],
+      }),
+    );
+  });
+
+  it("does not normalize @obs: mentions as wikilinks", async () => {
+    const { tracker, resolveMention } = makeMentionTracker({
+      ok: true,
+      value: {
+        targetType: "file",
+        resolvedPath: "notes/plan.md",
+        vaultName: "Vault",
+        content: "Content",
+        section: "Architecture",
+      },
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ wikilink: "@obs:plan.md#Architecture" }));
+
+    expect(resolveMention).toHaveBeenCalledWith("@obs:plan.md#Architecture");
+  });
+
+  it("returns EXIT_ERROR when @obs: mention resolution fails", async () => {
+    const { tracker } = makeMentionTracker({
+      ok: false,
+      error: { code: "FILE_NOT_FOUND", message: "Resource not found: missing" },
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    const code = await run(makeArgs({ wikilink: "@obs:missing" }));
+
+    expect(code).toBe(EXIT_ERROR);
+    expect(mockWriteStderr).toHaveBeenCalled();
+  });
+
+  it("outputs JSON for @obs: mention with --json", async () => {
+    const { tracker } = makeMentionTracker({
+      ok: true,
+      value: {
+        targetType: "agent",
+        resolvedPath: "agents/agent.md",
+        vaultName: "Vault",
+        content: "Agent",
+        section: undefined,
+      },
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ wikilink: "@obs:agent", json: true }));
+
+    expect(mockFormatResolveJSON).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
+  });
+
+  it("writes verbose timing for @obs: mention", async () => {
+    const { tracker } = makeMentionTracker({
+      ok: true,
+      value: {
+        targetType: "agent",
+        resolvedPath: "agents/agent.md",
+        vaultName: "Vault",
+        content: "Agent",
+        section: undefined,
+      },
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 42 } });
+
+    await run(makeArgs({ wikilink: "@obs:agent", verbose: true }));
+
+    expect(mockFormatVerboseTiming).toHaveBeenCalledWith("Resolution", expect.any(Number));
+    expect(mockFormatVerboseTiming).toHaveBeenCalledWith("Init", 42);
+  });
+
+  it("resolves /obs: skill via resolveSkill", async () => {
+    const { tracker, resolveSkill } = makeSkillTracker({
+      ok: true,
+      value: "30-resources/ai/skills/obsidian.md",
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    const code = await run(makeArgs({ wikilink: "/obs:obsidian" }));
+
+    expect(code).toBe(EXIT_SUCCESS);
+    expect(resolveSkill).toHaveBeenCalledWith("obsidian");
+    expect(mockFormatResolveResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        resolvedPath: "30-resources/ai/skills/obsidian.md",
+        physicalPath: "/Users/me/vault/30-resources/ai/skills/obsidian.md",
+        candidates: [],
+      }),
+    );
+  });
+
+  it("does not normalize /obs: skills as wikilinks", async () => {
+    const { tracker, resolveSkill } = makeSkillTracker({
+      ok: true,
+      value: "skills/my-skill/SKILL.md",
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ wikilink: "/obs:my-skill" }));
+
+    expect(resolveSkill).toHaveBeenCalledWith("my-skill");
+  });
+
+  it("returns EXIT_ERROR when /obs: skill resolution fails", async () => {
+    const { tracker } = makeSkillTracker({
+      ok: false,
+      error: { code: "FILE_NOT_FOUND", message: "Resource not found: missing" },
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    const code = await run(makeArgs({ wikilink: "/obs:missing" }));
+
+    expect(code).toBe(EXIT_ERROR);
+    expect(mockWriteStderr).toHaveBeenCalled();
+  });
+
+  it("outputs JSON for /obs: skill with --json", async () => {
+    const { tracker } = makeSkillTracker({
+      ok: true,
+      value: "skills/obsidian.md",
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ wikilink: "/obs:obsidian", json: true }));
+
+    expect(mockFormatResolveJSON).toHaveBeenCalledWith(expect.objectContaining({ ok: true }));
+  });
+
+  it("writes verbose timing for /obs: skill", async () => {
+    const { tracker } = makeSkillTracker({
+      ok: true,
+      value: "skills/obsidian.md",
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 17 } });
+
+    await run(makeArgs({ wikilink: "/obs:obsidian", verbose: true }));
+
+    expect(mockFormatVerboseTiming).toHaveBeenCalledWith("Resolution", expect.any(Number));
+    expect(mockFormatVerboseTiming).toHaveBeenCalledWith("Init", 17);
   });
 });

@@ -59,6 +59,55 @@ Use `--cli-path` if the `obsidian` binary is not on your `PATH`, and `--timeout`
 
 The `resolve` command uses the Obsidian CLI's `search` with `file:<name>` to find candidates, then picks the exact basename match. This differs from the raw search order — Obsidian's search returns results in its own relevance ranking, which may place partial matches before exact ones. For example, `file:system` may return `["Landscaper vs. System Testing.md", "system.md", "base-system.md"]`, but `resolve` selects `system.md` because its basename matches exactly. When multiple files share the same basename, the shortest vault-relative path wins.
 
+## Claude Plugin
+
+The Claude Code plugin intercepts every `UserPromptSubmit` hook, scans for `@obs:` mentions, resolves each through the vault, and injects the content as `additionalContext`.
+
+### Usage
+
+Reference vault files in any Claude Code prompt using the `@obs:` prefix:
+
+```
+@obs:architect                     # Agent by name (from agentsDirs)
+@obs:10-projects/plan.md           # File by vault-relative path
+@obs:plan.md#Architecture          # Section within a file
+@obs:my-skill                      # Skill by name (from skillsDirs)
+```
+
+Mentions inside fenced code blocks (`` ``` ``) and inline code (`` ` ``) are ignored. Duplicate mentions are resolved once. Failed resolutions appear as error messages in context rather than crashing.
+
+### Installation
+
+The plugin manifest lives at the repo root (`.claude-plugin/plugin.json`), so point `--plugin-dir` at the repo itself:
+
+```sh
+# Build the plugin (required before first use)
+pnpm build
+
+# Launch Claude Code with the plugin loaded
+claude --plugin-dir /path/to/obsidian-vfs
+
+# Or from within the repo
+claude --plugin-dir .
+```
+
+For live development, rebuild after changes — Claude Code picks up the new `dist/` on the next prompt:
+
+```sh
+# Edit source in packages/claude-plugin/src/ or packages/core/src/
+pnpm build
+# Next prompt in Claude Code uses the updated hook handler
+```
+
+## Environment Variables
+
+| Variable | Purpose | Default |
+|----------|---------|---------|
+| `OBSIDIAN_VFS_CLI_PATH` | Path to the Obsidian CLI binary | `"obsidian"` |
+| `OBSIDIAN_VFS_TIMEOUT_MS` | CLI operation timeout in milliseconds | `10000` |
+
+Both variables are resolved by `resolveExecConfig()` in `packages/core`. They apply to all packages (core, cli, claude-plugin). Invalid values fall back to defaults silently.
+
 ## Vault Configuration
 
 Place a JSON file at `.obsidian/obsidian-vfs.json` inside your vault to configure the VFS. All fields are optional and default to empty arrays:

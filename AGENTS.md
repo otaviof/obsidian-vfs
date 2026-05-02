@@ -46,6 +46,9 @@ When adding a new generated or vendored directory, add it to all three files.
 
 ## Conventions
 
+- **DRY** — Never duplicate code. Extract shared logic into the lowest common package and import it everywhere needed. If two files contain the same pattern, refactor into one reusable function or type.
+- **Explicit over implicit** — Name things clearly, export intentionally, import precisely. No barrel re-exports that hide origin. No magic defaults that require reading source to understand.
+- **Simplest wins** — Choose the most direct, readable solution. Fewer abstractions, fewer indirections, fewer tokens. If a helper doesn't earn its keep, inline it.
 - **Result types** — Return `VFSResult<T>` (ok/error discriminated union), never nulls.
 - **CLI serialization** — One subprocess at a time via async queue.
 - **CLI parsing** — `search`/`backlinks` return JSON; `vault`/`files`/`folders`/`read` return plain text. Exit code always 0. Detect errors via `Error:` stdout prefix. Per-command parsers required.

@@ -189,7 +189,7 @@ describe("resolveMention", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.targetType).toBe("skill");
-      expect(result.value.resolvedPath).toBe("skills/my-skill.md");
+      expect(result.value.resolvedPath).toBe("skills/my-skill/SKILL.md");
     }
   });
 

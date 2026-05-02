@@ -1,0 +1,22 @@
+{
+  "name": "@obsidian-vfs/claude-plugin",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/hook-handler.d.ts",
+      "import": "./dist/hook-handler.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm exec tsc -b",
+    "clean": "pnpm exec tsc -b --clean"
+  },
+  "dependencies": {
+    "@obsidian-vfs/core": "workspace:*"
+  }
+}

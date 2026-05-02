@@ -5,6 +5,12 @@ import type { VFSResult } from "./types.js";
 
 const execFile = promisify(execFileCb);
 
+/** Default path to the Obsidian CLI binary. */
+export const DEFAULT_CLI_PATH = "obsidian";
+
+/** Default timeout for CLI operations in milliseconds. */
+export const DEFAULT_TIMEOUT_MS = 10_000;
+
 /**
  * Options for CLI execution. Timeout and binary path.
  */
@@ -19,6 +25,22 @@ export interface CLIExecOptions {
 export interface CLIExecResult {
   readonly stdout: string;
   readonly stderr: string;
+}
+
+/** Resolve CLI execution options from environment variables with validated defaults. */
+export function resolveExecConfig(env: Record<string, string | undefined>): CLIExecOptions {
+  const cliPath = env.OBSIDIAN_VFS_CLI_PATH ?? DEFAULT_CLI_PATH;
+
+  let timeoutMs = DEFAULT_TIMEOUT_MS;
+  const rawTimeout = env.OBSIDIAN_VFS_TIMEOUT_MS;
+  if (rawTimeout !== undefined) {
+    const parsed = Number.parseInt(rawTimeout, 10);
+    if (Number.isFinite(parsed) && parsed > 0) {
+      timeoutMs = parsed;
+    }
+  }
+
+  return Object.freeze({ cliPath, timeoutMs });
 }
 
 /**
