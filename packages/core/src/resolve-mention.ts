@@ -1,3 +1,6 @@
+import { access } from "node:fs/promises";
+import path from "node:path";
+
 import type { LocalIndexTracker } from "./local-index-tracker.js";
 import type { MentionResult, VFSResult } from "./types.js";
 import { processContent } from "./content-slice.js";
@@ -21,7 +24,27 @@ async function resolveNonAgent(
   }
 
   if (namePart.includes("/") || namePart.toLowerCase().endsWith(".md")) {
-    return { ok: true, value: { targetType: "file", resolvedPath: namePart } };
+    const absolutePath = path.resolve(securityOptions.vaultRoot, namePart);
+    try {
+      await access(absolutePath);
+      return { ok: true, value: { targetType: "file", resolvedPath: namePart } };
+    } catch {
+      const basename = path.basename(namePart, ".md");
+      const wikilinkResult = await resolveWikilink(basename, {
+        cli: tracker.cli,
+        cache: tracker.cache,
+        vaultRoot: tracker.context.physicalPath,
+        allowedFolders: tracker.context.vfsConfig.allowedFolders,
+        mode: tracker.context.mode,
+      });
+      if (wikilinkResult.ok) {
+        return {
+          ok: true,
+          value: { targetType: "file", resolvedPath: wikilinkResult.value.resolvedPath },
+        };
+      }
+      return { ok: true, value: { targetType: "file", resolvedPath: namePart } };
+    }
   }
 
   const wikilinkResult = await resolveWikilink(namePart, {

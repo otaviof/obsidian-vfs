@@ -11,10 +11,11 @@ vi.mock("node:fs/promises", () => ({
   readdir: vi.fn(),
 }));
 
-const { readFile, realpath, access } = await import("node:fs/promises");
+const { readFile, realpath, access, readdir } = await import("node:fs/promises");
 const readFileMock = vi.mocked(readFile as unknown as (...args: unknown[]) => Promise<unknown>);
 const realpathMock = vi.mocked(realpath as unknown as (...args: unknown[]) => Promise<unknown>);
 const accessMock = vi.mocked(access as unknown as (...args: unknown[]) => Promise<unknown>);
+const readdirMock = vi.mocked(readdir as unknown as (...args: unknown[]) => Promise<unknown>);
 
 async function createTracker(
   configOverrides: Record<string, unknown> = {},
@@ -43,6 +44,7 @@ describe("resolveMention", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     realpathMock.mockImplementation((...args: unknown[]) => Promise.resolve(args[0]));
+    readdirMock.mockResolvedValue([]);
   });
 
   it("returns INVALID_URI on missing prefix", async () => {
@@ -209,5 +211,59 @@ describe("resolveMention", () => {
       expect(result.value.targetType).toBe("file");
       expect(result.value.resolvedPath).toBe("myfile.md");
     }
+  });
+
+  it("falls back to wikilink when direct slash-path does not exist", async () => {
+    const enoent = new Error("ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    accessMock.mockRejectedValueOnce(enoent);
+
+    const tracker = await createTracker(
+      {},
+      { search: vi.fn().mockResolvedValue({ ok: true, value: ["other/missing.md"] }) },
+    );
+
+    readFileMock.mockResolvedValueOnce(Buffer.from("found via wikilink"));
+
+    const result = await resolveMention("@obs:notes/missing.md", tracker);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.targetType).toBe("file");
+      expect(result.value.resolvedPath).toBe("other/missing.md");
+    }
+  });
+
+  it("falls back to wikilink when .md suffix path does not exist", async () => {
+    const enoent = new Error("ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    accessMock.mockRejectedValueOnce(enoent);
+
+    const tracker = await createTracker(
+      {},
+      { search: vi.fn().mockResolvedValue({ ok: true, value: ["docs/myfile.md"] }) },
+    );
+
+    readFileMock.mockResolvedValueOnce(Buffer.from("found via wikilink"));
+
+    const result = await resolveMention("@obs:myfile.md", tracker);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.targetType).toBe("file");
+      expect(result.value.resolvedPath).toBe("docs/myfile.md");
+    }
+  });
+
+  it("returns direct path when both access and wikilink fail", async () => {
+    const enoent = new Error("ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    accessMock.mockRejectedValueOnce(enoent);
+
+    const tracker = await createTracker();
+
+    readFileMock.mockRejectedValueOnce(enoent);
+
+    const result = await resolveMention("@obs:notes/gone.md", tracker);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("FILE_NOT_FOUND");
   });
 });
