@@ -1,4 +1,4 @@
-import type { LocalIndexTracker, VFSResult } from "@obsidian-vfs/core";
+import type { LocalIndexTracker, VFSResult, WikilinkResolution } from "@obsidian-vfs/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ResolveArgs } from "./types.js";
@@ -10,6 +10,7 @@ vi.mock("./bootstrap.js", () => ({
 
 vi.mock("./formatters.js", () => ({
   formatError: vi.fn((err: { message: string }) => `ERROR: ${err.message}`),
+  formatResolveCandidates: vi.fn(() => "CANDIDATES"),
   formatResolveResult: vi.fn((_out: unknown) => "RESOLVE_RESULT"),
   formatResolveJSON: vi.fn((r: unknown) => JSON.stringify(r)),
   formatUsageError: vi.fn((msg: string) => `USAGE: ${msg}`),
@@ -22,6 +23,7 @@ vi.mock("./formatters.js", () => ({
 
 import { bootstrapTracker } from "./bootstrap.js";
 import {
+  formatResolveCandidates,
   formatResolveJSON,
   formatResolveResult,
   formatUsageError,
@@ -37,6 +39,7 @@ const mockWriteStderr = vi.mocked(writeStderr);
 const mockFormatResolveResult = vi.mocked(formatResolveResult);
 const mockFormatResolveJSON = vi.mocked(formatResolveJSON);
 const mockFormatUsageError = vi.mocked(formatUsageError);
+const mockFormatResolveCandidates = vi.mocked(formatResolveCandidates);
 const mockFormatVerboseTiming = vi.mocked(formatVerboseTiming);
 
 function makeArgs(overrides: Partial<ResolveArgs> = {}): ResolveArgs {
@@ -50,7 +53,7 @@ function makeArgs(overrides: Partial<ResolveArgs> = {}): ResolveArgs {
   };
 }
 
-function makeTracker(resolveResult: VFSResult<string>) {
+function makeTracker(resolveResult: VFSResult<WikilinkResolution>) {
   const resolveWikilink = vi.fn<LocalIndexTracker["resolveWikilink"]>();
   resolveWikilink.mockResolvedValue(resolveResult);
   const tracker = {
@@ -70,7 +73,10 @@ describe("cmd-resolve", () => {
   });
 
   it("returns EXIT_SUCCESS on successful resolution", async () => {
-    const { tracker } = makeTracker({ ok: true, value: "10-projects/Project Plan.md" });
+    const { tracker } = makeTracker({
+      ok: true,
+      value: { resolvedPath: "10-projects/Project Plan.md", candidates: [] },
+    });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     const code = await run(makeArgs());
@@ -82,7 +88,7 @@ describe("cmd-resolve", () => {
   it("strips [[brackets]] from input", async () => {
     const { tracker, resolveWikilink } = makeTracker({
       ok: true,
-      value: "10-projects/Project Plan.md",
+      value: { resolvedPath: "10-projects/Project Plan.md", candidates: [] },
     });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
@@ -94,7 +100,7 @@ describe("cmd-resolve", () => {
   it("strips |alias from input", async () => {
     const { tracker, resolveWikilink } = makeTracker({
       ok: true,
-      value: "10-projects/Project Plan.md",
+      value: { resolvedPath: "10-projects/Project Plan.md", candidates: [] },
     });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
@@ -106,7 +112,7 @@ describe("cmd-resolve", () => {
   it("handles bare name input", async () => {
     const { tracker, resolveWikilink } = makeTracker({
       ok: true,
-      value: "10-projects/Project Plan.md",
+      value: { resolvedPath: "10-projects/Project Plan.md", candidates: [] },
     });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
@@ -116,7 +122,10 @@ describe("cmd-resolve", () => {
   });
 
   it("strips brackets and alias combined", async () => {
-    const { tracker, resolveWikilink } = makeTracker({ ok: true, value: "a.md" });
+    const { tracker, resolveWikilink } = makeTracker({
+      ok: true,
+      value: { resolvedPath: "a.md", candidates: [] },
+    });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     await run(makeArgs({ wikilink: "[[A|B]]" }));
@@ -125,7 +134,10 @@ describe("cmd-resolve", () => {
   });
 
   it("outputs JSON on success with --json", async () => {
-    const { tracker } = makeTracker({ ok: true, value: "10-projects/Project Plan.md" });
+    const { tracker } = makeTracker({
+      ok: true,
+      value: { resolvedPath: "10-projects/Project Plan.md", candidates: [] },
+    });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     await run(makeArgs({ json: true }));
@@ -169,7 +181,7 @@ describe("cmd-resolve", () => {
   it("trims whitespace from input", async () => {
     const { tracker, resolveWikilink } = makeTracker({
       ok: true,
-      value: "10-projects/Project Plan.md",
+      value: { resolvedPath: "10-projects/Project Plan.md", candidates: [] },
     });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
@@ -179,7 +191,10 @@ describe("cmd-resolve", () => {
   });
 
   it("writes verbose timing to stderr", async () => {
-    const { tracker } = makeTracker({ ok: true, value: "path.md" });
+    const { tracker } = makeTracker({
+      ok: true,
+      value: { resolvedPath: "path.md", candidates: [] },
+    });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 33 } });
 
     await run(makeArgs({ verbose: true }));
@@ -190,7 +205,10 @@ describe("cmd-resolve", () => {
   });
 
   it("computes physical path from vault and resolved path", async () => {
-    const { tracker } = makeTracker({ ok: true, value: "folder/note.md" });
+    const { tracker } = makeTracker({
+      ok: true,
+      value: { resolvedPath: "folder/note.md", candidates: [] },
+    });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     await run(makeArgs());
@@ -200,5 +218,50 @@ describe("cmd-resolve", () => {
         physicalPath: "/Users/me/vault/folder/note.md",
       }),
     );
+  });
+
+  it("writes candidates warning to stderr when multiple candidates exist", async () => {
+    const candidates = ["archive/note.md", "docs/note.md"];
+    const { tracker } = makeTracker({
+      ok: true,
+      value: { resolvedPath: "docs/note.md", candidates },
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ wikilink: "note" }));
+
+    expect(mockFormatResolveCandidates).toHaveBeenCalledWith("note", "docs/note.md", candidates);
+    expect(mockWriteStderr).toHaveBeenCalled();
+  });
+
+  it("does not write candidates warning for single candidate", async () => {
+    const { tracker } = makeTracker({
+      ok: true,
+      value: { resolvedPath: "docs/note.md", candidates: ["docs/note.md"] },
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ wikilink: "note" }));
+
+    expect(mockFormatResolveCandidates).not.toHaveBeenCalled();
+  });
+
+  it("includes candidates in JSON output", async () => {
+    const candidates = ["archive/note.md", "docs/note.md"];
+    const { tracker } = makeTracker({
+      ok: true,
+      value: { resolvedPath: "docs/note.md", candidates },
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ wikilink: "note", json: true }));
+
+    expect(mockFormatResolveJSON).toHaveBeenCalled();
+    const call = mockFormatResolveJSON.mock.calls[0]?.[0] as {
+      ok: boolean;
+      data?: { candidates: string[] };
+    };
+    expect(call.ok).toBe(true);
+    expect(call.data?.candidates).toEqual(candidates);
   });
 });

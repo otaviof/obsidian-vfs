@@ -32,7 +32,10 @@ async function resolveNonAgent(
     mode: tracker.context.mode,
   });
   if (!wikilinkResult.ok) return wikilinkResult;
-  return { ok: true, value: { targetType: "file", resolvedPath: wikilinkResult.value } };
+  return {
+    ok: true,
+    value: { targetType: "file", resolvedPath: wikilinkResult.value.resolvedPath },
+  };
 }
 
 /** Required prefix for vault mention strings. */

@@ -106,9 +106,9 @@ export function formatInspectJSON(
 /** Format the resolve result for terminal display. */
 export function formatResolveResult(output: ResolveOutput): string {
   return [
-    labelLine("Wikilink", output.wikilink),
-    labelLine("Vault Path", output.resolvedPath),
-    labelLine("Physical Path", output.physicalPath),
+    labelLine("Wikilink", `"${output.wikilink}"`),
+    labelLine("Vault Path", `"${output.resolvedPath}"`),
+    labelLine("Physical Path", `"${output.physicalPath}"`),
   ].join("\n");
 }
 
@@ -117,6 +117,24 @@ export function formatResolveJSON(
   result: { ok: true; data: ResolveOutput } | { ok: false; error: VFSError },
 ): string {
   return JSON.stringify(result, null, 2);
+}
+
+/** Format the search candidates warning for terminal display. */
+export function formatResolveCandidates(
+  wikilink: string,
+  resolvedPath: string,
+  candidates: readonly string[],
+): string {
+  const lines: string[] = [
+    "",
+    `Warning: ${candidates.length} search results for "${wikilink}", resolved to shortest exact match.`,
+    "Candidates:",
+  ];
+  for (const c of candidates) {
+    const marker = c === resolvedPath ? "  <-- resolved" : "";
+    lines.push(`  "${c}"${marker}`);
+  }
+  return lines.join("\n");
 }
 
 /** Format a timing measurement for verbose stderr output. */

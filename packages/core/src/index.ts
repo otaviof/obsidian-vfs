@@ -17,6 +17,7 @@ export type {
   VFSFileStat,
   VFSFileType,
   VFSResult,
+  WikilinkResolution,
 } from "./types.js";
 
 /**

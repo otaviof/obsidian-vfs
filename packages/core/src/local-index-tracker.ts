@@ -10,6 +10,7 @@ import type {
   VFSFileStat,
   VFSFileType,
   VFSResult,
+  WikilinkResolution,
 } from "./types.js";
 import type { PathSecurityOptions } from "./path-security.js";
 import type { FileChangeListener } from "./file-watcher.js";
@@ -163,8 +164,8 @@ export class LocalIndexTracker {
     return { ok: true, value: decoded };
   }
 
-  /** Resolve a bare wikilink name to a vault-relative path. */
-  async resolveWikilink(name: string): Promise<VFSResult<string>> {
+  /** Resolve a bare wikilink name to a vault-relative path with search candidates. */
+  async resolveWikilink(name: string): Promise<VFSResult<WikilinkResolution>> {
     return resolveWikilinkFn(name, {
       cli: this.cli,
       cache: this.cache,

@@ -212,6 +212,16 @@ describe("parsers", () => {
       });
     });
 
+    it("returns empty array for empty output", () => {
+      const result = parseSearchFiles("", "search query");
+      expect(result).toEqual({ ok: true, value: [] });
+    });
+
+    it("returns empty array for whitespace-only output", () => {
+      const result = parseSearchFiles("  \n  ", "search query");
+      expect(result).toEqual({ ok: true, value: [] });
+    });
+
     it("returns CLI_ERROR when stdout starts with Error:", () => {
       const result = parseSearchFiles("Error: search failed", "search query");
       expect(result).toEqual({

@@ -120,6 +120,10 @@ export function parseSearchFiles(stdout: string, command: string): VFSResult<str
   const err: VFSResult<string[]> | undefined = detectCLIError<string[]>(stdout, command);
   if (err) return err;
 
+  if (stdout.trim().length === 0) {
+    return { ok: true, value: [] };
+  }
+
   try {
     const parsed: unknown = JSON.parse(stdout);
     if (!Array.isArray(parsed)) {

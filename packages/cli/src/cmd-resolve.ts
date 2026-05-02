@@ -5,6 +5,7 @@ import { EXIT_ERROR, EXIT_SUCCESS, EXIT_USAGE } from "./types.js";
 import { bootstrapTracker } from "./bootstrap.js";
 import {
   formatError,
+  formatResolveCandidates,
   formatResolveJSON,
   formatResolveResult,
   formatUsageError,
@@ -57,13 +58,17 @@ export async function run(args: ResolveArgs): Promise<number> {
     return EXIT_ERROR;
   }
 
-  const physicalPath = path.join(boot.value.tracker.context.physicalPath, result.value);
-  const output: ResolveOutput = { wikilink, resolvedPath: result.value, physicalPath };
+  const { resolvedPath, candidates } = result.value;
+  const physicalPath = path.join(boot.value.tracker.context.physicalPath, resolvedPath);
+  const output: ResolveOutput = { wikilink, resolvedPath, physicalPath, candidates };
 
   if (args.json) {
     writeStdout(formatResolveJSON({ ok: true, data: output }));
   } else {
     writeStdout(formatResolveResult(output));
+    if (candidates.length > 1) {
+      writeStderr(formatResolveCandidates(wikilink, resolvedPath, candidates));
+    }
   }
 
   if (args.verbose) {

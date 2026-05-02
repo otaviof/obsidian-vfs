@@ -7,6 +7,7 @@ import {
   formatHelp,
   formatInspectJSON,
   formatInspectResult,
+  formatResolveCandidates,
   formatResolveJSON,
   formatResolveResult,
   formatUsageError,
@@ -28,6 +29,7 @@ const sampleResolve: ResolveOutput = {
   wikilink: "Project Plan",
   resolvedPath: "10-projects/Project Plan.md",
   physicalPath: "/Users/me/vault/10-projects/Project Plan.md",
+  candidates: [],
 };
 
 describe("formatError", () => {
@@ -151,14 +153,33 @@ describe("formatInspectJSON", () => {
 });
 
 describe("formatResolveResult", () => {
-  it("renders wikilink and paths", () => {
+  it("renders wikilink and paths with quotes", () => {
     const result = formatResolveResult(sampleResolve);
-    expect(result).toContain("Wikilink:");
-    expect(result).toContain("Project Plan");
-    expect(result).toContain("Vault Path:");
-    expect(result).toContain("10-projects/Project Plan.md");
-    expect(result).toContain("Physical Path:");
-    expect(result).toContain("/Users/me/vault/10-projects/Project Plan.md");
+    expect(result).toContain('"Project Plan"');
+    expect(result).toContain('"10-projects/Project Plan.md"');
+    expect(result).toContain('"/Users/me/vault/10-projects/Project Plan.md"');
+  });
+});
+
+describe("formatResolveCandidates", () => {
+  it("lists all candidates with resolved marker", () => {
+    const result = formatResolveCandidates("note", "docs/note.md", [
+      "archive/note.md",
+      "docs/note.md",
+      "ref/note-draft.md",
+    ]);
+    expect(result).toContain("3 search results");
+    expect(result).toContain('"note"');
+    expect(result).toContain('"archive/note.md"');
+    expect(result).toContain('"docs/note.md"  <-- resolved');
+    expect(result).toContain('"ref/note-draft.md"');
+    expect(result).not.toContain('"archive/note.md"  <-- resolved');
+  });
+
+  it("marks resolved path when it is not the first candidate", () => {
+    const result = formatResolveCandidates("cfg", "b/cfg.md", ["a/cfg.md", "b/cfg.md"]);
+    expect(result).toContain('"b/cfg.md"  <-- resolved');
+    expect(result).not.toContain('"a/cfg.md"  <-- resolved');
   });
 });
 

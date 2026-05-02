@@ -31,34 +31,39 @@ describe("resolveWikilink", () => {
     const searchMock = vi.fn().mockResolvedValue({ ok: true, value: ["docs/overview.md"] });
     const options = makeOptions({ cli: mockCLI({ search: searchMock }) });
     const result = await resolveWikilink("overview", options);
-    expect(result).toEqual({ ok: true, value: "docs/overview.md" });
+    expect(result).toEqual({
+      ok: true,
+      value: { resolvedPath: "docs/overview.md", candidates: ["docs/overview.md"] },
+    });
     expect(searchMock).toHaveBeenCalledWith("file:overview");
   });
 
   it("picks exact basename match from multiple search results", async () => {
-    const searchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      value: [
-        "archive/legacy/overview-draft.md",
-        "docs/overview.md",
-        "ref/overview-v2.md",
-      ],
-    });
+    const candidates = [
+      "archive/legacy/overview-draft.md",
+      "docs/overview.md",
+      "ref/overview-v2.md",
+    ];
+    const searchMock = vi.fn().mockResolvedValue({ ok: true, value: candidates });
     const options = makeOptions({ cli: mockCLI({ search: searchMock }) });
 
     const result = await resolveWikilink("overview", options);
-    expect(result).toEqual({ ok: true, value: "docs/overview.md" });
+    expect(result).toEqual({
+      ok: true,
+      value: { resolvedPath: "docs/overview.md", candidates },
+    });
   });
 
   it("prefers shortest path when multiple exact basename matches exist", async () => {
-    const searchMock = vi.fn().mockResolvedValue({
-      ok: true,
-      value: ["deep/nested/folder/readme.md", "docs/readme.md"],
-    });
+    const candidates = ["deep/nested/folder/readme.md", "docs/readme.md"];
+    const searchMock = vi.fn().mockResolvedValue({ ok: true, value: candidates });
     const options = makeOptions({ cli: mockCLI({ search: searchMock }) });
 
     const result = await resolveWikilink("readme", options);
-    expect(result).toEqual({ ok: true, value: "docs/readme.md" });
+    expect(result).toEqual({
+      ok: true,
+      value: { resolvedPath: "docs/readme.md", candidates },
+    });
   });
 
   it("falls back to glob when no exact basename match in search results", async () => {
@@ -70,7 +75,10 @@ describe("resolveWikilink", () => {
     const options = makeOptions({ cli: mockCLI({ search: searchMock }) });
 
     const result = await resolveWikilink("setup", options);
-    expect(result).toEqual({ ok: true, value: "sub/setup.md" });
+    expect(result).toEqual({
+      ok: true,
+      value: { resolvedPath: "sub/setup.md", candidates: [] },
+    });
   });
 
   it("caches result and returns from cache on second call", async () => {
@@ -81,7 +89,10 @@ describe("resolveWikilink", () => {
     searchMock.mockClear();
 
     const result = await resolveWikilink("config", options);
-    expect(result).toEqual({ ok: true, value: "docs/config.md" });
+    expect(result).toEqual({
+      ok: true,
+      value: { resolvedPath: "docs/config.md", candidates: [] },
+    });
     expect(searchMock).not.toHaveBeenCalled();
   });
 
@@ -90,7 +101,10 @@ describe("resolveWikilink", () => {
     const options = makeOptions();
 
     const result = await resolveWikilink("deploy", options);
-    expect(result).toEqual({ ok: true, value: "sub/deploy.md" });
+    expect(result).toEqual({
+      ok: true,
+      value: { resolvedPath: "sub/deploy.md", candidates: [] },
+    });
   });
 
   it("resolves via glob in degraded mode", async () => {
@@ -98,7 +112,10 @@ describe("resolveWikilink", () => {
     const options = makeOptions({ mode: "degraded" });
 
     const result = await resolveWikilink("getting-started", options);
-    expect(result).toEqual({ ok: true, value: "folder/getting-started.md" });
+    expect(result).toEqual({
+      ok: true,
+      value: { resolvedPath: "folder/getting-started.md", candidates: [] },
+    });
   });
 
   it("respects allowedFolders in glob", async () => {
@@ -109,7 +126,10 @@ describe("resolveWikilink", () => {
     });
 
     const result = await resolveWikilink("changelog", options);
-    expect(result).toEqual({ ok: true, value: "notes/deep/changelog.md" });
+    expect(result).toEqual({
+      ok: true,
+      value: { resolvedPath: "notes/deep/changelog.md", candidates: [] },
+    });
   });
 
   it("strips .md extension from input", async () => {
@@ -140,16 +160,19 @@ describe("resolveWikilink", () => {
     }
   });
 
-  it("propagates CLI error", async () => {
+  it("falls through to glob on CLI search error", async () => {
     const searchMock = vi.fn().mockResolvedValue({
       ok: false,
       error: { code: "CLI_ERROR", message: "CLI failed" },
     });
+    readdirMock.mockResolvedValueOnce(["sub/target.md"]);
     const options = makeOptions({ cli: mockCLI({ search: searchMock }) });
 
     const result = await resolveWikilink("target", options);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("CLI_ERROR");
+    expect(result).toEqual({
+      ok: true,
+      value: { resolvedPath: "sub/target.md", candidates: [] },
+    });
   });
 
   it("matches case-insensitively in glob", async () => {
@@ -157,7 +180,10 @@ describe("resolveWikilink", () => {
     const options = makeOptions({ mode: "degraded" });
 
     const result = await resolveWikilink("roadmap", options);
-    expect(result).toEqual({ ok: true, value: "Roadmap.md" });
+    expect(result).toEqual({
+      ok: true,
+      value: { resolvedPath: "Roadmap.md", candidates: [] },
+    });
   });
 
   it("returns FILE_NOT_FOUND for empty name", async () => {
@@ -183,14 +209,43 @@ describe("resolveWikilink", () => {
     if (!result.ok) expect(result.error.code).toBe("FILE_NOT_FOUND");
   });
 
-  it("matches basename case-insensitively in search results", async () => {
-    const searchMock = vi.fn().mockResolvedValue({
+  it("returns path-based wikilink directly without search", async () => {
+    const searchMock = vi.fn();
+    const options = makeOptions({ cli: mockCLI({ search: searchMock }) });
+
+    const result = await resolveWikilink("80-system/system.md", options);
+    expect(result).toEqual({
       ok: true,
-      value: ["docs/Changelog.md"],
+      value: { resolvedPath: "80-system/system.md", candidates: [] },
     });
+    expect(searchMock).not.toHaveBeenCalled();
+  });
+
+  it("appends .md to path-based wikilink without extension", async () => {
+    const options = makeOptions();
+    const result = await resolveWikilink("folder/note", options);
+    expect(result).toEqual({
+      ok: true,
+      value: { resolvedPath: "folder/note.md", candidates: [] },
+    });
+  });
+
+  it("rejects path traversal in path-based wikilink", async () => {
+    const options = makeOptions();
+    const result = await resolveWikilink("../../etc/passwd", options);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("PERMISSION_DENIED");
+  });
+
+  it("matches basename case-insensitively in search results", async () => {
+    const candidates = ["docs/Changelog.md"];
+    const searchMock = vi.fn().mockResolvedValue({ ok: true, value: candidates });
     const options = makeOptions({ cli: mockCLI({ search: searchMock }) });
 
     const result = await resolveWikilink("changelog", options);
-    expect(result).toEqual({ ok: true, value: "docs/Changelog.md" });
+    expect(result).toEqual({
+      ok: true,
+      value: { resolvedPath: "docs/Changelog.md", candidates },
+    });
   });
 });

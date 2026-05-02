@@ -56,4 +56,5 @@ export interface ResolveOutput {
   readonly wikilink: string;
   readonly resolvedPath: string;
   readonly physicalPath: string;
+  readonly candidates: readonly string[];
 }

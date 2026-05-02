@@ -273,7 +273,10 @@ describe("LocalIndexTracker", () => {
       if (!result.ok) return;
 
       const resolved = await result.value.resolveWikilink("Note");
-      expect(resolved).toEqual({ ok: true, value: "notes/Note.md" });
+      expect(resolved).toEqual({
+        ok: true,
+        value: { resolvedPath: "notes/Note.md", candidates: ["notes/Note.md"] },
+      });
       expect(searchMock).toHaveBeenCalledWith("file:Note");
     });
   });

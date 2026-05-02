@@ -47,6 +47,14 @@ export interface VaultContext {
 }
 
 /**
+ * Result of wikilink resolution bundling the chosen path with all search candidates.
+ */
+export interface WikilinkResolution {
+  readonly resolvedPath: string;
+  readonly candidates: readonly string[];
+}
+
+/**
  * Output of `obs://` URI resolution, what the URI points to and where.
  */
 export interface ResolutionResult {
