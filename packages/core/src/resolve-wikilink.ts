@@ -50,6 +50,17 @@ async function globFallback(
 /** Cache key prefix to namespace wikilink entries from file content entries. */
 const CACHE_PREFIX = "wikilink::";
 
+/** Pick the best match from search results using Obsidian's basename-exact-match rule. */
+function pickExactMatch(candidates: readonly string[], normalizedName: string): string | undefined {
+  const target = normalizedName.toLowerCase();
+  const exact = candidates.filter(
+    (f) => path.basename(f, ".md").toLowerCase() === target,
+  );
+  if (exact.length === 0) return undefined;
+  if (exact.length === 1) return exact[0];
+  return exact.reduce((a, b) => (a.length <= b.length ? a : b));
+}
+
 /**
  * Resolve a bare wikilink name to a vault-relative path.
  */
@@ -72,12 +83,12 @@ export async function resolveWikilink(
   }
 
   if (options.mode === "full") {
-    const searchResult = await options.cli.search(`file:"${normalizedName}"`, { limit: 1 });
+    const searchResult = await options.cli.search(`file:${normalizedName}`);
     if (!searchResult.ok) return searchResult;
-    if (searchResult.value.length > 0) {
-      const resolved = searchResult.value[0];
-      options.cache.set(cacheKey, resolved);
-      return { ok: true, value: resolved };
+    const match = pickExactMatch(searchResult.value, normalizedName);
+    if (match !== undefined) {
+      options.cache.set(cacheKey, match);
+      return { ok: true, value: match };
     }
   }
 

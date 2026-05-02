@@ -16,7 +16,6 @@ describe("ObsidianCLIImpl", () => {
     vi.clearAllMocks();
     cli = new ObsidianCLIImpl({
       cliPath: "/usr/local/bin/obsidian",
-      vaultPath: "/vault",
       timeoutMs: 5000,
     });
   });
@@ -76,7 +75,7 @@ describe("ObsidianCLIImpl", () => {
       const result = await cli.search("query");
 
       expect(execCLIMock).toHaveBeenCalledWith(
-        ["search", "query", "format=json"],
+        ["search", "query=query", "format=json"],
         expect.any(Object),
       );
       expect(result).toEqual({ ok: true, value: ["note.md"] });
@@ -94,7 +93,7 @@ describe("ObsidianCLIImpl", () => {
       await cli.search("query", { path: "folder", limit: 10, contextLength: 5 });
 
       expect(execCLIMock).toHaveBeenCalledWith(
-        ["search", "query", "format=json", "path=folder", "limit=10", "context-length=5"],
+        ["search", "query=query", "format=json", "path=folder", "limit=10", "context-length=5"],
         expect.any(Object),
       );
     });
@@ -111,7 +110,7 @@ describe("ObsidianCLIImpl", () => {
       const result = await cli.searchContext("query");
 
       expect(execCLIMock).toHaveBeenCalledWith(
-        ["search", "query", "format=json"],
+        ["search", "query=query", "format=json"],
         expect.any(Object),
       );
       expect(result).toEqual({ ok: true, value: matches });
@@ -126,7 +125,7 @@ describe("ObsidianCLIImpl", () => {
       await cli.searchContext("query", { path: "notes", limit: 5, contextLength: 3 });
 
       expect(execCLIMock).toHaveBeenCalledWith(
-        ["search", "query", "format=json", "path=notes", "limit=5", "context-length=3"],
+        ["search", "query=query", "format=json", "path=notes", "limit=5", "context-length=3"],
         expect.any(Object),
       );
     });

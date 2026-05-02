@@ -28,77 +28,115 @@ describe("resolveWikilink", () => {
   });
 
   it("resolves via CLI search in full mode", async () => {
-    const searchMock = vi.fn().mockResolvedValue({ ok: true, value: ["notes/Project Plan.md"] });
+    const searchMock = vi.fn().mockResolvedValue({ ok: true, value: ["docs/overview.md"] });
     const options = makeOptions({ cli: mockCLI({ search: searchMock }) });
-    const result = await resolveWikilink("Project Plan", options);
-    expect(result).toEqual({ ok: true, value: "notes/Project Plan.md" });
-    expect(searchMock).toHaveBeenCalledWith('file:"Project Plan"', { limit: 1 });
+    const result = await resolveWikilink("overview", options);
+    expect(result).toEqual({ ok: true, value: "docs/overview.md" });
+    expect(searchMock).toHaveBeenCalledWith("file:overview");
+  });
+
+  it("picks exact basename match from multiple search results", async () => {
+    const searchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      value: [
+        "archive/legacy/overview-draft.md",
+        "docs/overview.md",
+        "ref/overview-v2.md",
+      ],
+    });
+    const options = makeOptions({ cli: mockCLI({ search: searchMock }) });
+
+    const result = await resolveWikilink("overview", options);
+    expect(result).toEqual({ ok: true, value: "docs/overview.md" });
+  });
+
+  it("prefers shortest path when multiple exact basename matches exist", async () => {
+    const searchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      value: ["deep/nested/folder/readme.md", "docs/readme.md"],
+    });
+    const options = makeOptions({ cli: mockCLI({ search: searchMock }) });
+
+    const result = await resolveWikilink("readme", options);
+    expect(result).toEqual({ ok: true, value: "docs/readme.md" });
+  });
+
+  it("falls back to glob when no exact basename match in search results", async () => {
+    const searchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      value: ["archive/setup-guide.md"],
+    });
+    readdirMock.mockResolvedValueOnce(["sub/setup.md"]);
+    const options = makeOptions({ cli: mockCLI({ search: searchMock }) });
+
+    const result = await resolveWikilink("setup", options);
+    expect(result).toEqual({ ok: true, value: "sub/setup.md" });
   });
 
   it("caches result and returns from cache on second call", async () => {
-    const searchMock = vi.fn().mockResolvedValue({ ok: true, value: ["notes/Note.md"] });
+    const searchMock = vi.fn().mockResolvedValue({ ok: true, value: ["docs/config.md"] });
     const options = makeOptions({ cli: mockCLI({ search: searchMock }) });
 
-    await resolveWikilink("Note", options);
+    await resolveWikilink("config", options);
     searchMock.mockClear();
 
-    const result = await resolveWikilink("Note", options);
-    expect(result).toEqual({ ok: true, value: "notes/Note.md" });
+    const result = await resolveWikilink("config", options);
+    expect(result).toEqual({ ok: true, value: "docs/config.md" });
     expect(searchMock).not.toHaveBeenCalled();
   });
 
   it("falls back to glob when CLI returns empty", async () => {
-    readdirMock.mockResolvedValueOnce(["sub/Note.md"]);
+    readdirMock.mockResolvedValueOnce(["sub/deploy.md"]);
     const options = makeOptions();
 
-    const result = await resolveWikilink("Note", options);
-    expect(result).toEqual({ ok: true, value: "sub/Note.md" });
+    const result = await resolveWikilink("deploy", options);
+    expect(result).toEqual({ ok: true, value: "sub/deploy.md" });
   });
 
   it("resolves via glob in degraded mode", async () => {
-    readdirMock.mockResolvedValueOnce(["folder/My Note.md"]);
+    readdirMock.mockResolvedValueOnce(["folder/getting-started.md"]);
     const options = makeOptions({ mode: "degraded" });
 
-    const result = await resolveWikilink("My Note", options);
-    expect(result).toEqual({ ok: true, value: "folder/My Note.md" });
+    const result = await resolveWikilink("getting-started", options);
+    expect(result).toEqual({ ok: true, value: "folder/getting-started.md" });
   });
 
   it("respects allowedFolders in glob", async () => {
-    readdirMock.mockResolvedValueOnce(["deep/Note.md"]);
+    readdirMock.mockResolvedValueOnce(["deep/changelog.md"]);
     const options = makeOptions({
       mode: "degraded",
       allowedFolders: ["notes"],
     });
 
-    const result = await resolveWikilink("Note", options);
-    expect(result).toEqual({ ok: true, value: "notes/deep/Note.md" });
+    const result = await resolveWikilink("changelog", options);
+    expect(result).toEqual({ ok: true, value: "notes/deep/changelog.md" });
   });
 
   it("strips .md extension from input", async () => {
-    const searchMock = vi.fn().mockResolvedValue({ ok: true, value: ["notes/Note.md"] });
+    const searchMock = vi.fn().mockResolvedValue({ ok: true, value: ["docs/faq.md"] });
     const options = makeOptions({ cli: mockCLI({ search: searchMock }) });
 
-    await resolveWikilink("Note.md", options);
-    expect(searchMock).toHaveBeenCalledWith('file:"Note"', { limit: 1 });
+    await resolveWikilink("faq.md", options);
+    expect(searchMock).toHaveBeenCalledWith("file:faq");
   });
 
   it("trims whitespace from input", async () => {
-    const searchMock = vi.fn().mockResolvedValue({ ok: true, value: ["notes/Note.md"] });
+    const searchMock = vi.fn().mockResolvedValue({ ok: true, value: ["docs/glossary.md"] });
     const options = makeOptions({ cli: mockCLI({ search: searchMock }) });
 
-    await resolveWikilink("  Note  ", options);
-    expect(searchMock).toHaveBeenCalledWith('file:"Note"', { limit: 1 });
+    await resolveWikilink("  glossary  ", options);
+    expect(searchMock).toHaveBeenCalledWith("file:glossary");
   });
 
   it("returns FILE_NOT_FOUND when no match", async () => {
     readdirMock.mockResolvedValueOnce([]);
     const options = makeOptions();
 
-    const result = await resolveWikilink("Nonexistent", options);
+    const result = await resolveWikilink("nonexistent", options);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("FILE_NOT_FOUND");
-      expect(result.error.message).toContain("Nonexistent");
+      expect(result.error.message).toContain("nonexistent");
     }
   });
 
@@ -109,17 +147,17 @@ describe("resolveWikilink", () => {
     });
     const options = makeOptions({ cli: mockCLI({ search: searchMock }) });
 
-    const result = await resolveWikilink("Note", options);
+    const result = await resolveWikilink("target", options);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("CLI_ERROR");
   });
 
   it("matches case-insensitively in glob", async () => {
-    readdirMock.mockResolvedValueOnce(["Project Plan.md"]);
+    readdirMock.mockResolvedValueOnce(["Roadmap.md"]);
     const options = makeOptions({ mode: "degraded" });
 
-    const result = await resolveWikilink("project plan", options);
-    expect(result).toEqual({ ok: true, value: "Project Plan.md" });
+    const result = await resolveWikilink("roadmap", options);
+    expect(result).toEqual({ ok: true, value: "Roadmap.md" });
   });
 
   it("returns FILE_NOT_FOUND for empty name", async () => {
@@ -133,7 +171,7 @@ describe("resolveWikilink", () => {
     readdirMock.mockRejectedValueOnce(new Error("EACCES"));
     const options = makeOptions({ mode: "degraded" });
 
-    const result = await resolveWikilink("Note", options);
+    const result = await resolveWikilink("target", options);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("FILE_NOT_FOUND");
   });
@@ -143,5 +181,16 @@ describe("resolveWikilink", () => {
     const result = await resolveWikilink("   ", options);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("FILE_NOT_FOUND");
+  });
+
+  it("matches basename case-insensitively in search results", async () => {
+    const searchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      value: ["docs/Changelog.md"],
+    });
+    const options = makeOptions({ cli: mockCLI({ search: searchMock }) });
+
+    const result = await resolveWikilink("changelog", options);
+    expect(result).toEqual({ ok: true, value: "docs/Changelog.md" });
   });
 });

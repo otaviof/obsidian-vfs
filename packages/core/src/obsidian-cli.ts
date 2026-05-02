@@ -49,7 +49,7 @@ export class ObsidianCLIImpl implements ObsidianCLI {
     opts?: { path?: string; limit?: number; contextLength?: number },
   ): Promise<VFSResult<string[]>> {
     return this.#queue.enqueue(async () => {
-      const args = ["search", query, "format=json", ...this.#buildSearchOpts(opts)];
+      const args = ["search", `query=${query}`, "format=json", ...this.#buildSearchOpts(opts)];
       const result = await execCLI(args, this.#options);
       if (!result.ok) return result;
       return parseSearchFiles(result.value.stdout, args.join(" "));
@@ -62,7 +62,7 @@ export class ObsidianCLIImpl implements ObsidianCLI {
     opts?: { path?: string; limit?: number; contextLength?: number },
   ): Promise<VFSResult<SearchMatch[]>> {
     return this.#queue.enqueue(async () => {
-      const args = ["search", query, "format=json", ...this.#buildSearchOpts(opts)];
+      const args = ["search", `query=${query}`, "format=json", ...this.#buildSearchOpts(opts)];
       const result = await execCLI(args, this.#options);
       if (!result.ok) return result;
       return parseSearchJSON(result.value.stdout, args.join(" "));

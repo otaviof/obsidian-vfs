@@ -31,7 +31,6 @@ describe("execCLI", () => {
   const baseOptions: CLIExecOptions = {
     timeoutMs: 5000,
     cliPath: "/usr/local/bin/obsidian-cli",
-    vaultPath: "/vault",
   };
 
   beforeEach(() => {
@@ -103,7 +102,7 @@ describe("execCLI", () => {
     expect(execFileMock).toHaveBeenCalledWith(
       "/usr/local/bin/obsidian-cli",
       ["search", "query", "format=json"],
-      expect.objectContaining({ cwd: "/vault" }),
+      expect.objectContaining({ signal: expect.any(AbortSignal) as AbortSignal }),
       expect.any(Function),
     );
   });

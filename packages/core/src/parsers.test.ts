@@ -169,6 +169,12 @@ describe("parsers", () => {
   });
 
   describe("parseSearchFiles", () => {
+    it("parses plain string[] from Obsidian CLI", () => {
+      const input = ["note.md", "other.md"];
+      const result = parseSearchFiles(JSON.stringify(input), "search query");
+      expect(result).toEqual({ ok: true, value: ["note.md", "other.md"] });
+    });
+
     it("extracts file paths from SearchMatch JSON", () => {
       const input: SearchMatch[] = [
         { file: "note.md", matches: [{ line: 1, text: "hello" }] },
@@ -182,7 +188,7 @@ describe("parsers", () => {
       const result = parseSearchFiles('{"file":"note.md"}', "search query");
       expect(result).toEqual({
         ok: false,
-        error: { code: "PARSE_ERROR", message: "Expected SearchMatch[]", command: "search query" },
+        error: { code: "PARSE_ERROR", message: "Expected JSON array", command: "search query" },
       });
     });
 
@@ -190,7 +196,11 @@ describe("parsers", () => {
       const result = parseSearchFiles('[{"path":"note.md"}]', "search query");
       expect(result).toEqual({
         ok: false,
-        error: { code: "PARSE_ERROR", message: "Expected SearchMatch[]", command: "search query" },
+        error: {
+          code: "PARSE_ERROR",
+          message: "Expected string[] or SearchMatch[]",
+          command: "search query",
+        },
       });
     });
 

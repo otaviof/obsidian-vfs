@@ -274,7 +274,7 @@ describe("LocalIndexTracker", () => {
 
       const resolved = await result.value.resolveWikilink("Note");
       expect(resolved).toEqual({ ok: true, value: "notes/Note.md" });
-      expect(searchMock).toHaveBeenCalledWith('file:"Note"', { limit: 1 });
+      expect(searchMock).toHaveBeenCalledWith("file:Note");
     });
   });
 

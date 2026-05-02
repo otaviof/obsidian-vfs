@@ -6,12 +6,11 @@ import type { VFSResult } from "./types.js";
 const execFile = promisify(execFileCb);
 
 /**
- * Options for CLI execution. Timeout, binary path, and vault working directory.
+ * Options for CLI execution. Timeout and binary path.
  */
 export interface CLIExecOptions {
   readonly timeoutMs: number;
   readonly cliPath: string;
-  readonly vaultPath: string;
 }
 
 /**
@@ -36,7 +35,6 @@ export async function execCLI(
   try {
     const { stdout, stderr } = await execFile(options.cliPath, [...args], {
       signal: ac.signal,
-      cwd: options.vaultPath,
     });
     return { ok: true, value: { stdout, stderr } };
   } catch (err: unknown) {

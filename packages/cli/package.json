@@ -1,0 +1,25 @@
+{
+  "name": "@obsidian-vfs/cli",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "obsidian-vfs": "./dist/main.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/main.d.ts",
+      "import": "./dist/main.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm exec tsc -b",
+    "clean": "pnpm exec tsc -b --clean"
+  },
+  "dependencies": {
+    "@obsidian-vfs/core": "workspace:*"
+  }
+}

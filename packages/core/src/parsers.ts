@@ -108,8 +108,13 @@ export function parseBacklinksJSON(stdout: string, command: string): VFSResult<B
   }
 }
 
+function isStringArray(v: unknown): v is string[] {
+  return Array.isArray(v) && v.every((item) => typeof item === "string");
+}
+
 /**
- * Parses stdout as JSON array of SearchMatch, then extracts file paths.
+ * Parses stdout as JSON array of file paths. Accepts both a plain string[]
+ * (actual Obsidian CLI output) and a SearchMatch[] (extracts the file field).
  */
 export function parseSearchFiles(stdout: string, command: string): VFSResult<string[]> {
   const err: VFSResult<string[]> | undefined = detectCLIError<string[]>(stdout, command);
@@ -117,14 +122,22 @@ export function parseSearchFiles(stdout: string, command: string): VFSResult<str
 
   try {
     const parsed: unknown = JSON.parse(stdout);
-    if (!Array.isArray(parsed) || !parsed.every(isSearchMatch)) {
+    if (!Array.isArray(parsed)) {
       return {
         ok: false,
-        error: { code: "PARSE_ERROR", message: "Expected SearchMatch[]", command },
+        error: { code: "PARSE_ERROR", message: "Expected JSON array", command },
       };
     }
-    const files = parsed.map((m) => m.file);
-    return { ok: true, value: files };
+    if (isStringArray(parsed)) {
+      return { ok: true, value: parsed };
+    }
+    if (parsed.every(isSearchMatch)) {
+      return { ok: true, value: parsed.map((m) => m.file) };
+    }
+    return {
+      ok: false,
+      error: { code: "PARSE_ERROR", message: "Expected string[] or SearchMatch[]", command },
+    };
   } catch {
     return {
       ok: false,
