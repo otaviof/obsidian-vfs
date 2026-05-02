@@ -42,3 +42,4 @@ When adding a new generated or vendored directory, add it to all three files.
 - **Mutations through CLI** — `create`, `rename`, `move`, `delete` via CLI to preserve wikilinks.
 - **Degraded mode** (Obsidian not running) — reads and enumeration work via `node:fs`; search, wikilink resolution, mutations unavailable.
 - **Security** — `path.resolve` + vault-root prefix check on all I/O. Reject symlinks outside vault. `allowedFolders` enforced on all operations including plugin context injection.
+- **JSDoc** — Every exported class, interface, type, and function must have a `/** … */` comment. Keep it to one sentence describing *what*, not *how*. Exported methods on classes/interfaces also require a one-line `/** … */`.

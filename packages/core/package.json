@@ -15,5 +15,8 @@
   "scripts": {
     "build": "pnpm exec tsc -b",
     "clean": "pnpm exec tsc -b --clean"
+  },
+  "devDependencies": {
+    "vitest": "^4.0.0"
   }
 }
