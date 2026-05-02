@@ -1,6 +1,6 @@
 {
   "name": "obsidian-vfs",
   "version": "0.0.0",
-  "description": "Resolve @obs: mentions from your Obsidian vault into Claude Code context",
-  "hooks": "./hooks/hooks.json"
+  "description": "Resolve @obs: mentions and Skills from your Obsidian vault into Claude Code context",
+  "hooks": "../hooks/hooks.json"
 }

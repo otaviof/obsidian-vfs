@@ -99,6 +99,10 @@ pnpm build
 # Next prompt in Claude Code uses the updated hook handler
 ```
 
+### Known issues
+
+- **`IS_DEMO=1` disables hooks.** If this environment variable is set in `~/.claude/settings.json` (or exported), all hooks — including the `@obs:` resolver — are silently blocked. Remove it or set `IS_DEMO=0` to restore hook execution.
+
 ## Environment Variables
 
 | Variable | Purpose | Default |
