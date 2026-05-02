@@ -1,41 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ObsidianCLI } from "./cli.js";
 import { LocalIndexTracker } from "./local-index-tracker.js";
+import { mockCLI } from "./test-helpers.js";
 
 vi.mock("node:fs/promises", () => ({
   readFile: vi.fn(),
   realpath: vi.fn(),
+  access: vi.fn(),
+  readdir: vi.fn(),
+  stat: vi.fn(),
 }));
 
 const { readFile, realpath } = await import("node:fs/promises");
 const readFileMock = vi.mocked(readFile as unknown as (...args: unknown[]) => Promise<unknown>);
 const realpathMock = vi.mocked(realpath as unknown as (...args: unknown[]) => Promise<unknown>);
-
-function mockCLI(overrides: Partial<ObsidianCLI> = {}): ObsidianCLI {
-  return {
-    vaultPath: vi.fn().mockResolvedValue({ ok: true, value: "/vault" }),
-    vaultName: vi.fn().mockResolvedValue({ ok: true, value: "TestVault" }),
-    isAvailable: vi.fn().mockResolvedValue(true),
-    search: vi.fn(),
-    searchContext: vi.fn(),
-    files: vi.fn(),
-    folders: vi.fn(),
-    backlinks: vi.fn(),
-    links: vi.fn(),
-    create: vi.fn(),
-    rename: vi.fn(),
-    move: vi.fn(),
-    delete: vi.fn(),
-    append: vi.fn(),
-    prepend: vi.fn(),
-    open: vi.fn(),
-    dailyPath: vi.fn(),
-    tags: vi.fn(),
-    propertyRead: vi.fn(),
-    ...overrides,
-  };
-}
 
 describe("LocalIndexTracker", () => {
   beforeEach(() => {
@@ -283,6 +261,110 @@ describe("LocalIndexTracker", () => {
       expect(tracker.cache.has("/vault/a.md")).toBe(false);
       expect(tracker.cache.has("/vault/b.md")).toBe(true);
       expect(tracker.cache.has("/vault/c.md")).toBe(true);
+    });
+  });
+
+  describe("resolveWikilink", () => {
+    it("delegates to resolveWikilink with correct options", async () => {
+      const searchMock = vi.fn().mockResolvedValue({ ok: true, value: ["notes/Note.md"] });
+      const cli = mockCLI({ search: searchMock });
+      const result = await LocalIndexTracker.create(cli);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const resolved = await result.value.resolveWikilink("Note");
+      expect(resolved).toEqual({ ok: true, value: "notes/Note.md" });
+      expect(searchMock).toHaveBeenCalledWith('file:"Note"', { limit: 1 });
+    });
+  });
+
+  describe("resolveAgent", () => {
+    it("delegates to resolveResource with agentsDirs", async () => {
+      readFileMock.mockImplementation((...args: unknown[]) => {
+        if (args[1] === "utf-8") {
+          return Promise.resolve(JSON.stringify({ agentsDirs: ["agents"], allowedFolders: [] }));
+        }
+        return Promise.reject(new Error("unexpected"));
+      });
+      const { access } = await import("node:fs/promises");
+      const accessMock = vi.mocked(access as unknown as (...args: unknown[]) => Promise<unknown>);
+      accessMock.mockResolvedValueOnce(undefined);
+
+      const result = await LocalIndexTracker.create(mockCLI());
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const resolved = await result.value.resolveAgent("architect");
+      expect(resolved).toEqual({ ok: true, value: "agents/architect.md" });
+    });
+  });
+
+  describe("resolveSkill", () => {
+    it("delegates to resolveResource with skillsDirs", async () => {
+      readFileMock.mockImplementation((...args: unknown[]) => {
+        if (args[1] === "utf-8") {
+          return Promise.resolve(JSON.stringify({ skillsDirs: ["skills"], allowedFolders: [] }));
+        }
+        return Promise.reject(new Error("unexpected"));
+      });
+      const { access } = await import("node:fs/promises");
+      const accessMock = vi.mocked(access as unknown as (...args: unknown[]) => Promise<unknown>);
+      accessMock.mockResolvedValueOnce(undefined);
+
+      const result = await LocalIndexTracker.create(mockCLI());
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const resolved = await result.value.resolveSkill("my-skill");
+      expect(resolved).toEqual({ ok: true, value: "skills/my-skill.md" });
+    });
+  });
+
+  describe("readDirectory", () => {
+    it("delegates with security options", async () => {
+      const { readdir } = await import("node:fs/promises");
+      const readdirMock = vi.mocked(readdir as unknown as (...args: unknown[]) => Promise<unknown>);
+      readdirMock.mockResolvedValueOnce([]);
+
+      const result = await LocalIndexTracker.create(mockCLI());
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const dirResult = await result.value.readDirectory(".");
+      expect(dirResult).toEqual({ ok: true, value: [] });
+    });
+  });
+
+  describe("stat", () => {
+    it("delegates with security options", async () => {
+      const { stat } = await import("node:fs/promises");
+      const statMock = vi.mocked(stat as unknown as (...args: unknown[]) => Promise<unknown>);
+      statMock.mockResolvedValueOnce({
+        isDirectory: () => false,
+        mtimeMs: 1000,
+        ctimeMs: 2000,
+        size: 42,
+      });
+
+      const result = await LocalIndexTracker.create(mockCLI());
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const statResult = await result.value.stat("notes/foo.md");
+      expect(statResult).toEqual({
+        ok: true,
+        value: { type: "file", mtime: 1000, ctime: 2000, size: 42 },
+      });
+    });
+  });
+
+  describe("watching", () => {
+    it("stores cli from create", async () => {
+      const cli = mockCLI();
+      const result = await LocalIndexTracker.create(cli);
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value.cli).toBe(cli);
     });
   });
 });

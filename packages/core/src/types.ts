@@ -54,3 +54,36 @@ export interface ResolutionResult {
   resolvedPath: string;
   vaultName: string;
 }
+
+/**
+ * Cleanup handle for subscriptions and watchers.
+ */
+export interface Disposable {
+  dispose(): void;
+}
+
+/**
+ * Filesystem entry type for directory enumeration.
+ */
+export type VFSFileType = "file" | "directory";
+
+/**
+ * File metadata matching the shape VSCode FileStat needs.
+ */
+export interface VFSFileStat {
+  readonly type: VFSFileType;
+  readonly mtime: number;
+  readonly ctime: number;
+  readonly size: number;
+}
+
+/**
+ * Output of `@obs:` mention resolution with full content payload.
+ */
+export interface MentionResult {
+  readonly targetType: "file" | "agent" | "skill";
+  readonly resolvedPath: string;
+  readonly vaultName: string;
+  readonly content: string;
+  readonly section?: string;
+}

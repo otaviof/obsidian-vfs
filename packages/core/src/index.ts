@@ -7,11 +7,15 @@ export type { BacklinkEntry, ObsidianCLI, SearchMatch } from "./cli.js";
  * Foundational data structures: error codes, result union, config, and resolution.
  */
 export type {
+  Disposable,
   ErrorCode,
+  MentionResult,
   ResolutionResult,
   VaultContext,
   VFSConfig,
   VFSError,
+  VFSFileStat,
+  VFSFileType,
   VFSResult,
 } from "./types.js";
 
@@ -31,6 +35,21 @@ export type { PathSecurityOptions } from "./path-security.js";
 export type { LocalIndexTrackerOptions } from "./local-index-tracker.js";
 
 /**
+ * Content transformation options.
+ */
+export type { ContentSliceOptions } from "./content-slice.js";
+
+/**
+ * Wikilink resolution parameters.
+ */
+export type { ResolveWikilinkOptions } from "./resolve-wikilink.js";
+
+/**
+ * File watcher event types.
+ */
+export type { FileChangeEvent, FileChangeListener, FileChangeType } from "./file-watcher.js";
+
+/**
  * Concrete implementations — CLI wrapper and async queue.
  */
 export { ObsidianCLIImpl } from "./obsidian-cli.js";
@@ -44,3 +63,13 @@ export { parseObsUri, buildObsUri } from "./uri.js";
 export { validateVFSConfig } from "./vfs-config.js";
 export { readVirtualFile } from "./read-file.js";
 export { LocalIndexTracker } from "./local-index-tracker.js";
+
+/**
+ * Modules: resolution, content processing, watching, enumeration.
+ */
+export { resolveWikilink } from "./resolve-wikilink.js";
+export { resolveResource } from "./resolve-resource.js";
+export { sliceContent, scrubWikilinks, processContent } from "./content-slice.js";
+export { VaultFileWatcher } from "./file-watcher.js";
+export { readDirectory, statVirtualFile } from "./fs-enumeration.js";
+export { resolveMention } from "./resolve-mention.js";
