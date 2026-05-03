@@ -8,7 +8,7 @@ Read-only virtual filesystem exposing an [Obsidian](https://obsidian.md) vault v
 |---------|-------------|
 | `packages/core` | `obs://` URI resolution, LRU cache, Obsidian CLI wrapper, direct file reads via `node:fs` |
 | `packages/vscode` | VS Code `FileSystemProvider` for `obs://` — reads from disk, mutations through CLI |
-| `packages/claude-plugin` | Agent SDK plugin resolving `@obs:` mentions into context via `UserPromptSubmit` hook |
+| `packages/claude-plugin` | Agent SDK plugin resolving `@obs:` and `/obs:` mentions into context via `UserPromptSubmit` hook |
 | `packages/cli` | `npx obsidian-vfs` diagnostics — `inspect`, `resolve`, `status` |
 
 The consumer packages (`vscode`, `claude-plugin`, `cli`) depend on `core` but have no cross-dependencies between each other.
@@ -38,13 +38,15 @@ pnpm cli --help
 The vault is discovered automatically by the Obsidian CLI:
 
 ```sh
-# Resolve a wikilink to its vault path
+# Resolve a wikilink or /obs: skill to its vault path
 pnpm cli resolve "Project Plan"
 pnpm cli resolve "[[Project Plan]]"
+pnpm cli resolve "/obs:obsidian"
 
-# Inspect an @obs: mention (shows resolved path, target type, and content)
+# Inspect an @obs: or /obs: mention (shows resolved path, target type, and content)
 pnpm cli inspect "architect"
 pnpm cli inspect "10-projects/plan.md#Architecture"
+pnpm cli inspect "/obs:obsidian"
 
 # Machine-readable output
 pnpm cli resolve "Note" --json
@@ -61,20 +63,28 @@ The `resolve` command uses the Obsidian CLI's `search` with `file:<name>` to fin
 
 ## Claude Plugin
 
-The Claude Code plugin intercepts every `UserPromptSubmit` hook, scans for `@obs:` mentions, resolves each through the vault, and injects the content as `additionalContext`.
+The Claude Code plugin intercepts every `UserPromptSubmit` hook, scans for `@obs:` and `/obs:` mentions, resolves each through the vault, and injects the content as `additionalContext`.
 
 ### Usage
 
-Reference vault files in any Claude Code prompt using the `@obs:` prefix:
+Two mention syntaxes are supported:
+
+**`@obs:` — context mentions** resolve through the full chain: agents, skills, files, then wikilinks.
 
 ```
 @obs:architect                     # Agent by name (from agentsDirs)
 @obs:10-projects/plan.md           # File by vault-relative path
 @obs:plan.md#Architecture          # Section within a file
-@obs:my-skill                      # Skill by name (from skillsDirs)
 ```
 
-Mentions inside fenced code blocks (`` ``` ``) and inline code (`` ` ``) are ignored. Duplicate mentions are resolved once. Failed resolutions appear as error messages in context rather than crashing.
+**`/obs:` — skill mentions** always resolve as a skill. No fallback to agents, files, or wikilinks.
+
+```
+/obs:obsidian                      # Skill by name (from skillsDirs)
+/obs:obsidian#Usage                # Section within a skill
+```
+
+Mentions inside fenced code blocks and inline code are ignored. Duplicate mentions are resolved once; `@obs:X` and `/obs:X` with the same name resolve independently. Failed resolutions appear as error messages in context rather than crashing.
 
 ### Installation
 
@@ -127,7 +137,7 @@ Place a JSON file at `.obsidian/obsidian-vfs.json` inside your vault to configur
 | Field | Type | Description |
 |-------|------|-------------|
 | `agentsDirs` | `string[]` | Vault-relative folders containing agent definitions. Used by `inspect` to resolve agent mentions. |
-| `skillsDirs` | `string[]` | Vault-relative folders containing skill definitions. Used by `inspect` to resolve skill mentions. |
+| `skillsDirs` | `string[]` | Vault-relative folders containing skill definitions (`name/SKILL.md`). Used by `/obs:` mentions and `@obs:` fallback. |
 | `allowedFolders` | `string[]` | Restrict all read operations to these vault-relative folders. Empty means no restriction (full vault access). |
 
 If the file is missing or empty (`{}`), the VFS operates with defaults (no agent/skill directories, full vault access).

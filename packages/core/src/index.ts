@@ -79,4 +79,10 @@ export { resolveResource, resolveSkillResource } from "./resolve-resource.js";
 export { sliceContent, scrubWikilinks, processContent } from "./content-slice.js";
 export { VaultFileWatcher } from "./file-watcher.js";
 export { readDirectory, statVirtualFile } from "./fs-enumeration.js";
-export { resolveMention } from "./resolve-mention.js";
+export {
+  MENTION_PREFIX,
+  SKILL_PREFIX,
+  parseSection,
+  resolveMention,
+  resolveSkillMention,
+} from "./resolve-mention.js";

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LocalIndexTracker } from "./local-index-tracker.js";
-import { resolveMention } from "./resolve-mention.js";
+import { parseSection, resolveMention, resolveSkillMention } from "./resolve-mention.js";
 import { mockCLI } from "./test-helpers.js";
 
 vi.mock("node:fs/promises", () => ({
@@ -265,5 +265,101 @@ describe("resolveMention", () => {
     const result = await resolveMention("@obs:notes/gone.md", tracker);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("FILE_NOT_FOUND");
+  });
+});
+
+describe("parseSection", () => {
+  it("returns full string as namePart when no hash", () => {
+    expect(parseSection("obsidian")).toEqual({ namePart: "obsidian", section: undefined });
+  });
+
+  it("splits on first hash", () => {
+    expect(parseSection("obsidian#Usage")).toEqual({ namePart: "obsidian", section: "Usage" });
+  });
+
+  it("treats empty section as undefined", () => {
+    expect(parseSection("obsidian#")).toEqual({ namePart: "obsidian", section: undefined });
+  });
+
+  it("handles path with hash", () => {
+    expect(parseSection("notes/plan.md#Design")).toEqual({
+      namePart: "notes/plan.md",
+      section: "Design",
+    });
+  });
+});
+
+describe("resolveSkillMention", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    realpathMock.mockImplementation((...args: unknown[]) => Promise.resolve(args[0]));
+    readdirMock.mockResolvedValue([]);
+  });
+
+  it("returns INVALID_URI on missing /obs: prefix", async () => {
+    const tracker = await createTracker({ skillsDirs: ["skills"] });
+    const result = await resolveSkillMention("@obs:obsidian", tracker);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("INVALID_URI");
+  });
+
+  it("returns INVALID_URI on empty reference", async () => {
+    const tracker = await createTracker({ skillsDirs: ["skills"] });
+    const result = await resolveSkillMention("/obs:", tracker);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("INVALID_URI");
+  });
+
+  it("resolves /obs:obsidian as skill", async () => {
+    accessMock.mockResolvedValueOnce(undefined);
+    const tracker = await createTracker({ skillsDirs: ["skills"] });
+
+    readFileMock.mockResolvedValueOnce(Buffer.from("skill content"));
+
+    const result = await resolveSkillMention("/obs:obsidian", tracker);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.targetType).toBe("skill");
+      expect(result.value.resolvedPath).toBe("skills/obsidian/SKILL.md");
+      expect(result.value.content).toContain("skill content");
+    }
+  });
+
+  it("extracts section from /obs: mention", async () => {
+    accessMock.mockResolvedValueOnce(undefined);
+    const tracker = await createTracker({ skillsDirs: ["skills"] });
+
+    readFileMock.mockResolvedValueOnce(
+      Buffer.from("# Overview\nIntro\n## Usage\nHow to use\n## Other"),
+    );
+
+    const result = await resolveSkillMention("/obs:obsidian#Usage", tracker);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.section).toBe("Usage");
+      expect(result.value.content).toContain("How to use");
+      expect(result.value.content).not.toContain("Intro");
+    }
+  });
+
+  it("returns error when skill not found (no wikilink fallback)", async () => {
+    const enoent = new Error("ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    accessMock.mockRejectedValueOnce(enoent);
+
+    const tracker = await createTracker({ skillsDirs: ["skills"] });
+
+    const result = await resolveSkillMention("/obs:missing", tracker);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("FILE_NOT_FOUND");
+    }
+  });
+
+  it("returns INVALID_URI for /obs:#section (empty path)", async () => {
+    const tracker = await createTracker({ skillsDirs: ["skills"] });
+    const result = await resolveSkillMention("/obs:#Heading", tracker);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("INVALID_URI");
   });
 });

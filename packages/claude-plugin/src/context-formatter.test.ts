@@ -3,8 +3,12 @@ import { describe, expect, it } from "vitest";
 import type { ExtractedMention, ResolvedMention } from "./types.js";
 import { formatContext } from "./context-formatter.js";
 
-function mention(raw: string, reference: string): ExtractedMention {
-  return { raw, reference, startIndex: 0, endIndex: raw.length };
+function mention(
+  raw: string,
+  reference: string,
+  kind: "context" | "skill" = "context",
+): ExtractedMention {
+  return { kind, raw, reference, startIndex: 0, endIndex: raw.length };
 }
 
 describe("formatContext", () => {
@@ -105,13 +109,15 @@ describe("formatContext", () => {
   it("uses correct type label for skill", () => {
     const resolved: ResolvedMention = {
       status: "resolved",
-      mention: mention("@obs:skill", "skill"),
+      mention: mention("/obs:skill", "skill", "skill"),
       targetType: "skill",
-      resolvedPath: "skills/skill.md",
+      resolvedPath: "skills/skill/SKILL.md",
       section: undefined,
       content: "Skill content",
     };
-    expect(formatContext([resolved])).toContain("(skill,");
+    const result = formatContext([resolved]);
+    expect(result).toContain("/obs:skill");
+    expect(result).toContain("(skill,");
   });
 
   it("renders mixed resolved and error mentions", () => {
@@ -133,5 +139,19 @@ describe("formatContext", () => {
     const result = formatContext(mentions);
     expect(result).toContain("Good content");
     expect(result).toContain("Error: Permission denied");
+  });
+
+  it("formats /obs: skill mention with correct raw prefix", () => {
+    const resolved: ResolvedMention = {
+      status: "resolved",
+      mention: mention("/obs:obsidian", "obsidian", "skill"),
+      targetType: "skill",
+      resolvedPath: "skills/obsidian/SKILL.md",
+      section: undefined,
+      content: "Obsidian skill content",
+    };
+    const result = formatContext([resolved]);
+    expect(result).toContain("--- /obs:obsidian (skill, skills/obsidian/SKILL.md) ---");
+    expect(result).toContain("Obsidian skill content");
   });
 });

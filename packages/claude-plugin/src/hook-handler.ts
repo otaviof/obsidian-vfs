@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 
-import { resolveMention } from "@obsidian-vfs/core";
+import {
+  MENTION_PREFIX,
+  SKILL_PREFIX,
+  resolveMention,
+  resolveSkillMention as coreResolveSkillMention,
+} from "@obsidian-vfs/core";
 import { resolveExecConfig } from "@obsidian-vfs/core";
 import type { LocalIndexTracker } from "@obsidian-vfs/core";
 
@@ -19,7 +24,7 @@ async function readStdin(): Promise<string> {
 }
 
 /** Parse stdin JSON into HookInput, returning null on invalid input. */
-function parseInput(raw: string): HookInput | null {
+export function parseInput(raw: string): HookInput | null {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw) as unknown;
@@ -44,12 +49,35 @@ function writeOutput(output: HookOutput): void {
   process.stdout.write(JSON.stringify(output) + "\n");
 }
 
+/** Resolve a `/obs:` mention as a skill via the core pipeline. */
+async function resolveSkillMention(
+  mention: ExtractedMention,
+  tracker: LocalIndexTracker,
+): Promise<ResolvedMention> {
+  const result = await coreResolveSkillMention(SKILL_PREFIX + mention.reference, tracker);
+  if (result.ok) {
+    return {
+      status: "resolved",
+      mention,
+      targetType: result.value.targetType,
+      resolvedPath: result.value.resolvedPath,
+      section: result.value.section,
+      content: result.value.content,
+    };
+  }
+  return { status: "error", mention, errorMessage: result.error.message };
+}
+
 /** Resolve one ExtractedMention through the tracker. */
 async function resolveSingleMention(
   mention: ExtractedMention,
   tracker: LocalIndexTracker,
 ): Promise<ResolvedMention> {
-  const fullMention = "@obs:" + mention.reference;
+  if (mention.kind === "skill") {
+    return resolveSkillMention(mention, tracker);
+  }
+
+  const fullMention = MENTION_PREFIX + mention.reference;
   const result = await resolveMention(fullMention, tracker);
 
   if (result.ok) {

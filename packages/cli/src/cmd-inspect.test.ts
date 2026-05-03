@@ -4,6 +4,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { InspectArgs } from "./types.js";
 import { EXIT_ERROR, EXIT_SUCCESS } from "./types.js";
 
+vi.mock("@obsidian-vfs/core", async () => {
+  const actual = await vi.importActual("@obsidian-vfs/core");
+  return { ...actual, resolveSkillMention: vi.fn() };
+});
+
 vi.mock("./bootstrap.js", () => ({
   bootstrapTracker: vi.fn(),
 }));
@@ -19,6 +24,7 @@ vi.mock("./formatters.js", () => ({
   writeStderr: vi.fn(),
 }));
 
+import { resolveSkillMention } from "@obsidian-vfs/core";
 import { bootstrapTracker } from "./bootstrap.js";
 import {
   formatError,
@@ -31,6 +37,7 @@ import {
 import { run } from "./cmd-inspect.js";
 
 const mockBootstrap = vi.mocked(bootstrapTracker);
+const mockResolveSkillMention = vi.mocked(resolveSkillMention);
 const mockWriteStdout = vi.mocked(writeStdout);
 const mockWriteStderr = vi.mocked(writeStderr);
 const mockFormatInspectResult = vi.mocked(formatInspectResult);
@@ -65,7 +72,7 @@ function makeTracker(resolveMentionResult: VFSResult<MentionResult>) {
   const resolveMention = vi.fn<LocalIndexTracker["resolveMention"]>();
   resolveMention.mockResolvedValue(resolveMentionResult);
   const tracker = {
-    context: { physicalPath: "/Users/me/vault" },
+    context: { physicalPath: "/Users/me/vault", name: "My Vault" },
     resolveMention,
   } as unknown as LocalIndexTracker;
   return { tracker, resolveMention };
@@ -219,5 +226,46 @@ describe("cmd-inspect", () => {
       }),
       expect.any(Object),
     );
+  });
+
+  it("resolves /obs: mention as skill via resolveSkillMention", async () => {
+    const { tracker, resolveMention } = makeTracker({ ok: true, value: makeMentionResult() });
+    mockResolveSkillMention.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        targetType: "skill",
+        resolvedPath: "skills/obsidian/SKILL.md",
+        vaultName: "My Vault",
+        content: "Skill content",
+        section: undefined,
+      },
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    const code = await run(makeArgs({ mention: "/obs:obsidian" }));
+
+    expect(code).toBe(EXIT_SUCCESS);
+    expect(resolveMention).not.toHaveBeenCalled();
+    expect(mockResolveSkillMention).toHaveBeenCalledWith("/obs:obsidian", tracker);
+    expect(mockFormatInspectResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        targetType: "skill",
+        resolvedPath: "skills/obsidian/SKILL.md",
+      }),
+      expect.any(Object),
+    );
+  });
+
+  it("returns EXIT_ERROR when /obs: skill not found", async () => {
+    const { tracker } = makeTracker({ ok: true, value: makeMentionResult() });
+    mockResolveSkillMention.mockResolvedValueOnce({
+      ok: false,
+      error: { code: "FILE_NOT_FOUND", message: "Skill not found: missing" },
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    const code = await run(makeArgs({ mention: "/obs:missing" }));
+
+    expect(code).toBe(EXIT_ERROR);
   });
 });

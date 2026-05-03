@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { MENTION_PREFIX, SKILL_PREFIX } from "@obsidian-vfs/core";
 import type { VFSError } from "@obsidian-vfs/core";
 
 import type { ResolveArgs, ResolveOutput } from "./types.js";
@@ -28,12 +29,6 @@ function normalizeWikilink(input: string): string {
   }
   return cleaned.trim();
 }
-
-/** Prefix that identifies an @obs: mention. */
-const MENTION_PREFIX = "@obs:";
-
-/** Prefix that identifies a /obs: skill reference. */
-const SKILL_PREFIX = "/obs:";
 
 /** Classify the input reference type. */
 function classifyInput(raw: string): "mention" | "skill" | "wikilink" {

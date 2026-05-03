@@ -107,8 +107,8 @@ export function formatInspectJSON(
 export function formatResolveResult(output: ResolveOutput): string {
   return [
     labelLine("Wikilink", `"${output.wikilink}"`),
-    labelLine("Vault Path", `"${output.resolvedPath}"`),
-    labelLine("Physical Path", `"${output.physicalPath}"`),
+    labelLine("Vault-Path", `"${output.resolvedPath}"`),
+    labelLine("Physical-Path", `"${output.physicalPath}"`),
   ].join("\n");
 }
 

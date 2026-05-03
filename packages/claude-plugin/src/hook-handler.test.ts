@@ -6,23 +6,28 @@ vi.mock("@obsidian-vfs/core", () => {
     LocalIndexTracker: {
       create: vi.fn(),
     },
+    MENTION_PREFIX: "@obs:",
+    SKILL_PREFIX: "/obs:",
     resolveMention: vi.fn(),
+    resolveSkillMention: vi.fn(),
     resolveExecConfig: vi.fn().mockReturnValue({ cliPath: "obsidian", timeoutMs: 10_000 }),
     DEFAULT_CLI_PATH: "obsidian",
     DEFAULT_TIMEOUT_MS: 10_000,
   };
 });
 
-import { LocalIndexTracker, resolveMention } from "@obsidian-vfs/core";
+import { LocalIndexTracker, resolveMention, resolveSkillMention } from "@obsidian-vfs/core";
 import type { MentionResult, VFSResult } from "@obsidian-vfs/core";
 
 import { extractMentions } from "./mention-extractor.js";
 import { formatContext } from "./context-formatter.js";
 import { bootstrapTracker } from "./bootstrap.js";
+import { parseInput } from "./hook-handler.js";
 
 // eslint-disable-next-line @typescript-eslint/unbound-method
 const mockCreate = vi.mocked(LocalIndexTracker.create);
 const mockResolveMention = vi.mocked(resolveMention);
+const mockResolveSkillMention = vi.mocked(resolveSkillMention);
 
 /** Build a valid HookInput JSON string. */
 function hookInput(prompt: string): string {
@@ -33,24 +38,6 @@ function hookInput(prompt: string): string {
     cwd: "/tmp",
     prompt,
   });
-}
-
-/** Parse stdin JSON into HookInput, returning null on invalid input. */
-function parseInput(raw: string): unknown {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw) as unknown;
-  } catch {
-    return null;
-  }
-
-  if (typeof parsed !== "object" || parsed === null) return null;
-
-  const obj = parsed as Record<string, unknown>;
-  if (obj.hook_event_name !== "UserPromptSubmit") return null;
-  if (typeof obj.prompt !== "string") return null;
-
-  return obj;
 }
 
 describe("hook-handler", () => {
@@ -73,6 +60,36 @@ describe("hook-handler", () => {
 
     it("returns null for missing prompt", () => {
       const input = JSON.stringify({ hook_event_name: "UserPromptSubmit" });
+      expect(parseInput(input)).toBeNull();
+    });
+
+    it("returns null for missing session_id", () => {
+      const input = JSON.stringify({
+        hook_event_name: "UserPromptSubmit",
+        prompt: "test",
+        transcript_path: "/tmp",
+        cwd: "/tmp",
+      });
+      expect(parseInput(input)).toBeNull();
+    });
+
+    it("returns null for missing transcript_path", () => {
+      const input = JSON.stringify({
+        hook_event_name: "UserPromptSubmit",
+        prompt: "test",
+        session_id: "s",
+        cwd: "/tmp",
+      });
+      expect(parseInput(input)).toBeNull();
+    });
+
+    it("returns null for missing cwd", () => {
+      const input = JSON.stringify({
+        hook_event_name: "UserPromptSubmit",
+        prompt: "test",
+        session_id: "s",
+        transcript_path: "/tmp",
+      });
       expect(parseInput(input)).toBeNull();
     });
 
@@ -285,6 +302,68 @@ describe("hook-handler", () => {
         ]);
         expect(context).toContain("section: Header");
       }
+    });
+  });
+
+  describe("/obs: skill resolution", () => {
+    it("resolves /obs: mention as skill via core", () => {
+      mockResolveSkillMention.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          targetType: "skill",
+          resolvedPath: "skills/obsidian/SKILL.md",
+          vaultName: "Vault",
+          content: "Skill content here",
+          section: undefined,
+        },
+      });
+
+      const mentions = extractMentions("Use /obs:obsidian");
+      expect(mentions).toHaveLength(1);
+      expect(mentions[0].kind).toBe("skill");
+
+      const context = formatContext([
+        {
+          status: "resolved",
+          mention: mentions[0],
+          targetType: "skill",
+          resolvedPath: "skills/obsidian/SKILL.md",
+          section: undefined,
+          content: "Skill content here",
+        },
+      ]);
+      expect(context).toContain("/obs:obsidian");
+      expect(context).toContain("(skill,");
+      expect(context).toContain("Skill content here");
+    });
+
+    it("handles mixed @obs: and /obs: mentions", () => {
+      const mentions = extractMentions("@obs:architect and /obs:obsidian");
+      expect(mentions).toHaveLength(2);
+      expect(mentions[0].kind).toBe("context");
+      expect(mentions[0].reference).toBe("architect");
+      expect(mentions[1].kind).toBe("skill");
+      expect(mentions[1].reference).toBe("obsidian");
+    });
+
+    it("reports error when skill not found", () => {
+      mockResolveSkillMention.mockResolvedValueOnce({
+        ok: false,
+        error: { code: "FILE_NOT_FOUND", message: "Skill not found: missing" },
+      });
+
+      const mentions = extractMentions("/obs:missing");
+      expect(mentions).toHaveLength(1);
+      expect(mentions[0].kind).toBe("skill");
+
+      const context = formatContext([
+        {
+          status: "error",
+          mention: mentions[0],
+          errorMessage: "Skill not found: missing",
+        },
+      ]);
+      expect(context).toContain("Error: Skill not found: missing");
     });
   });
 });

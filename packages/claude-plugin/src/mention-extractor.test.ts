@@ -7,6 +7,7 @@ describe("extractMentions", () => {
     const result = extractMentions("Check @obs:architect for guidance");
     expect(result).toHaveLength(1);
     expect(result[0].reference).toBe("architect");
+    expect(result[0].kind).toBe("context");
   });
 
   it("extracts multiple mentions in order", () => {
@@ -117,5 +118,58 @@ describe("extractMentions", () => {
     expect(result[0].raw).toBe("@obs:note");
     expect(result[0].startIndex).toBe(6);
     expect(result[0].endIndex).toBe(15);
+  });
+
+  it("extracts /obs: mention as skill kind", () => {
+    const result = extractMentions("Use /obs:obsidian for this");
+    expect(result).toHaveLength(1);
+    expect(result[0].kind).toBe("skill");
+    expect(result[0].raw).toBe("/obs:obsidian");
+    expect(result[0].reference).toBe("obsidian");
+  });
+
+  it("extracts both @obs: and /obs: in same prompt", () => {
+    const result = extractMentions("Check @obs:architect and /obs:obsidian");
+    expect(result).toHaveLength(2);
+    expect(result[0].kind).toBe("context");
+    expect(result[0].reference).toBe("architect");
+    expect(result[1].kind).toBe("skill");
+    expect(result[1].reference).toBe("obsidian");
+  });
+
+  it("does not dedup @obs:X and /obs:X with same name", () => {
+    const result = extractMentions("@obs:obsidian and /obs:obsidian");
+    expect(result).toHaveLength(2);
+    expect(result[0].kind).toBe("context");
+    expect(result[1].kind).toBe("skill");
+  });
+
+  it("ignores /obs: in fenced code blocks", () => {
+    const result = extractMentions("```\n/obs:obsidian\n```");
+    expect(result).toHaveLength(0);
+  });
+
+  it("ignores /obs: in inline code", () => {
+    const result = extractMentions("Use `/obs:obsidian` syntax");
+    expect(result).toHaveLength(0);
+  });
+
+  it("strips trailing punctuation from /obs: mention", () => {
+    const result = extractMentions("See /obs:obsidian, then proceed");
+    expect(result).toHaveLength(1);
+    expect(result[0].reference).toBe("obsidian");
+  });
+
+  it("extracts /obs: with section targeting", () => {
+    const result = extractMentions("Load /obs:obsidian#Usage");
+    expect(result).toHaveLength(1);
+    expect(result[0].kind).toBe("skill");
+    expect(result[0].reference).toBe("obsidian#Usage");
+  });
+
+  it("deduplicates repeated /obs: mentions", () => {
+    const result = extractMentions("/obs:obsidian and /obs:obsidian again");
+    expect(result).toHaveLength(1);
+    expect(result[0].kind).toBe("skill");
   });
 });

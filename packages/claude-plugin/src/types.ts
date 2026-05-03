@@ -20,8 +20,9 @@ export interface HookOutput {
   };
 }
 
-/** A single @obs: mention extracted from the user prompt. */
+/** A single `@obs:` or `/obs:` mention extracted from the user prompt. */
 export interface ExtractedMention {
+  readonly kind: "context" | "skill";
   readonly raw: string;
   readonly reference: string;
   readonly startIndex: number;
