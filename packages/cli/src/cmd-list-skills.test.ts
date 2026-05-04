@@ -1,4 +1,3 @@
-import type { DiscoveredSkill, VFSResult } from "@obsidian-vfs/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ListSkillsArgs } from "./types.js";
@@ -7,7 +6,8 @@ import {
   CLI_DEFAULTS,
   FORMAT_ERROR_STUB,
   FORMAT_VERBOSE_TIMING_STUB,
-  makeLocalIndexTrackerWith,
+  makeDiscoveredSkill,
+  makeListSkillsTracker,
 } from "./test-helpers.js";
 
 vi.mock("./bootstrap.js", () => ({
@@ -46,20 +46,6 @@ function makeArgs(overrides: Partial<ListSkillsArgs> = {}): ListSkillsArgs {
   };
 }
 
-function makeSkill(overrides: Partial<DiscoveredSkill> = {}): DiscoveredSkill {
-  return {
-    name: "deploy",
-    description: "Deploy helper",
-    vaultRelativePath: "skills/deploy/SKILL.md",
-    ...overrides,
-  };
-}
-
-function makeTracker(listSkillsResult: VFSResult<DiscoveredSkill[]>) {
-  const { tracker } = makeLocalIndexTrackerWith("listSkills", listSkillsResult);
-  return tracker;
-}
-
 describe("cmd-list-skills", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -70,20 +56,20 @@ describe("cmd-list-skills", () => {
   });
 
   it("returns EXIT_SUCCESS with skills", async () => {
-    const tracker = makeTracker({ ok: true, value: [makeSkill()] });
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredSkill()] });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     const code = await run(makeArgs());
 
     expect(code).toBe(EXIT_SUCCESS);
     expect(mockFormatResult).toHaveBeenCalledWith(
-      expect.objectContaining({ skills: [makeSkill()], count: 1 }),
+      expect.objectContaining({ skills: [makeDiscoveredSkill()], count: 1 }),
     );
     expect(mockWriteStdout).toHaveBeenCalled();
   });
 
   it("outputs JSON with --json", async () => {
-    const tracker = makeTracker({ ok: true, value: [makeSkill()] });
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredSkill()] });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     await run(makeArgs({ json: true }));
@@ -105,7 +91,7 @@ describe("cmd-list-skills", () => {
   });
 
   it("returns EXIT_ERROR on listSkills failure", async () => {
-    const tracker = makeTracker({
+    const tracker = makeListSkillsTracker({
       ok: false,
       error: { code: "CLI_ERROR", message: "listing failed" },
     });
@@ -117,7 +103,7 @@ describe("cmd-list-skills", () => {
   });
 
   it("writes verbose timing to stderr", async () => {
-    const tracker = makeTracker({ ok: true, value: [makeSkill()] });
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredSkill()] });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 42 } });
 
     await run(makeArgs({ verbose: true }));
@@ -142,7 +128,7 @@ describe("cmd-list-skills", () => {
   });
 
   it("handles empty skill list", async () => {
-    const tracker = makeTracker({ ok: true, value: [] });
+    const tracker = makeListSkillsTracker({ ok: true, value: [] });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     const code = await run(makeArgs());

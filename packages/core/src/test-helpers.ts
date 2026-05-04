@@ -1,6 +1,12 @@
+import type { Mock } from "vitest";
 import { vi } from "vitest";
 
 import type { ObsidianCLI } from "./cli.js";
+
+/** Wrap a mocked `node:fs/promises` function with a type-safe cast to avoid verbose inline casts. */
+export function mockFsFunction<T>(fn: T): Mock<(...args: unknown[]) => Promise<unknown>> {
+  return vi.mocked(fn as unknown as (...args: unknown[]) => Promise<unknown>);
+}
 
 /**
  * Create a fully-stubbed ObsidianCLI mock with optional per-method overrides.

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { resolveResource, resolveSkillResource } from "./resolve-resource.js";
+import { mockFsFunction } from "./test-helpers.js";
 
 vi.mock("node:fs/promises", () => ({
   access: vi.fn(),
@@ -8,7 +9,7 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 const { access } = await import("node:fs/promises");
-const accessMock = vi.mocked(access as unknown as (...args: unknown[]) => Promise<unknown>);
+const accessMock = mockFsFunction(access);
 
 const SECURITY_OPTIONS = { vaultRoot: "/vault", allowedFolders: [] as string[] };
 

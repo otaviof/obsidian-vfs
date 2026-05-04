@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LocalIndexTracker } from "./local-index-tracker.js";
-import { mockCLI } from "./test-helpers.js";
+import { mockCLI, mockFsFunction } from "./test-helpers.js";
 
 vi.mock("node:fs/promises", () => ({
   readFile: vi.fn(),
@@ -12,8 +12,8 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 const { readFile, realpath } = await import("node:fs/promises");
-const readFileMock = vi.mocked(readFile as unknown as (...args: unknown[]) => Promise<unknown>);
-const realpathMock = vi.mocked(realpath as unknown as (...args: unknown[]) => Promise<unknown>);
+const readFileMock = mockFsFunction(readFile);
+const realpathMock = mockFsFunction(realpath);
 
 describe("LocalIndexTracker", () => {
   beforeEach(() => {
@@ -290,7 +290,7 @@ describe("LocalIndexTracker", () => {
         return Promise.reject(new Error("unexpected"));
       });
       const { access } = await import("node:fs/promises");
-      const accessMock = vi.mocked(access as unknown as (...args: unknown[]) => Promise<unknown>);
+      const accessMock = mockFsFunction(access);
       accessMock.mockResolvedValueOnce(undefined);
 
       const result = await LocalIndexTracker.create(mockCLI());
@@ -311,7 +311,7 @@ describe("LocalIndexTracker", () => {
         return Promise.reject(new Error("unexpected"));
       });
       const { access } = await import("node:fs/promises");
-      const accessMock = vi.mocked(access as unknown as (...args: unknown[]) => Promise<unknown>);
+      const accessMock = mockFsFunction(access);
       accessMock.mockResolvedValueOnce(undefined);
 
       const result = await LocalIndexTracker.create(mockCLI());
@@ -326,7 +326,7 @@ describe("LocalIndexTracker", () => {
   describe("readDirectory", () => {
     it("delegates with security options", async () => {
       const { readdir } = await import("node:fs/promises");
-      const readdirMock = vi.mocked(readdir as unknown as (...args: unknown[]) => Promise<unknown>);
+      const readdirMock = mockFsFunction(readdir);
       readdirMock.mockResolvedValueOnce([]);
 
       const result = await LocalIndexTracker.create(mockCLI());
@@ -341,7 +341,7 @@ describe("LocalIndexTracker", () => {
   describe("stat", () => {
     it("delegates with security options", async () => {
       const { stat } = await import("node:fs/promises");
-      const statMock = vi.mocked(stat as unknown as (...args: unknown[]) => Promise<unknown>);
+      const statMock = mockFsFunction(stat);
       statMock.mockResolvedValueOnce({
         isDirectory: () => false,
         mtimeMs: 1000,
@@ -378,7 +378,7 @@ describe("LocalIndexTracker", () => {
       const tracker = await createTrackerWithSkills(["skills"]);
 
       const { readdir } = await import("node:fs/promises");
-      const readdirMock = vi.mocked(readdir as unknown as (...args: unknown[]) => Promise<unknown>);
+      const readdirMock = mockFsFunction(readdir);
       readdirMock.mockResolvedValueOnce([
         { name: "deploy", isDirectory: () => true },
         { name: "review", isDirectory: () => true },
@@ -410,7 +410,7 @@ describe("LocalIndexTracker", () => {
       const tracker = await createTrackerWithSkills(["skills-a", "skills-b"]);
 
       const { readdir } = await import("node:fs/promises");
-      const readdirMock = vi.mocked(readdir as unknown as (...args: unknown[]) => Promise<unknown>);
+      const readdirMock = mockFsFunction(readdir);
       readdirMock
         .mockResolvedValueOnce([{ name: "deploy", isDirectory: () => true }])
         .mockResolvedValueOnce([{ name: "deploy", isDirectory: () => true }]);
@@ -431,7 +431,7 @@ describe("LocalIndexTracker", () => {
       const tracker = await createTrackerWithSkills(["skills"]);
 
       const { readdir } = await import("node:fs/promises");
-      const readdirMock = vi.mocked(readdir as unknown as (...args: unknown[]) => Promise<unknown>);
+      const readdirMock = mockFsFunction(readdir);
       readdirMock.mockResolvedValueOnce([
         { name: "broken", isDirectory: () => true },
         { name: "valid", isDirectory: () => true },
@@ -454,7 +454,7 @@ describe("LocalIndexTracker", () => {
       const tracker = await createTrackerWithSkills(["skills"]);
 
       const { readdir } = await import("node:fs/promises");
-      const readdirMock = vi.mocked(readdir as unknown as (...args: unknown[]) => Promise<unknown>);
+      const readdirMock = mockFsFunction(readdir);
       readdirMock.mockResolvedValueOnce([{ name: "plain", isDirectory: () => true }]);
 
       readFileMock.mockResolvedValueOnce(Buffer.from("No frontmatter here"));
@@ -478,7 +478,7 @@ describe("LocalIndexTracker", () => {
       const tracker = await createTrackerWithSkills(["skills"]);
 
       const { readdir } = await import("node:fs/promises");
-      const readdirMock = vi.mocked(readdir as unknown as (...args: unknown[]) => Promise<unknown>);
+      const readdirMock = mockFsFunction(readdir);
       readdirMock.mockResolvedValueOnce([
         { name: "readme.md", isDirectory: () => false },
         { name: "actual-skill", isDirectory: () => true },
@@ -499,7 +499,7 @@ describe("LocalIndexTracker", () => {
       const tracker = await createTrackerWithSkills(["bad-dir", "good-dir"]);
 
       const { readdir } = await import("node:fs/promises");
-      const readdirMock = vi.mocked(readdir as unknown as (...args: unknown[]) => Promise<unknown>);
+      const readdirMock = mockFsFunction(readdir);
       readdirMock
         .mockRejectedValueOnce(Object.assign(new Error("ENOENT"), { code: "ENOENT" }))
         .mockResolvedValueOnce([{ name: "deploy", isDirectory: () => true }]);
@@ -520,7 +520,7 @@ describe("LocalIndexTracker", () => {
       const tracker = await createTrackerWithSkills(["dir-a", "dir-b"]);
 
       const { readdir } = await import("node:fs/promises");
-      const readdirMock = vi.mocked(readdir as unknown as (...args: unknown[]) => Promise<unknown>);
+      const readdirMock = mockFsFunction(readdir);
       readdirMock
         .mockResolvedValueOnce([{ name: "alpha", isDirectory: () => true }])
         .mockResolvedValueOnce([{ name: "beta", isDirectory: () => true }]);
@@ -540,7 +540,7 @@ describe("LocalIndexTracker", () => {
       const tracker = await createTrackerWithSkills(["skills"]);
 
       const { readdir } = await import("node:fs/promises");
-      const readdirMock = vi.mocked(readdir as unknown as (...args: unknown[]) => Promise<unknown>);
+      const readdirMock = mockFsFunction(readdir);
       readdirMock.mockResolvedValueOnce([
         { name: "good-skill", isDirectory: () => true },
         { name: "bad;name", isDirectory: () => true },
@@ -563,7 +563,7 @@ describe("LocalIndexTracker", () => {
       const tracker = await createTrackerWithSkills(["skills"]);
 
       const { readdir } = await import("node:fs/promises");
-      const readdirMock = vi.mocked(readdir as unknown as (...args: unknown[]) => Promise<unknown>);
+      const readdirMock = mockFsFunction(readdir);
       readdirMock.mockResolvedValueOnce([{ name: "spaced", isDirectory: () => true }]);
 
       readFileMock.mockResolvedValueOnce(
@@ -580,7 +580,7 @@ describe("LocalIndexTracker", () => {
       const tracker = await createTrackerWithSkills(["skills"]);
 
       const { readdir } = await import("node:fs/promises");
-      const readdirMock = vi.mocked(readdir as unknown as (...args: unknown[]) => Promise<unknown>);
+      const readdirMock = mockFsFunction(readdir);
       readdirMock.mockResolvedValueOnce([{ name: "empty-desc", isDirectory: () => true }]);
 
       readFileMock.mockResolvedValueOnce(
@@ -597,7 +597,7 @@ describe("LocalIndexTracker", () => {
       const tracker = await createTrackerWithSkills(["skills"]);
 
       const { readdir } = await import("node:fs/promises");
-      const readdirMock = vi.mocked(readdir as unknown as (...args: unknown[]) => Promise<unknown>);
+      const readdirMock = mockFsFunction(readdir);
       readdirMock.mockResolvedValueOnce([{ name: "body-desc", isDirectory: () => true }]);
 
       readFileMock.mockResolvedValueOnce(
@@ -614,7 +614,7 @@ describe("LocalIndexTracker", () => {
       const tracker = await createTrackerWithSkills(["skills"]);
 
       const { readdir } = await import("node:fs/promises");
-      const readdirMock = vi.mocked(readdir as unknown as (...args: unknown[]) => Promise<unknown>);
+      const readdirMock = mockFsFunction(readdir);
       readdirMock.mockResolvedValueOnce([{ name: "unclosed", isDirectory: () => true }]);
 
       readFileMock.mockResolvedValueOnce(

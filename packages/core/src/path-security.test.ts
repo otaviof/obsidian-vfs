@@ -6,13 +6,14 @@ import {
   checkSymlink,
   validatePath,
 } from "./path-security.js";
+import { mockFsFunction } from "./test-helpers.js";
 
 vi.mock("node:fs/promises", () => ({
   realpath: vi.fn(),
 }));
 
 const { realpath } = await import("node:fs/promises");
-const realpathMock = vi.mocked(realpath as unknown as (...args: unknown[]) => Promise<unknown>);
+const realpathMock = mockFsFunction(realpath);
 
 describe("canonicalizePath", () => {
   const vaultRoot = "/vault";

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Dirent } from "node:fs";
 
 import { readDirectory, statVirtualFile } from "./fs-enumeration.js";
+import { mockFsFunction } from "./test-helpers.js";
 
 vi.mock("node:fs/promises", () => ({
   readdir: vi.fn(),
@@ -10,9 +11,9 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 const { readdir, stat, realpath } = await import("node:fs/promises");
-const readdirMock = vi.mocked(readdir as unknown as (...args: unknown[]) => Promise<unknown>);
-const statMock = vi.mocked(stat as unknown as (...args: unknown[]) => Promise<unknown>);
-const realpathMock = vi.mocked(realpath as unknown as (...args: unknown[]) => Promise<unknown>);
+const readdirMock = mockFsFunction(readdir);
+const statMock = mockFsFunction(stat);
+const realpathMock = mockFsFunction(realpath);
 
 const OPTIONS = { vaultRoot: "/vault", allowedFolders: [] as string[] };
 

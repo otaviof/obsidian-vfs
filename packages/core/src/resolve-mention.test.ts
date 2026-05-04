@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LocalIndexTracker } from "./local-index-tracker.js";
 import { parseSection, resolveMention, resolveSkillMention } from "./resolve-mention.js";
-import { mockCLI } from "./test-helpers.js";
+import { mockCLI, mockFsFunction } from "./test-helpers.js";
 
 vi.mock("node:fs/promises", () => ({
   readFile: vi.fn(),
@@ -12,10 +12,10 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 const { readFile, realpath, access, readdir } = await import("node:fs/promises");
-const readFileMock = vi.mocked(readFile as unknown as (...args: unknown[]) => Promise<unknown>);
-const realpathMock = vi.mocked(realpath as unknown as (...args: unknown[]) => Promise<unknown>);
-const accessMock = vi.mocked(access as unknown as (...args: unknown[]) => Promise<unknown>);
-const readdirMock = vi.mocked(readdir as unknown as (...args: unknown[]) => Promise<unknown>);
+const readFileMock = mockFsFunction(readFile);
+const realpathMock = mockFsFunction(realpath);
+const accessMock = mockFsFunction(access);
+const readdirMock = mockFsFunction(readdir);
 
 async function createTracker(
   configOverrides: Record<string, unknown> = {},

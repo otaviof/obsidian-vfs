@@ -2,14 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LRUCache } from "./lru-cache.js";
 import { resolveWikilink, type ResolveWikilinkOptions } from "./resolve-wikilink.js";
-import { mockCLI } from "./test-helpers.js";
+import { mockCLI, mockFsFunction } from "./test-helpers.js";
 
 vi.mock("node:fs/promises", () => ({
   readdir: vi.fn(),
 }));
 
 const { readdir } = await import("node:fs/promises");
-const readdirMock = vi.mocked(readdir as unknown as (...args: unknown[]) => Promise<unknown>);
+const readdirMock = mockFsFunction(readdir);
 
 function makeOptions(overrides: Partial<ResolveWikilinkOptions> = {}): ResolveWikilinkOptions {
   return {

@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { readVirtualFile } from "./read-file.js";
+import { mockFsFunction } from "./test-helpers.js";
 
 vi.mock("node:fs/promises", () => ({
   readFile: vi.fn(),
@@ -8,8 +9,8 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 const { readFile, realpath } = await import("node:fs/promises");
-const readFileMock = vi.mocked(readFile as unknown as (...args: unknown[]) => Promise<unknown>);
-const realpathMock = vi.mocked(realpath as unknown as (...args: unknown[]) => Promise<unknown>);
+const readFileMock = mockFsFunction(readFile);
+const realpathMock = mockFsFunction(realpath);
 
 describe("readVirtualFile", () => {
   const options = { vaultRoot: "/vault", allowedFolders: [] as string[] };

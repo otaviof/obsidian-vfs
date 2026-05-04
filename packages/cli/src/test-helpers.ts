@@ -1,4 +1,4 @@
-import type { LocalIndexTracker, VFSResult } from "@obsidian-vfs/core";
+import type { DiscoveredSkill, LocalIndexTracker, VFSResult } from "@obsidian-vfs/core";
 import { vi } from "vitest";
 
 /** Default CLI option values shared across all command test factories. */
@@ -38,4 +38,20 @@ export function makeLocalIndexTrackerWith<K extends keyof LocalIndexTracker>(
     ...extraMethods,
   } as unknown as LocalIndexTracker;
   return { tracker, mock };
+}
+
+/** Build a `DiscoveredSkill` with sensible defaults, overridable per-field. */
+export function makeDiscoveredSkill(overrides: Partial<DiscoveredSkill> = {}): DiscoveredSkill {
+  return {
+    name: "deploy",
+    description: "Deploy helper",
+    vaultRelativePath: "skills/deploy/SKILL.md",
+    ...overrides,
+  };
+}
+
+/** Build a mock tracker whose `listSkills` resolves to the given result. */
+export function makeListSkillsTracker(listSkillsResult: VFSResult<DiscoveredSkill[]>) {
+  const { tracker } = makeLocalIndexTrackerWith("listSkills", listSkillsResult);
+  return tracker;
 }
