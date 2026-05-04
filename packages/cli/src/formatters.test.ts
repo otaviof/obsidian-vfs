@@ -1,12 +1,19 @@
 import type { VFSError } from "@obsidian-vfs/core";
 import { describe, expect, it } from "vitest";
 
-import type { InspectOutput, ProvisionSkillsOutput, ResolveOutput } from "./types.js";
+import type {
+  InspectOutput,
+  ListSkillsOutput,
+  ProvisionSkillsOutput,
+  ResolveOutput,
+} from "./types.js";
 import {
   formatError,
   formatHelp,
   formatInspectJSON,
   formatInspectResult,
+  formatListSkillsJSON,
+  formatListSkillsResult,
   formatProvisionSkillsJSON,
   formatProvisionSkillsResult,
   formatResolveCandidates,
@@ -203,12 +210,55 @@ describe("formatVerboseTiming", () => {
   });
 });
 
+describe("formatListSkillsResult", () => {
+  it("renders skill table", () => {
+    const output: ListSkillsOutput = {
+      skills: [
+        { name: "deploy", description: "Deploy helper", vaultRelativePath: "skills/deploy" },
+        { name: "review", description: "Code reviewer", vaultRelativePath: "skills/review" },
+      ],
+      count: 2,
+    };
+    const result = formatListSkillsResult(output);
+    expect(result).toContain("Found 2 skills:");
+    expect(result).toContain("deploy");
+    expect(result).toContain("Deploy helper");
+    expect(result).toContain("skills/deploy");
+    expect(result).toContain("review");
+    expect(result).toContain("Code reviewer");
+    expect(result).toContain("skills/review");
+  });
+
+  it("handles empty list", () => {
+    const result = formatListSkillsResult({ skills: [], count: 0 });
+    expect(result).toBe("Found 0 skills.");
+  });
+});
+
+describe("formatListSkillsJSON", () => {
+  it("serializes output", () => {
+    const output: ListSkillsOutput = {
+      skills: [
+        { name: "deploy", description: "Deploy helper", vaultRelativePath: "skills/deploy" },
+      ],
+      count: 1,
+    };
+    const json = formatListSkillsJSON(output);
+    const parsed = JSON.parse(json) as ListSkillsOutput;
+    expect(parsed.skills).toHaveLength(1);
+    expect(parsed.count).toBe(1);
+  });
+});
+
 describe("formatProvisionSkillsResult", () => {
+  const noFilter = { include: [] as string[], exclude: [] as string[], discoveredCount: 2, filteredCount: 2 };
   const baseOutput: ProvisionSkillsOutput = {
     written: ["deploy", "review"],
+    skipped: [],
     permissionsAdded: 2,
     dryRun: false,
     errors: [],
+    filter: noFilter,
   };
 
   it("renders written skills and permissions", () => {
@@ -242,24 +292,57 @@ describe("formatProvisionSkillsResult", () => {
 
   it("renders correctly when all operations fail", () => {
     const result = formatProvisionSkillsResult({
+      ...baseOutput,
       written: [],
       permissionsAdded: 0,
-      dryRun: false,
       errors: ["Error A", "Error B"],
     });
     expect(result).toContain("Wrote 0 skills");
     expect(result).toContain("error: Error A");
     expect(result).toContain("error: Error B");
   });
+
+  it("shows skipped when present", () => {
+    const result = formatProvisionSkillsResult({
+      ...baseOutput,
+      written: ["deploy"],
+      skipped: ["draft-notes", "draft-review"],
+      filter: { include: [], exclude: ["draft-*"], discoveredCount: 3, filteredCount: 1 },
+    });
+    expect(result).toContain("skipped:");
+    expect(result).toContain("draft-notes, draft-review");
+  });
+
+  it("shows filter summary when filter is active", () => {
+    const result = formatProvisionSkillsResult({
+      ...baseOutput,
+      written: ["deploy"],
+      skipped: ["draft-notes", "draft-review"],
+      filter: { include: [], exclude: ["draft-*"], discoveredCount: 3, filteredCount: 1 },
+    });
+    expect(result).toContain("filter:");
+    expect(result).toContain('--exclude "draft-*"');
+    expect(result).toContain("3 discovered, 1 provisioned");
+  });
+
+  it("omits filter lines when no filter is active", () => {
+    const result = formatProvisionSkillsResult(baseOutput);
+    expect(result).not.toContain("skipped:");
+    expect(result).not.toContain("filter:");
+  });
 });
 
 describe("formatProvisionSkillsJSON", () => {
+  const noFilter = { include: [] as string[], exclude: [] as string[], discoveredCount: 1, filteredCount: 1 };
+
   it("serializes output as JSON", () => {
     const output: ProvisionSkillsOutput = {
       written: ["deploy"],
+      skipped: [],
       permissionsAdded: 1,
       dryRun: false,
       errors: [],
+      filter: noFilter,
     };
     const json = formatProvisionSkillsJSON(output);
     const parsed = JSON.parse(json) as ProvisionSkillsOutput;
@@ -271,9 +354,11 @@ describe("formatProvisionSkillsJSON", () => {
   it("serializes dry-run output with errors", () => {
     const output: ProvisionSkillsOutput = {
       written: ["a"],
+      skipped: [],
       permissionsAdded: 1,
       dryRun: true,
       errors: ["some error"],
+      filter: noFilter,
     };
     const json = formatProvisionSkillsJSON(output);
     const parsed = JSON.parse(json) as ProvisionSkillsOutput;
@@ -287,12 +372,15 @@ describe("formatHelp", () => {
     const help = formatHelp();
     expect(help).toContain("inspect");
     expect(help).toContain("resolve");
+    expect(help).toContain("list-skills");
     expect(help).toContain("provision-skills");
     expect(help).toContain("--json");
     expect(help).toContain("--verbose");
     expect(help).toContain("--full");
     expect(help).toContain("--body");
     expect(help).toContain("--dry-run");
+    expect(help).toContain("--include");
+    expect(help).toContain("--exclude");
     expect(help).toContain("--cli-path");
     expect(help).toContain("--timeout");
     expect(help).toContain("--help");

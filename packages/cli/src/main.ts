@@ -4,15 +4,22 @@ import { parseArgs } from "node:util";
 
 import { DEFAULT_CLI_PATH, DEFAULT_TIMEOUT_MS } from "@obsidian-vfs/core";
 
-import type { CLIOptions, InspectArgs, ProvisionSkillsArgs, ResolveArgs } from "./types.js";
+import type {
+  CLIOptions,
+  InspectArgs,
+  ListSkillsArgs,
+  ProvisionSkillsArgs,
+  ResolveArgs,
+} from "./types.js";
 import { EXIT_ERROR, EXIT_SUCCESS, EXIT_USAGE } from "./types.js";
 import { run as runInspect } from "./cmd-inspect.js";
+import { run as runListSkills } from "./cmd-list-skills.js";
 import { run as runProvisionSkills } from "./cmd-provision-skills.js";
 import { run as runResolve } from "./cmd-resolve.js";
 import { formatHelp, formatUsageError, writeStderr, writeStdout } from "./formatters.js";
 
 /** Valid command names for dispatch. */
-const VALID_COMMANDS = new Set(["inspect", "resolve", "provision-skills", "help"]);
+const VALID_COMMANDS = new Set(["inspect", "resolve", "provision-skills", "list-skills", "help"]);
 
 /** Parse process.argv into structured CLI options. */
 export function parseGlobalArgs(
@@ -30,6 +37,8 @@ export function parseGlobalArgs(
         full: { type: "boolean", default: false },
         body: { type: "boolean", default: false },
         "dry-run": { type: "boolean", default: false },
+        include: { type: "string", multiple: true, default: [] as string[] },
+        exclude: { type: "string", multiple: true, default: [] as string[] },
         "cli-path": { type: "string", default: DEFAULT_CLI_PATH },
         timeout: { type: "string", default: String(DEFAULT_TIMEOUT_MS) },
         help: { type: "boolean", short: "h", default: false },
@@ -54,6 +63,8 @@ export function parseGlobalArgs(
         full: false,
         body: false,
         dryRun: false,
+        include: [],
+        exclude: [],
         cliPath: DEFAULT_CLI_PATH,
         timeoutMs: DEFAULT_TIMEOUT_MS,
       },
@@ -74,6 +85,13 @@ export function parseGlobalArgs(
     return { ok: false, exitCode: EXIT_USAGE };
   }
 
+  const include = parsed.values.include as string[];
+  const exclude = parsed.values.exclude as string[];
+  if (include.length > 0 && exclude.length > 0) {
+    writeStderr(formatUsageError("--include and --exclude are mutually exclusive"));
+    return { ok: false, exitCode: EXIT_USAGE };
+  }
+
   return {
     ok: true,
     options: {
@@ -83,6 +101,8 @@ export function parseGlobalArgs(
       full: parsed.values.full as boolean,
       body: parsed.values.body as boolean,
       dryRun: parsed.values["dry-run"] as boolean,
+      include,
+      exclude,
       cliPath: parsed.values["cli-path"] as string,
       timeoutMs,
     },
@@ -129,6 +149,18 @@ function buildProvisionSkillsArgs(options: CLIOptions): ProvisionSkillsArgs {
     dryRun: options.dryRun,
     json: options.json,
     verbose: options.verbose,
+    include: options.include,
+    exclude: options.exclude,
+    cliPath: options.cliPath,
+    timeoutMs: options.timeoutMs,
+  };
+}
+
+/** Build ListSkillsArgs from parsed options. */
+function buildListSkillsArgs(options: CLIOptions): ListSkillsArgs {
+  return {
+    json: options.json,
+    verbose: options.verbose,
     cliPath: options.cliPath,
     timeoutMs: options.timeoutMs,
   };
@@ -152,6 +184,9 @@ async function dispatch(options: CLIOptions, positionals: readonly string[]): Pr
       if (!args) return EXIT_USAGE;
       return runResolve(args);
     }
+
+    case "list-skills":
+      return runListSkills(buildListSkillsArgs(options));
 
     case "provision-skills":
       return runProvisionSkills(buildProvisionSkillsArgs(options));

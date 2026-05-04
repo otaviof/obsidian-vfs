@@ -3,9 +3,10 @@ import path from "node:path";
 
 import type { DiscoveredSkill } from "@obsidian-vfs/core";
 
-import type { ProvisionSkillsArgs, ProvisionSkillsOutput } from "./types.js";
+import type { ProvisionSkillsArgs, ProvisionSkillsFilter, ProvisionSkillsOutput } from "./types.js";
 import { EXIT_ERROR, EXIT_SUCCESS } from "./types.js";
 import { bootstrapTracker } from "./bootstrap.js";
+import { filterSkills } from "./filter-skills.js";
 import {
   formatError,
   formatProvisionSkillsJSON,
@@ -150,6 +151,18 @@ export async function run(args: ProvisionSkillsArgs): Promise<number> {
   const enumMs = performance.now() - enumStart;
   const discovered = skillsResult.value;
 
+  const { matched, skipped } = filterSkills(discovered, {
+    include: args.include,
+    exclude: args.exclude,
+  });
+
+  const filter: ProvisionSkillsFilter = {
+    include: args.include,
+    exclude: args.exclude,
+    discoveredCount: discovered.length,
+    filteredCount: matched.length,
+  };
+
   const cwd = process.cwd();
   const skillsDir = path.join(cwd, PROXY_SKILLS_DIR);
   const settingsPath = path.join(cwd, SETTINGS_PATH);
@@ -158,7 +171,7 @@ export async function run(args: ProvisionSkillsArgs): Promise<number> {
   const errors: string[] = [];
 
   if (!args.dryRun) {
-    for (const skill of discovered) {
+    for (const skill of matched) {
       try {
         const status = await writeProxySkill(skill, skillsDir);
         if (status === "written") written.push(skill.name);
@@ -167,7 +180,7 @@ export async function run(args: ProvisionSkillsArgs): Promise<number> {
       }
     }
   } else {
-    for (const skill of discovered) {
+    for (const skill of matched) {
       written.push(skill.name);
     }
   }
@@ -178,7 +191,7 @@ export async function run(args: ProvisionSkillsArgs): Promise<number> {
     try {
       const result = await syncSettingsPermissions(
         settingsPath,
-        discovered.map((s) => s.name),
+        matched.map((s) => s.name),
       );
       permissionsAdded = result.added;
     } catch (err) {
@@ -188,19 +201,21 @@ export async function run(args: ProvisionSkillsArgs): Promise<number> {
     try {
       const result = await countPermissionChanges(
         settingsPath,
-        discovered.map((s) => s.name),
+        matched.map((s) => s.name),
       );
       permissionsAdded = result.added;
     } catch {
-      permissionsAdded = discovered.length;
+      permissionsAdded = matched.length;
     }
   }
 
   const output: ProvisionSkillsOutput = {
     written,
+    skipped,
     permissionsAdded,
     dryRun: args.dryRun,
     errors,
+    filter,
   };
 
   if (args.json) {

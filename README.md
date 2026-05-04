@@ -9,7 +9,7 @@ Read-only virtual filesystem exposing an [Obsidian](https://obsidian.md) vault v
 | `packages/core` | `obs://` URI resolution, LRU cache, Obsidian CLI wrapper, direct file reads via `node:fs` |
 | `packages/vscode` | VS Code `FileSystemProvider` for `obs://` — reads from disk, mutations through CLI |
 | `packages/claude-plugin` | Agent SDK plugin resolving `@obs:` and `/obs:` mentions into context via `UserPromptSubmit` hook |
-| `packages/cli` | `npx obsidian-vfs` diagnostics and provisioning — `inspect`, `resolve`, `provision-skills` |
+| `packages/cli` | `npx obsidian-vfs` diagnostics and provisioning — `inspect`, `resolve`, `list-skills`, `provision-skills` |
 
 The consumer packages (`vscode`, `claude-plugin`, `cli`) depend on `core` but have no cross-dependencies between each other.
 
@@ -60,6 +60,18 @@ pnpm cli inspect "agent" --verbose
 
 Use `--cli-path` if the `obsidian` binary is not on your `PATH`, and `--timeout` to adjust the CLI timeout (default 10 000 ms).
 
+### Listing Vault Skills
+
+Enumerate all skills discovered from the vault's `skillsDirs`:
+
+```sh
+# Terminal table output
+pnpm cli list-skills
+
+# Machine-readable output
+pnpm cli list-skills --json
+```
+
 ### Provisioning Vault Skills
 
 #### The problem
@@ -102,9 +114,17 @@ pnpm cli provision-skills
 # Preview without writing
 pnpm cli provision-skills --dry-run
 
+# Only provision specific skills (repeatable)
+pnpm cli provision-skills --include deploy --include review
+
+# Provision all except matching skills (repeatable)
+pnpm cli provision-skills --exclude "draft-*"
+
 # Machine-readable output
 pnpm cli provision-skills --json
 ```
+
+The `--include` and `--exclude` flags accept glob patterns (`*` and `?`) and are mutually exclusive. When a filter is active, skills that don't match appear in the `skipped` output but existing proxies and permissions for those skills are never removed.
 
 The command enumerates every `skillsDir` configured in `.obsidian/obsidian-vfs.json`, finds subdirectories containing a `SKILL.md`, extracts frontmatter metadata, and writes proxy files. Writes are idempotent — if a proxy already exists with identical content, it is skipped. Skill names are validated against `/^[a-zA-Z0-9._-]+$/`; names with shell metacharacters are rejected. When multiple `skillsDirs` contain a skill with the same name, the first directory wins.
 

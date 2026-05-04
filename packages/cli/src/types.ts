@@ -1,3 +1,5 @@
+import type { DiscoveredSkill } from "@obsidian-vfs/core";
+
 /** Exit code for successful command execution. */
 export const EXIT_SUCCESS = 0;
 
@@ -9,12 +11,14 @@ export const EXIT_USAGE = 2;
 
 /** Global options parsed from process.argv. */
 export interface CLIOptions {
-  readonly command: "inspect" | "resolve" | "provision-skills" | "help";
+  readonly command: "inspect" | "resolve" | "provision-skills" | "list-skills" | "help";
   readonly json: boolean;
   readonly verbose: boolean;
   readonly full: boolean;
   readonly body: boolean;
   readonly dryRun: boolean;
+  readonly include: readonly string[];
+  readonly exclude: readonly string[];
   readonly cliPath: string;
   readonly timeoutMs: number;
 }
@@ -30,21 +34,47 @@ export interface InspectArgs {
   readonly timeoutMs: number;
 }
 
-/** Arguments for the provision-skills command. */
-export interface ProvisionSkillsArgs {
-  readonly dryRun: boolean;
+/** Arguments for the list-skills command. */
+export interface ListSkillsArgs {
   readonly json: boolean;
   readonly verbose: boolean;
   readonly cliPath: string;
   readonly timeoutMs: number;
 }
 
+/** Structured output of the list-skills command. */
+export interface ListSkillsOutput {
+  readonly skills: readonly DiscoveredSkill[];
+  readonly count: number;
+}
+
+/** Arguments for the provision-skills command. */
+export interface ProvisionSkillsArgs {
+  readonly dryRun: boolean;
+  readonly json: boolean;
+  readonly verbose: boolean;
+  readonly include: readonly string[];
+  readonly exclude: readonly string[];
+  readonly cliPath: string;
+  readonly timeoutMs: number;
+}
+
+/** Metadata about skill filtering applied during provisioning. */
+export interface ProvisionSkillsFilter {
+  readonly include: readonly string[];
+  readonly exclude: readonly string[];
+  readonly discoveredCount: number;
+  readonly filteredCount: number;
+}
+
 /** Structured output of the provision-skills command. */
 export interface ProvisionSkillsOutput {
   readonly written: readonly string[];
+  readonly skipped: readonly string[];
   readonly permissionsAdded: number;
   readonly dryRun: boolean;
   readonly errors: readonly string[];
+  readonly filter: ProvisionSkillsFilter;
 }
 
 /** Arguments for the resolve command. */

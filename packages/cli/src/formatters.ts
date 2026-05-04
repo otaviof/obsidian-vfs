@@ -1,6 +1,11 @@
 import type { VFSError } from "@obsidian-vfs/core";
 
-import type { InspectOutput, ProvisionSkillsOutput, ResolveOutput } from "./types.js";
+import type {
+  InspectOutput,
+  ListSkillsOutput,
+  ProvisionSkillsOutput,
+  ResolveOutput,
+} from "./types.js";
 
 /** Maximum number of lines shown in inspect content preview. */
 const INSPECT_MAX_LINES = 80;
@@ -142,6 +147,34 @@ export function formatVerboseTiming(label: string, ms: number): string {
   return `[verbose] ${label}: ${ms.toFixed(1)}ms`;
 }
 
+/** Format the list-skills result for terminal display. */
+export function formatListSkillsResult(output: ListSkillsOutput): string {
+  if (output.count === 0) {
+    return "Found 0 skills.";
+  }
+
+  const maxName = Math.max(...output.skills.map((s) => s.name.length));
+  const nameWidth = maxName + 2;
+  const descWidth = 50;
+  const lines: string[] = [`Found ${output.count} skills:`, ""];
+
+  for (const skill of output.skills) {
+    const desc = skill.description.length > descWidth
+      ? skill.description.slice(0, descWidth - 1) + "…"
+      : skill.description;
+    lines.push(
+      `  ${skill.name.padEnd(nameWidth)}${desc.padEnd(descWidth)}${skill.vaultRelativePath}`,
+    );
+  }
+
+  return lines.join("\n");
+}
+
+/** Format the list-skills result as JSON. */
+export function formatListSkillsJSON(output: ListSkillsOutput): string {
+  return JSON.stringify(output, null, 2);
+}
+
 /** Format the provision-skills result for terminal display. */
 export function formatProvisionSkillsResult(output: ProvisionSkillsOutput): string {
   const prefix = output.dryRun ? "[dry-run] " : "";
@@ -149,8 +182,28 @@ export function formatProvisionSkillsResult(output: ProvisionSkillsOutput): stri
     `${prefix}Wrote ${output.written.length} skills:`,
     "",
     labelLine("written", output.written.join(", ") || "(none)"),
-    labelLine("permissions", `added ${output.permissionsAdded} in .claude/settings.local.json`),
   ];
+
+  if (output.skipped.length > 0) {
+    lines.push(labelLine("skipped", output.skipped.join(", ")));
+  }
+
+  lines.push(
+    labelLine("permissions", `added ${output.permissionsAdded} in .claude/settings.local.json`),
+  );
+
+  const hasFilter = output.filter.include.length > 0 || output.filter.exclude.length > 0;
+  if (hasFilter) {
+    const pattern = output.filter.include.length > 0
+      ? `--include ${output.filter.include.map((p) => `"${p}"`).join(" ")}`
+      : `--exclude ${output.filter.exclude.map((p) => `"${p}"`).join(" ")}`;
+    lines.push(
+      labelLine(
+        "filter",
+        `${pattern} (${output.filter.discoveredCount} discovered, ${output.filter.filteredCount} provisioned)`,
+      ),
+    );
+  }
 
   if (output.errors.length > 0) {
     lines.push("");
@@ -174,6 +227,7 @@ export function formatHelp(): string {
 Commands:
   inspect <mention>       Resolve an @obs: mention and show the result
   resolve <wikilink>      Resolve a [[wikilink]] to its vault path
+  list-skills             List all discovered vault skills
   provision-skills        Generate proxy SKILL.md files from vault skills
 
 Options:
@@ -182,6 +236,8 @@ Options:
   --full                  Show full content (inspect only, no truncation)
   --body                  Output only the content body (inspect only)
   --dry-run               Show what would change without writing (provision-skills)
+  --include <glob>        Only provision skills matching glob (repeatable, provision-skills)
+  --exclude <glob>        Skip skills matching glob (repeatable, provision-skills)
   --cli-path <path>       Path to Obsidian CLI binary (default: obsidian)
   --timeout <ms>          CLI timeout in milliseconds (default: 10000)
   -h, --help              Show this help message
@@ -192,8 +248,12 @@ Examples:
   obsidian-vfs inspect "10-projects/plan.md#Architecture"
   obsidian-vfs resolve "Project Plan"
   obsidian-vfs resolve "[[Project Plan]]"
+  obsidian-vfs list-skills
+  obsidian-vfs list-skills --json
   obsidian-vfs provision-skills
-  obsidian-vfs provision-skills --dry-run`;
+  obsidian-vfs provision-skills --dry-run
+  obsidian-vfs provision-skills --include deploy --include review
+  obsidian-vfs provision-skills --exclude "draft-*"`;
 }
 
 /** Format a usage error with the correct usage hint. */

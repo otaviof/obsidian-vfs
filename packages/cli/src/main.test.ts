@@ -217,4 +217,73 @@ describe("parseGlobalArgs", () => {
       expect(result.options.dryRun).toBe(true);
     }
   });
+
+  it("parses list-skills command", () => {
+    const result = parseGlobalArgs(["list-skills"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.command).toBe("list-skills");
+    }
+  });
+
+  it("parses --include", () => {
+    const result = parseGlobalArgs(["provision-skills", "--include", "deploy"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.include).toEqual(["deploy"]);
+    }
+  });
+
+  it("parses repeated --include", () => {
+    const result = parseGlobalArgs([
+      "provision-skills",
+      "--include",
+      "deploy",
+      "--include",
+      "review",
+    ]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.include).toEqual(["deploy", "review"]);
+    }
+  });
+
+  it("parses --exclude", () => {
+    const result = parseGlobalArgs(["provision-skills", "--exclude", "draft-*"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.exclude).toEqual(["draft-*"]);
+    }
+  });
+
+  it("--include defaults to empty array", () => {
+    const result = parseGlobalArgs(["provision-skills"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.include).toEqual([]);
+    }
+  });
+
+  it("--exclude defaults to empty array", () => {
+    const result = parseGlobalArgs(["provision-skills"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.exclude).toEqual([]);
+    }
+  });
+
+  it("rejects --include and --exclude together", () => {
+    const result = parseGlobalArgs([
+      "provision-skills",
+      "--include",
+      "deploy",
+      "--exclude",
+      "draft-*",
+    ]);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.exitCode).toBe(2);
+    }
+    expect(mockWriteStderr).toHaveBeenCalled();
+  });
 });

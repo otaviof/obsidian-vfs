@@ -51,6 +51,8 @@ const mockFormatJSON = vi.mocked(formatProvisionSkillsJSON);
 function makeArgs(overrides: Partial<ProvisionSkillsArgs> = {}): ProvisionSkillsArgs {
   return {
     dryRun: false,
+    include: [],
+    exclude: [],
     ...CLI_DEFAULTS,
     ...overrides,
   };
@@ -373,6 +375,117 @@ describe("cmd-provision-skills", () => {
     expect(code).toBe(EXIT_SUCCESS);
     expect(mockFormatResult).toHaveBeenCalledWith(
       expect.objectContaining({ written: ["review"] }),
+    );
+  });
+
+  it("provisions only included skills", async () => {
+    const skills = [
+      makeSkill({ name: "deploy", description: "Deployer" }),
+      makeSkill({ name: "review", description: "Reviewer" }),
+    ];
+    const tracker = makeTracker({ ok: true, value: skills });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ include: ["deploy"] }));
+
+    expect(mockFormatResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        written: ["deploy"],
+        skipped: ["review"],
+        filter: expect.objectContaining({ discoveredCount: 2, filteredCount: 1 }) as unknown,
+      }),
+    );
+  });
+
+  it("provisions multiple included skills", async () => {
+    const skills = [
+      makeSkill({ name: "deploy", description: "Deployer" }),
+      makeSkill({ name: "review", description: "Reviewer" }),
+      makeSkill({ name: "architect", description: "Architect" }),
+    ];
+    const tracker = makeTracker({ ok: true, value: skills });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ include: ["deploy", "review"] }));
+
+    expect(mockFormatResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        written: ["deploy", "review"],
+        skipped: ["architect"],
+      }),
+    );
+  });
+
+  it("excludes matching skills", async () => {
+    const skills = [
+      makeSkill({ name: "deploy", description: "Deployer" }),
+      makeSkill({ name: "draft-notes", description: "Draft notes" }),
+    ];
+    const tracker = makeTracker({ ok: true, value: skills });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ exclude: ["draft-*"] }));
+
+    expect(mockFormatResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        written: ["deploy"],
+        skipped: ["draft-notes"],
+      }),
+    );
+  });
+
+  it("no filter provisions all skills with empty skipped", async () => {
+    const skills = [makeSkill()];
+    const tracker = makeTracker({ ok: true, value: skills });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs());
+
+    expect(mockFormatResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        skipped: [],
+        filter: expect.objectContaining({
+          include: [],
+          exclude: [],
+          discoveredCount: 1,
+          filteredCount: 1,
+        }) as unknown,
+      }),
+    );
+  });
+
+  it("--dry-run with include lists only matching skills", async () => {
+    const skills = [
+      makeSkill({ name: "deploy", description: "Deployer" }),
+      makeSkill({ name: "review", description: "Reviewer" }),
+    ];
+    const tracker = makeTracker({ ok: true, value: skills });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ dryRun: true, include: ["deploy"] }));
+
+    expect(mockFormatResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        written: ["deploy"],
+        skipped: ["review"],
+        dryRun: true,
+      }),
+    );
+  });
+
+  it("include that matches nothing results in empty written", async () => {
+    const skills = [makeSkill()];
+    const tracker = makeTracker({ ok: true, value: skills });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ include: ["nonexistent"] }));
+
+    expect(mockFormatResult).toHaveBeenCalledWith(
+      expect.objectContaining({
+        written: [],
+        skipped: ["deploy"],
+        filter: expect.objectContaining({ filteredCount: 0 }) as unknown,
+      }),
     );
   });
 });
