@@ -1,8 +1,14 @@
-import type { DiscoveredSkill, LocalIndexTracker, VFSResult } from "@obsidian-vfs/core";
+import type { DiscoveredSkill, VFSResult } from "@obsidian-vfs/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ProvisionSkillsArgs } from "./types.js";
 import { EXIT_ERROR, EXIT_SUCCESS } from "./types.js";
+import {
+  CLI_DEFAULTS,
+  FORMAT_ERROR_STUB,
+  FORMAT_VERBOSE_TIMING_STUB,
+  makeLocalIndexTrackerWith,
+} from "./test-helpers.js";
 
 vi.mock("node:fs/promises", () => ({
   mkdir: vi.fn().mockResolvedValue(undefined),
@@ -15,12 +21,10 @@ vi.mock("./bootstrap.js", () => ({
 }));
 
 vi.mock("./formatters.js", () => ({
-  formatError: vi.fn((err: { message: string }) => `ERROR: ${err.message}`),
+  formatError: vi.fn(FORMAT_ERROR_STUB),
   formatProvisionSkillsResult: vi.fn(() => "PROVISION_RESULT"),
   formatProvisionSkillsJSON: vi.fn((o: unknown) => JSON.stringify(o)),
-  formatVerboseTiming: vi.fn(
-    (label: string, ms: number) => `[verbose] ${label}: ${ms.toFixed(1)}ms`,
-  ),
+  formatVerboseTiming: vi.fn(FORMAT_VERBOSE_TIMING_STUB),
   writeStdout: vi.fn(),
   writeStderr: vi.fn(),
 }));
@@ -47,10 +51,7 @@ const mockFormatJSON = vi.mocked(formatProvisionSkillsJSON);
 function makeArgs(overrides: Partial<ProvisionSkillsArgs> = {}): ProvisionSkillsArgs {
   return {
     dryRun: false,
-    json: false,
-    verbose: false,
-    cliPath: "obsidian",
-    timeoutMs: 10_000,
+    ...CLI_DEFAULTS,
     ...overrides,
   };
 }
@@ -65,12 +66,8 @@ function makeSkill(overrides: Partial<DiscoveredSkill> = {}): DiscoveredSkill {
 }
 
 function makeTracker(listSkillsResult: VFSResult<DiscoveredSkill[]>) {
-  const listSkills = vi.fn<() => Promise<VFSResult<DiscoveredSkill[]>>>();
-  listSkills.mockResolvedValue(listSkillsResult);
-  return {
-    context: { physicalPath: "/Users/me/vault", name: "My Vault" },
-    listSkills,
-  } as unknown as LocalIndexTracker;
+  const { tracker } = makeLocalIndexTrackerWith("listSkills", listSkillsResult);
+  return tracker;
 }
 
 describe("cmd-provision-skills", () => {

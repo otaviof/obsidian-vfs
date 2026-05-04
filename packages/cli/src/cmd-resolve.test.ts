@@ -1,27 +1,26 @@
-import type {
-  LocalIndexTracker,
-  MentionResult,
-  VFSResult,
-  WikilinkResolution,
-} from "@obsidian-vfs/core";
+import type { MentionResult, VFSResult, WikilinkResolution } from "@obsidian-vfs/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ResolveArgs } from "./types.js";
 import { EXIT_ERROR, EXIT_SUCCESS, EXIT_USAGE } from "./types.js";
+import {
+  CLI_DEFAULTS,
+  FORMAT_ERROR_STUB,
+  FORMAT_VERBOSE_TIMING_STUB,
+  makeLocalIndexTrackerWith,
+} from "./test-helpers.js";
 
 vi.mock("./bootstrap.js", () => ({
   bootstrapTracker: vi.fn(),
 }));
 
 vi.mock("./formatters.js", () => ({
-  formatError: vi.fn((err: { message: string }) => `ERROR: ${err.message}`),
+  formatError: vi.fn(FORMAT_ERROR_STUB),
   formatResolveCandidates: vi.fn(() => "CANDIDATES"),
   formatResolveResult: vi.fn((_out: unknown) => "RESOLVE_RESULT"),
   formatResolveJSON: vi.fn((r: unknown) => JSON.stringify(r)),
   formatUsageError: vi.fn((msg: string) => `USAGE: ${msg}`),
-  formatVerboseTiming: vi.fn(
-    (label: string, ms: number) => `[verbose] ${label}: ${ms.toFixed(1)}ms`,
-  ),
+  formatVerboseTiming: vi.fn(FORMAT_VERBOSE_TIMING_STUB),
   writeStdout: vi.fn(),
   writeStderr: vi.fn(),
 }));
@@ -50,45 +49,35 @@ const mockFormatVerboseTiming = vi.mocked(formatVerboseTiming);
 function makeArgs(overrides: Partial<ResolveArgs> = {}): ResolveArgs {
   return {
     wikilink: "Project Plan",
-    json: false,
-    verbose: false,
-    cliPath: "obsidian",
-    timeoutMs: 10_000,
+    ...CLI_DEFAULTS,
     ...overrides,
   };
 }
 
 function makeTracker(resolveResult: VFSResult<WikilinkResolution>) {
-  const resolveWikilink = vi.fn<LocalIndexTracker["resolveWikilink"]>();
-  resolveWikilink.mockResolvedValue(resolveResult);
-  const tracker = {
-    context: { physicalPath: "/Users/me/vault" },
-    resolveWikilink,
-    resolveMention: vi.fn(),
-  } as unknown as LocalIndexTracker;
+  const { tracker, mock: resolveWikilink } = makeLocalIndexTrackerWith(
+    "resolveWikilink",
+    resolveResult,
+    { resolveMention: vi.fn() },
+  );
   return { tracker, resolveWikilink };
 }
 
 function makeMentionTracker(mentionResult: VFSResult<MentionResult>) {
-  const resolveMention = vi.fn<LocalIndexTracker["resolveMention"]>();
-  resolveMention.mockResolvedValue(mentionResult);
-  const tracker = {
-    context: { physicalPath: "/Users/me/vault" },
-    resolveWikilink: vi.fn(),
-    resolveMention,
-  } as unknown as LocalIndexTracker;
+  const { tracker, mock: resolveMention } = makeLocalIndexTrackerWith(
+    "resolveMention",
+    mentionResult,
+    { resolveWikilink: vi.fn() },
+  );
   return { tracker, resolveMention };
 }
 
 function makeSkillTracker(skillResult: VFSResult<string>) {
-  const resolveSkill = vi.fn<LocalIndexTracker["resolveSkill"]>();
-  resolveSkill.mockResolvedValue(skillResult);
-  const tracker = {
-    context: { physicalPath: "/Users/me/vault" },
-    resolveWikilink: vi.fn(),
-    resolveMention: vi.fn(),
-    resolveSkill,
-  } as unknown as LocalIndexTracker;
+  const { tracker, mock: resolveSkill } = makeLocalIndexTrackerWith(
+    "resolveSkill",
+    skillResult,
+    { resolveWikilink: vi.fn(), resolveMention: vi.fn() },
+  );
   return { tracker, resolveSkill };
 }
 

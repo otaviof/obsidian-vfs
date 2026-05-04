@@ -1,8 +1,14 @@
-import type { LocalIndexTracker, MentionResult, VFSResult } from "@obsidian-vfs/core";
+import type { MentionResult, VFSResult } from "@obsidian-vfs/core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { InspectArgs } from "./types.js";
 import { EXIT_ERROR, EXIT_SUCCESS } from "./types.js";
+import {
+  CLI_DEFAULTS,
+  FORMAT_ERROR_STUB,
+  FORMAT_VERBOSE_TIMING_STUB,
+  makeLocalIndexTrackerWith,
+} from "./test-helpers.js";
 
 vi.mock("@obsidian-vfs/core", async () => {
   const actual = await vi.importActual("@obsidian-vfs/core");
@@ -14,12 +20,10 @@ vi.mock("./bootstrap.js", () => ({
 }));
 
 vi.mock("./formatters.js", () => ({
-  formatError: vi.fn((err: { message: string }) => `ERROR: ${err.message}`),
+  formatError: vi.fn(FORMAT_ERROR_STUB),
   formatInspectResult: vi.fn((_out: unknown, _opts: unknown) => "INSPECT_RESULT"),
   formatInspectJSON: vi.fn((r: unknown) => JSON.stringify(r)),
-  formatVerboseTiming: vi.fn(
-    (label: string, ms: number) => `[verbose] ${label}: ${ms.toFixed(1)}ms`,
-  ),
+  formatVerboseTiming: vi.fn(FORMAT_VERBOSE_TIMING_STUB),
   writeStdout: vi.fn(),
   writeStderr: vi.fn(),
 }));
@@ -48,12 +52,9 @@ const mockFormatVerboseTiming = vi.mocked(formatVerboseTiming);
 function makeArgs(overrides: Partial<InspectArgs> = {}): InspectArgs {
   return {
     mention: "architect",
-    json: false,
-    verbose: false,
     full: false,
     body: false,
-    cliPath: "obsidian",
-    timeoutMs: 10_000,
+    ...CLI_DEFAULTS,
     ...overrides,
   };
 }
@@ -70,12 +71,10 @@ function makeMentionResult(overrides: Partial<MentionResult> = {}): MentionResul
 }
 
 function makeTracker(resolveMentionResult: VFSResult<MentionResult>) {
-  const resolveMention = vi.fn<LocalIndexTracker["resolveMention"]>();
-  resolveMention.mockResolvedValue(resolveMentionResult);
-  const tracker = {
-    context: { physicalPath: "/Users/me/vault", name: "My Vault" },
-    resolveMention,
-  } as unknown as LocalIndexTracker;
+  const { tracker, mock: resolveMention } = makeLocalIndexTrackerWith(
+    "resolveMention",
+    resolveMentionResult,
+  );
   return { tracker, resolveMention };
 }
 
