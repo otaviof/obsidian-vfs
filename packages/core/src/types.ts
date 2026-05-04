@@ -97,9 +97,9 @@ export interface MentionResult {
 }
 
 /**
- * Metadata for a single vault skill discovered during enumeration.
+ * Metadata for a vault resource (skill or agent) discovered during enumeration.
  */
-export interface DiscoveredSkill {
+export interface DiscoveredResource {
   readonly name: string;
   readonly description: string;
   readonly vaultRelativePath: string;

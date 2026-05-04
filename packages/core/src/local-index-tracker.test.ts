@@ -628,6 +628,203 @@ describe("LocalIndexTracker", () => {
     });
   });
 
+  describe("listAgents", () => {
+    async function createTrackerWithAgents(agentsDirs: string[]) {
+      readFileMock.mockImplementation((...args: unknown[]) => {
+        if (args[1] === "utf-8") {
+          return Promise.resolve(JSON.stringify({ agentsDirs, allowedFolders: [] }));
+        }
+        return Promise.reject(new Error("unexpected"));
+      });
+      const result = await LocalIndexTracker.create(mockCLI());
+      if (!result.ok) throw new Error("Failed to create tracker");
+      return result.value;
+    }
+
+    it("enumerates agents from single agentsDir", async () => {
+      const tracker = await createTrackerWithAgents(["agents"]);
+
+      const { readdir } = await import("node:fs/promises");
+      const readdirMock = mockFsFunction(readdir);
+      readdirMock.mockResolvedValueOnce([
+        { name: "architect.md", isDirectory: () => false },
+        { name: "reviewer.md", isDirectory: () => false },
+      ]);
+
+      readFileMock
+        .mockResolvedValueOnce(
+          Buffer.from("---\ndescription: System architect\n---\nArchitect content"),
+        )
+        .mockResolvedValueOnce(
+          Buffer.from("---\ndescription: Code reviewer\n---\nReview content"),
+        );
+
+      const result = await tracker.listAgents();
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value).toHaveLength(2);
+      expect(result.value[0]).toEqual({
+        name: "architect",
+        description: "System architect",
+        vaultRelativePath: "agents/architect.md",
+      });
+      expect(result.value[1]).toEqual({
+        name: "reviewer",
+        description: "Code reviewer",
+        vaultRelativePath: "agents/reviewer.md",
+      });
+    });
+
+    it("deduplicates across multiple agentsDirs (first wins)", async () => {
+      const tracker = await createTrackerWithAgents(["agents-a", "agents-b"]);
+
+      const { readdir } = await import("node:fs/promises");
+      const readdirMock = mockFsFunction(readdir);
+      readdirMock
+        .mockResolvedValueOnce([{ name: "architect.md", isDirectory: () => false }])
+        .mockResolvedValueOnce([{ name: "architect.md", isDirectory: () => false }]);
+
+      readFileMock.mockResolvedValueOnce(
+        Buffer.from("---\ndescription: First architect\n---\nContent A"),
+      );
+
+      const result = await tracker.listAgents();
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value).toHaveLength(1);
+      expect(result.value[0].description).toBe("First architect");
+      expect(result.value[0].vaultRelativePath).toBe("agents-a/architect.md");
+    });
+
+    it("skips directory entries", async () => {
+      const tracker = await createTrackerWithAgents(["agents"]);
+
+      const { readdir } = await import("node:fs/promises");
+      const readdirMock = mockFsFunction(readdir);
+      readdirMock.mockResolvedValueOnce([
+        { name: "subdir.md", isDirectory: () => true },
+        { name: "valid.md", isDirectory: () => false },
+      ]);
+
+      readFileMock.mockResolvedValueOnce(
+        Buffer.from("---\ndescription: Valid agent\n---\nContent"),
+      );
+
+      const result = await tracker.listAgents();
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value).toHaveLength(1);
+      expect(result.value[0].name).toBe("valid");
+    });
+
+    it("uses default description when no frontmatter", async () => {
+      const tracker = await createTrackerWithAgents(["agents"]);
+
+      const { readdir } = await import("node:fs/promises");
+      const readdirMock = mockFsFunction(readdir);
+      readdirMock.mockResolvedValueOnce([{ name: "plain.md", isDirectory: () => false }]);
+
+      readFileMock.mockResolvedValueOnce(Buffer.from("No frontmatter here"));
+
+      const result = await tracker.listAgents();
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value[0].description).toBe("Obsidian vault agent: plain");
+    });
+
+    it("returns empty list when agentsDirs is empty", async () => {
+      const tracker = await createTrackerWithAgents([]);
+
+      const result = await tracker.listAgents();
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value).toEqual([]);
+    });
+
+    it("skips agent names with unsafe characters", async () => {
+      const tracker = await createTrackerWithAgents(["agents"]);
+
+      const { readdir } = await import("node:fs/promises");
+      const readdirMock = mockFsFunction(readdir);
+      readdirMock.mockResolvedValueOnce([
+        { name: "good-agent.md", isDirectory: () => false },
+        { name: "bad;name.md", isDirectory: () => false },
+        { name: "$(evil).md", isDirectory: () => false },
+        { name: "has spaces.md", isDirectory: () => false },
+      ]);
+
+      readFileMock.mockResolvedValueOnce(
+        Buffer.from("---\ndescription: Good\n---\nContent"),
+      );
+
+      const result = await tracker.listAgents();
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value).toHaveLength(1);
+      expect(result.value[0].name).toBe("good-agent");
+    });
+
+    it("continues when an agentsDir fails to enumerate", async () => {
+      const tracker = await createTrackerWithAgents(["bad-dir", "good-dir"]);
+
+      const { readdir } = await import("node:fs/promises");
+      const readdirMock = mockFsFunction(readdir);
+      readdirMock
+        .mockRejectedValueOnce(Object.assign(new Error("ENOENT"), { code: "ENOENT" }))
+        .mockResolvedValueOnce([{ name: "architect.md", isDirectory: () => false }]);
+
+      readFileMock.mockResolvedValueOnce(
+        Buffer.from("---\ndescription: From good dir\n---\nContent"),
+      );
+
+      const result = await tracker.listAgents();
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value).toHaveLength(1);
+      expect(result.value[0].name).toBe("architect");
+      expect(result.value[0].vaultRelativePath).toBe("good-dir/architect.md");
+    });
+
+    it("collects distinct agents from multiple agentsDirs", async () => {
+      const tracker = await createTrackerWithAgents(["dir-a", "dir-b"]);
+
+      const { readdir } = await import("node:fs/promises");
+      const readdirMock = mockFsFunction(readdir);
+      readdirMock
+        .mockResolvedValueOnce([{ name: "alpha.md", isDirectory: () => false }])
+        .mockResolvedValueOnce([{ name: "beta.md", isDirectory: () => false }]);
+
+      readFileMock
+        .mockResolvedValueOnce(Buffer.from("---\ndescription: Alpha agent\n---\nA"))
+        .mockResolvedValueOnce(Buffer.from("---\ndescription: Beta agent\n---\nB"));
+
+      const result = await tracker.listAgents();
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value).toHaveLength(2);
+      expect(result.value.map((a) => a.name)).toEqual(["alpha", "beta"]);
+    });
+
+    it("strips .md from filename to derive name", async () => {
+      const tracker = await createTrackerWithAgents(["agents"]);
+
+      const { readdir } = await import("node:fs/promises");
+      const readdirMock = mockFsFunction(readdir);
+      readdirMock.mockResolvedValueOnce([
+        { name: "my-agent.md", isDirectory: () => false },
+      ]);
+
+      readFileMock.mockResolvedValueOnce(
+        Buffer.from("---\ndescription: My agent\n---\nContent"),
+      );
+
+      const result = await tracker.listAgents();
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.value[0].name).toBe("my-agent");
+    });
+  });
+
   describe("watching", () => {
     it("stores cli from create", async () => {
       const cli = mockCLI();

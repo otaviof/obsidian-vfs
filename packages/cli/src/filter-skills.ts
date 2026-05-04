@@ -1,14 +1,12 @@
-import type { DiscoveredSkill } from "@obsidian-vfs/core";
-
-/** Options for skill filtering. */
+/** Options for resource filtering. */
 interface FilterOptions {
   readonly include: readonly string[];
   readonly exclude: readonly string[];
 }
 
-/** Result of filtering a skill list. */
-interface FilterResult {
-  readonly matched: readonly DiscoveredSkill[];
+/** Result of filtering a resource list. */
+interface FilterResult<T> {
+  readonly matched: readonly T[];
   readonly skipped: readonly string[];
 }
 
@@ -19,37 +17,37 @@ export function globToRegExp(pattern: string): RegExp {
   return new RegExp(`^${withWildcards}$`);
 }
 
-/** Filter a list of discovered skills by include/exclude glob patterns. */
-export function filterSkills(
-  skills: readonly DiscoveredSkill[],
+/** Filter a list of named resources by include/exclude glob patterns. */
+export function filterSkills<T extends { readonly name: string }>(
+  items: readonly T[],
   options: FilterOptions,
-): FilterResult {
+): FilterResult<T> {
   if (options.include.length === 0 && options.exclude.length === 0) {
-    return { matched: skills, skipped: [] };
+    return { matched: items, skipped: [] };
   }
 
   if (options.include.length > 0) {
     const patterns = options.include.map(globToRegExp);
-    const matched: DiscoveredSkill[] = [];
+    const matched: T[] = [];
     const skipped: string[] = [];
-    for (const skill of skills) {
-      if (patterns.some((re) => re.test(skill.name))) {
-        matched.push(skill);
+    for (const item of items) {
+      if (patterns.some((re) => re.test(item.name))) {
+        matched.push(item);
       } else {
-        skipped.push(skill.name);
+        skipped.push(item.name);
       }
     }
     return { matched, skipped };
   }
 
   const patterns = options.exclude.map(globToRegExp);
-  const matched: DiscoveredSkill[] = [];
+  const matched: T[] = [];
   const skipped: string[] = [];
-  for (const skill of skills) {
-    if (patterns.some((re) => re.test(skill.name))) {
-      skipped.push(skill.name);
+  for (const item of items) {
+    if (patterns.some((re) => re.test(item.name))) {
+      skipped.push(item.name);
     } else {
-      matched.push(skill);
+      matched.push(item);
     }
   }
   return { matched, skipped };

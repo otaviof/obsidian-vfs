@@ -9,7 +9,7 @@ Read-only virtual filesystem exposing an [Obsidian](https://obsidian.md) vault v
 | `packages/core` | `obs://` URI resolution, LRU cache, Obsidian CLI wrapper, direct file reads via `node:fs` |
 | `packages/vscode` | VS Code `FileSystemProvider` for `obs://` — reads from disk, mutations through CLI |
 | `packages/claude-plugin` | Agent SDK plugin resolving `@obs:` and `/obs:` mentions into context via `UserPromptSubmit` hook |
-| `packages/cli` | `npx obsidian-vfs` diagnostics and provisioning — `inspect`, `resolve`, `list-skills`, `provision-skills` |
+| `packages/cli` | `npx obsidian-vfs` diagnostics and provisioning — `inspect`, `resolve`, `list-skills`, `provision-skills`, `list-agents`, `provision-agents` |
 
 The consumer packages (`vscode`, `claude-plugin`, `cli`) depend on `core` but have no cross-dependencies between each other.
 
@@ -130,6 +130,43 @@ The command enumerates every `skillsDir` configured in `.obsidian/obsidian-vfs.j
 
 The command only adds — it never removes proxy files or permission rules. Proxies are cheap to regenerate, and accidental deletion of a manually-tweaked proxy or permission rule is more disruptive than a stale file on disk. To remove a deprovisioned skill, delete its `.claude/skills/<name>/` directory and the corresponding rule from `.claude/settings.local.json` manually.
 
+### Listing Vault Agents
+
+Enumerate all agents discovered from the vault's `agentsDirs`:
+
+```sh
+# Terminal table output
+pnpm cli list-agents
+
+# Machine-readable output
+pnpm cli list-agents --json
+```
+
+### Provisioning Vault Agents
+
+The subcommand `provision-agents` generates proxy agent files under `.claude/agents/`. Unlike skill proxies (which use `!`command`` for dynamic content loading), agent proxies write the **full vault content** at provisioning time because `!`command`` preprocessing is a SKILL.md-only feature — it does not work in agent files.
+
+All frontmatter from the vault source is forwarded verbatim (`tools`, `model`, `hooks`, `memory`, etc.), with `name` ensured from the filename. `[[wikilinks]]` in the body are converted to `obs://` URIs via `scrubWikilinks()` at provisioning time. At runtime, Claude follows these links via `obs-read`, so the progressive disclosure chain works at any depth.
+
+| Aspect | `provision-skills` | `provision-agents` |
+|--------|--------------------|--------------------|
+| Output format | `.claude/skills/<name>/SKILL.md` (directory) | `.claude/agents/<name>.md` (flat file) |
+| Body mechanism | `!`command`` loads fresh content per session | Full content written at provisioning time |
+| Frontmatter | Minimal (name + description) | All fields forwarded from vault |
+| Wikilink scrubbing | At runtime by `obs-read` | At provisioning time by CLI |
+| Permissions | Per-skill `Bash(./bin/obs-read ...)` | Single global `Bash(obs-read *)` |
+| Content freshness | Always current | Stale until re-provisioned |
+
+```sh
+pnpm cli provision-agents
+pnpm cli provision-agents --dry-run
+pnpm cli provision-agents --include architect --include reviewer
+pnpm cli provision-agents --exclude "draft-*"
+pnpm cli provision-agents --json
+```
+
+Same add-only behavior as skills. The command never removes proxy files or permission rules. To remove a deprovisioned agent, delete `.claude/agents/<name>.md` manually.
+
 ### Wikilink Resolution
 
 The `resolve` command uses the Obsidian CLI's `search` with `file:<name>` to find candidates, then picks the exact basename match. This differs from the raw search order — Obsidian's search returns results in its own relevance ranking, which may place partial matches before exact ones. For example, `file:system` may return `["Landscaper vs. System Testing.md", "system.md", "base-system.md"]`, but `resolve` selects `system.md` because its basename matches exactly. When multiple files share the same basename, the shortest vault-relative path wins.
@@ -209,7 +246,7 @@ Place a JSON file at `.obsidian/obsidian-vfs.json` inside your vault to configur
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `agentsDirs` | `string[]` | Vault-relative folders containing agent definitions. Used by `inspect` to resolve agent mentions. |
+| `agentsDirs` | `string[]` | Vault-relative folders containing agent definitions (flat `.md` files). Used by `inspect` to resolve agent mentions and by `provision-agents` to generate proxy agents. |
 | `skillsDirs` | `string[]` | Vault-relative folders containing skill definitions (`name/SKILL.md`). Used by `/obs:` mentions and `@obs:` fallback. |
 | `allowedFolders` | `string[]` | Restrict all read operations to these vault-relative folders. Empty means no restriction (full vault access). |
 

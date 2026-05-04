@@ -2,8 +2,8 @@ import type { VFSError } from "@obsidian-vfs/core";
 
 import type {
   InspectOutput,
-  ListSkillsOutput,
-  ProvisionSkillsOutput,
+  ListResourcesOutput,
+  ProvisionOutput,
   ResolveOutput,
 } from "./types.js";
 
@@ -147,39 +147,43 @@ export function formatVerboseTiming(label: string, ms: number): string {
   return `[verbose] ${label}: ${ms.toFixed(1)}ms`;
 }
 
-/** Format the list-skills result for terminal display. */
-export function formatListSkillsResult(output: ListSkillsOutput): string {
+/** Format a list-resources result for terminal display. */
+export function formatListResourcesResult(
+  output: ListResourcesOutput,
+  resourceKind: string,
+): string {
   if (output.count === 0) {
-    return "Found 0 skills.";
+    return `Found 0 ${resourceKind}.`;
   }
 
-  const maxName = Math.max(...output.skills.map((s) => s.name.length));
+  const maxName = Math.max(...output.resources.map((s) => s.name.length));
   const nameWidth = maxName + 2;
   const descWidth = 50;
-  const lines: string[] = [`Found ${output.count} skills:`, ""];
+  const lines: string[] = [`Found ${output.count} ${resourceKind}:`, ""];
 
-  for (const skill of output.skills) {
-    const desc = skill.description.length > descWidth
-      ? skill.description.slice(0, descWidth - 1) + "…"
-      : skill.description;
+  for (const resource of output.resources) {
+    const desc =
+      resource.description.length > descWidth
+        ? resource.description.slice(0, descWidth - 1) + "…"
+        : resource.description;
     lines.push(
-      `  ${skill.name.padEnd(nameWidth)}${desc.padEnd(descWidth)}${skill.vaultRelativePath}`,
+      `  ${resource.name.padEnd(nameWidth)}${desc.padEnd(descWidth)}${resource.vaultRelativePath}`,
     );
   }
 
   return lines.join("\n");
 }
 
-/** Format the list-skills result as JSON. */
-export function formatListSkillsJSON(output: ListSkillsOutput): string {
+/** Format a list-resources result as JSON. */
+export function formatListResourcesJSON(output: ListResourcesOutput): string {
   return JSON.stringify(output, null, 2);
 }
 
-/** Format the provision-skills result for terminal display. */
-export function formatProvisionSkillsResult(output: ProvisionSkillsOutput): string {
+/** Format a provision result for terminal display. */
+export function formatProvisionResult(output: ProvisionOutput, resourceKind: string): string {
   const prefix = output.dryRun ? "[dry-run] " : "";
   const lines: string[] = [
-    `${prefix}Wrote ${output.written.length} skills:`,
+    `${prefix}Wrote ${output.written.length} ${resourceKind}:`,
     "",
     labelLine("written", output.written.join(", ") || "(none)"),
   ];
@@ -194,9 +198,10 @@ export function formatProvisionSkillsResult(output: ProvisionSkillsOutput): stri
 
   const hasFilter = output.filter.include.length > 0 || output.filter.exclude.length > 0;
   if (hasFilter) {
-    const pattern = output.filter.include.length > 0
-      ? `--include ${output.filter.include.map((p) => `"${p}"`).join(" ")}`
-      : `--exclude ${output.filter.exclude.map((p) => `"${p}"`).join(" ")}`;
+    const pattern =
+      output.filter.include.length > 0
+        ? `--include ${output.filter.include.map((p) => `"${p}"`).join(" ")}`
+        : `--exclude ${output.filter.exclude.map((p) => `"${p}"`).join(" ")}`;
     lines.push(
       labelLine(
         "filter",
@@ -215,8 +220,8 @@ export function formatProvisionSkillsResult(output: ProvisionSkillsOutput): stri
   return lines.join("\n");
 }
 
-/** Format the provision-skills result as JSON. */
-export function formatProvisionSkillsJSON(output: ProvisionSkillsOutput): string {
+/** Format a provision result as JSON. */
+export function formatProvisionJSON(output: ProvisionOutput): string {
   return JSON.stringify(output, null, 2);
 }
 
@@ -229,15 +234,17 @@ Commands:
   resolve <wikilink>      Resolve a [[wikilink]] to its vault path
   list-skills             List all discovered vault skills
   provision-skills        Generate proxy SKILL.md files from vault skills
+  list-agents             List all discovered vault agents
+  provision-agents        Generate proxy agent files from vault agents
 
 Options:
   --json                  Output as JSON
   -v, --verbose           Show timing and diagnostics
   --full                  Show full content (inspect only, no truncation)
   --body                  Output only the content body (inspect only)
-  --dry-run               Show what would change without writing (provision-skills)
-  --include <glob>        Only provision skills matching glob (repeatable, provision-skills)
-  --exclude <glob>        Skip skills matching glob (repeatable, provision-skills)
+  --dry-run               Show what would change without writing (provision-*)
+  --include <glob>        Only provision resources matching glob (repeatable, provision-*)
+  --exclude <glob>        Skip resources matching glob (repeatable, provision-*)
   --cli-path <path>       Path to Obsidian CLI binary (default: obsidian)
   --timeout <ms>          CLI timeout in milliseconds (default: 10000)
   -h, --help              Show this help message
@@ -253,7 +260,13 @@ Examples:
   obsidian-vfs provision-skills
   obsidian-vfs provision-skills --dry-run
   obsidian-vfs provision-skills --include deploy --include review
-  obsidian-vfs provision-skills --exclude "draft-*"`;
+  obsidian-vfs provision-skills --exclude "draft-*"
+  obsidian-vfs list-agents
+  obsidian-vfs list-agents --json
+  obsidian-vfs provision-agents
+  obsidian-vfs provision-agents --dry-run
+  obsidian-vfs provision-agents --include architect --include reviewer
+  obsidian-vfs provision-agents --exclude "draft-*"`;
 }
 
 /** Format a usage error with the correct usage hint. */

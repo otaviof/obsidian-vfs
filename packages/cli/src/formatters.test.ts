@@ -3,8 +3,8 @@ import { describe, expect, it } from "vitest";
 
 import type {
   InspectOutput,
-  ListSkillsOutput,
-  ProvisionSkillsOutput,
+  ListResourcesOutput,
+  ProvisionOutput,
   ResolveOutput,
 } from "./types.js";
 import {
@@ -12,10 +12,10 @@ import {
   formatHelp,
   formatInspectJSON,
   formatInspectResult,
-  formatListSkillsJSON,
-  formatListSkillsResult,
-  formatProvisionSkillsJSON,
-  formatProvisionSkillsResult,
+  formatListResourcesJSON,
+  formatListResourcesResult,
+  formatProvisionJSON,
+  formatProvisionResult,
   formatResolveCandidates,
   formatResolveJSON,
   formatResolveResult,
@@ -210,16 +210,16 @@ describe("formatVerboseTiming", () => {
   });
 });
 
-describe("formatListSkillsResult", () => {
-  it("renders skill table", () => {
-    const output: ListSkillsOutput = {
-      skills: [
+describe("formatListResourcesResult", () => {
+  it("renders resource table", () => {
+    const output: ListResourcesOutput = {
+      resources: [
         { name: "deploy", description: "Deploy helper", vaultRelativePath: "skills/deploy" },
         { name: "review", description: "Code reviewer", vaultRelativePath: "skills/review" },
       ],
       count: 2,
     };
-    const result = formatListSkillsResult(output);
+    const result = formatListResourcesResult(output, "skills");
     expect(result).toContain("Found 2 skills:");
     expect(result).toContain("deploy");
     expect(result).toContain("Deploy helper");
@@ -230,29 +230,41 @@ describe("formatListSkillsResult", () => {
   });
 
   it("handles empty list", () => {
-    const result = formatListSkillsResult({ skills: [], count: 0 });
+    const result = formatListResourcesResult({ resources: [], count: 0 }, "skills");
     expect(result).toBe("Found 0 skills.");
+  });
+
+  it("renders agents with correct kind", () => {
+    const output: ListResourcesOutput = {
+      resources: [
+        { name: "architect", description: "System architect", vaultRelativePath: "agents/architect.md" },
+      ],
+      count: 1,
+    };
+    const result = formatListResourcesResult(output, "agents");
+    expect(result).toContain("Found 1 agents:");
+    expect(result).toContain("architect");
   });
 });
 
-describe("formatListSkillsJSON", () => {
+describe("formatListResourcesJSON", () => {
   it("serializes output", () => {
-    const output: ListSkillsOutput = {
-      skills: [
+    const output: ListResourcesOutput = {
+      resources: [
         { name: "deploy", description: "Deploy helper", vaultRelativePath: "skills/deploy" },
       ],
       count: 1,
     };
-    const json = formatListSkillsJSON(output);
-    const parsed = JSON.parse(json) as ListSkillsOutput;
-    expect(parsed.skills).toHaveLength(1);
+    const json = formatListResourcesJSON(output);
+    const parsed = JSON.parse(json) as ListResourcesOutput;
+    expect(parsed.resources).toHaveLength(1);
     expect(parsed.count).toBe(1);
   });
 });
 
-describe("formatProvisionSkillsResult", () => {
+describe("formatProvisionResult", () => {
   const noFilter = { include: [] as string[], exclude: [] as string[], discoveredCount: 2, filteredCount: 2 };
-  const baseOutput: ProvisionSkillsOutput = {
+  const baseOutput: ProvisionOutput = {
     written: ["deploy", "review"],
     skipped: [],
     permissionsAdded: 2,
@@ -261,82 +273,87 @@ describe("formatProvisionSkillsResult", () => {
     filter: noFilter,
   };
 
-  it("renders written skills and permissions", () => {
-    const result = formatProvisionSkillsResult(baseOutput);
+  it("renders written resources and permissions", () => {
+    const result = formatProvisionResult(baseOutput, "skills");
     expect(result).toContain("deploy, review");
     expect(result).toContain("added 2");
   });
 
   it("shows correct count in header", () => {
-    const result = formatProvisionSkillsResult(baseOutput);
+    const result = formatProvisionResult(baseOutput, "skills");
     expect(result).toContain("Wrote 2 skills");
   });
 
-  it("shows (none) when no skills written", () => {
-    const result = formatProvisionSkillsResult({ ...baseOutput, written: [] });
+  it("shows (none) when no resources written", () => {
+    const result = formatProvisionResult({ ...baseOutput, written: [] }, "skills");
     expect(result).toContain("(none)");
   });
 
   it("prefixes with [dry-run] when dryRun is true", () => {
-    const result = formatProvisionSkillsResult({ ...baseOutput, dryRun: true });
+    const result = formatProvisionResult({ ...baseOutput, dryRun: true }, "skills");
     expect(result).toContain("[dry-run]");
   });
 
   it("includes errors when present", () => {
-    const result = formatProvisionSkillsResult({
+    const result = formatProvisionResult({
       ...baseOutput,
       errors: ["Failed to write proxy"],
-    });
+    }, "skills");
     expect(result).toContain("error: Failed to write proxy");
   });
 
   it("renders correctly when all operations fail", () => {
-    const result = formatProvisionSkillsResult({
+    const result = formatProvisionResult({
       ...baseOutput,
       written: [],
       permissionsAdded: 0,
       errors: ["Error A", "Error B"],
-    });
+    }, "skills");
     expect(result).toContain("Wrote 0 skills");
     expect(result).toContain("error: Error A");
     expect(result).toContain("error: Error B");
   });
 
   it("shows skipped when present", () => {
-    const result = formatProvisionSkillsResult({
+    const result = formatProvisionResult({
       ...baseOutput,
       written: ["deploy"],
       skipped: ["draft-notes", "draft-review"],
       filter: { include: [], exclude: ["draft-*"], discoveredCount: 3, filteredCount: 1 },
-    });
+    }, "skills");
     expect(result).toContain("skipped:");
     expect(result).toContain("draft-notes, draft-review");
   });
 
   it("shows filter summary when filter is active", () => {
-    const result = formatProvisionSkillsResult({
+    const result = formatProvisionResult({
       ...baseOutput,
       written: ["deploy"],
       skipped: ["draft-notes", "draft-review"],
       filter: { include: [], exclude: ["draft-*"], discoveredCount: 3, filteredCount: 1 },
-    });
+    }, "skills");
     expect(result).toContain("filter:");
     expect(result).toContain('--exclude "draft-*"');
     expect(result).toContain("3 discovered, 1 provisioned");
   });
 
   it("omits filter lines when no filter is active", () => {
-    const result = formatProvisionSkillsResult(baseOutput);
+    const result = formatProvisionResult(baseOutput, "skills");
     expect(result).not.toContain("skipped:");
     expect(result).not.toContain("filter:");
   });
+
+  it("uses correct resource kind for agents", () => {
+    const result = formatProvisionResult({ ...baseOutput, written: ["architect"] }, "agents");
+    expect(result).toContain("Wrote 1 agents");
+  });
 });
 
-describe("formatProvisionSkillsJSON", () => {
+describe("formatProvisionJSON", () => {
   const noFilter = { include: [] as string[], exclude: [] as string[], discoveredCount: 1, filteredCount: 1 };
 
   it("serializes output as JSON", () => {
-    const output: ProvisionSkillsOutput = {
+    const output: ProvisionOutput = {
       written: ["deploy"],
       skipped: [],
       permissionsAdded: 1,
@@ -344,15 +361,15 @@ describe("formatProvisionSkillsJSON", () => {
       errors: [],
       filter: noFilter,
     };
-    const json = formatProvisionSkillsJSON(output);
-    const parsed = JSON.parse(json) as ProvisionSkillsOutput;
+    const json = formatProvisionJSON(output);
+    const parsed = JSON.parse(json) as ProvisionOutput;
     expect(parsed.written).toEqual(["deploy"]);
     expect(parsed.permissionsAdded).toBe(1);
     expect(parsed.dryRun).toBe(false);
   });
 
   it("serializes dry-run output with errors", () => {
-    const output: ProvisionSkillsOutput = {
+    const output: ProvisionOutput = {
       written: ["a"],
       skipped: [],
       permissionsAdded: 1,
@@ -360,8 +377,8 @@ describe("formatProvisionSkillsJSON", () => {
       errors: ["some error"],
       filter: noFilter,
     };
-    const json = formatProvisionSkillsJSON(output);
-    const parsed = JSON.parse(json) as ProvisionSkillsOutput;
+    const json = formatProvisionJSON(output);
+    const parsed = JSON.parse(json) as ProvisionOutput;
     expect(parsed.dryRun).toBe(true);
     expect(parsed.errors).toEqual(["some error"]);
   });
@@ -374,6 +391,8 @@ describe("formatHelp", () => {
     expect(help).toContain("resolve");
     expect(help).toContain("list-skills");
     expect(help).toContain("provision-skills");
+    expect(help).toContain("list-agents");
+    expect(help).toContain("provision-agents");
     expect(help).toContain("--json");
     expect(help).toContain("--verbose");
     expect(help).toContain("--full");

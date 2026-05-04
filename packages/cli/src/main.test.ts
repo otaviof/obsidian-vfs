@@ -286,4 +286,38 @@ describe("parseGlobalArgs", () => {
     }
     expect(mockWriteStderr).toHaveBeenCalled();
   });
+
+  it("parses list-agents command", () => {
+    const result = parseGlobalArgs(["list-agents"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.command).toBe("list-agents");
+    }
+  });
+
+  it("parses provision-agents command", () => {
+    const result = parseGlobalArgs(["provision-agents"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.command).toBe("provision-agents");
+    }
+  });
+
+  it("--include works with provision-agents", () => {
+    const result = parseGlobalArgs(["provision-agents", "--include", "architect"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.command).toBe("provision-agents");
+      expect(result.options.include).toEqual(["architect"]);
+    }
+  });
+
+  it("--exclude works with provision-agents", () => {
+    const result = parseGlobalArgs(["provision-agents", "--exclude", "draft-*"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.command).toBe("provision-agents");
+      expect(result.options.exclude).toEqual(["draft-*"]);
+    }
+  });
 });

@@ -7,7 +7,7 @@ import {
   FORMAT_ERROR_STUB,
   FORMAT_VERBOSE_TIMING_STUB,
   makeDiscoveredResource,
-  makeListSkillsTracker,
+  makeListAgentsTracker,
 } from "./test-helpers.js";
 
 vi.mock("./bootstrap.js", () => ({
@@ -31,13 +31,19 @@ import {
   writeStderr,
   writeStdout,
 } from "./formatters.js";
-import { run } from "./cmd-list-skills.js";
+import { run } from "./cmd-list-agents.js";
 
 const mockBootstrap = vi.mocked(bootstrapTracker);
 const mockWriteStdout = vi.mocked(writeStdout);
 const mockWriteStderr = vi.mocked(writeStderr);
 const mockFormatResult = vi.mocked(formatListResourcesResult);
 const mockFormatJSON = vi.mocked(formatListResourcesJSON);
+
+const agentDefaults: { name: string; description: string; vaultRelativePath: string } = {
+  name: "architect",
+  description: "System architect",
+  vaultRelativePath: "agents/architect.md",
+};
 
 function makeArgs(overrides: Partial<ListResourcesArgs> = {}): ListResourcesArgs {
   return {
@@ -46,7 +52,7 @@ function makeArgs(overrides: Partial<ListResourcesArgs> = {}): ListResourcesArgs
   };
 }
 
-describe("cmd-list-skills", () => {
+describe("cmd-list-agents", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -55,22 +61,28 @@ describe("cmd-list-skills", () => {
     vi.restoreAllMocks();
   });
 
-  it("returns EXIT_SUCCESS with skills", async () => {
-    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
+  it("returns EXIT_SUCCESS with agents", async () => {
+    const tracker = makeListAgentsTracker({
+      ok: true,
+      value: [makeDiscoveredResource(agentDefaults)],
+    });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     const code = await run(makeArgs());
 
     expect(code).toBe(EXIT_SUCCESS);
     expect(mockFormatResult).toHaveBeenCalledWith(
-      expect.objectContaining({ resources: [makeDiscoveredResource()], count: 1 }),
-      "skills",
+      expect.objectContaining({ resources: [makeDiscoveredResource(agentDefaults)], count: 1 }),
+      "agents",
     );
     expect(mockWriteStdout).toHaveBeenCalled();
   });
 
   it("outputs JSON with --json", async () => {
-    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
+    const tracker = makeListAgentsTracker({
+      ok: true,
+      value: [makeDiscoveredResource(agentDefaults)],
+    });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     await run(makeArgs({ json: true }));
@@ -91,8 +103,8 @@ describe("cmd-list-skills", () => {
     expect(mockWriteStderr).toHaveBeenCalled();
   });
 
-  it("returns EXIT_ERROR on listSkills failure", async () => {
-    const tracker = makeListSkillsTracker({
+  it("returns EXIT_ERROR on listAgents failure", async () => {
+    const tracker = makeListAgentsTracker({
       ok: false,
       error: { code: "CLI_ERROR", message: "listing failed" },
     });
@@ -104,7 +116,10 @@ describe("cmd-list-skills", () => {
   });
 
   it("writes verbose timing to stderr", async () => {
-    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
+    const tracker = makeListAgentsTracker({
+      ok: true,
+      value: [makeDiscoveredResource(agentDefaults)],
+    });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 42 } });
 
     await run(makeArgs({ verbose: true }));
@@ -128,8 +143,8 @@ describe("cmd-list-skills", () => {
     expect(mockWriteStderr).not.toHaveBeenCalled();
   });
 
-  it("handles empty skill list", async () => {
-    const tracker = makeListSkillsTracker({ ok: true, value: [] });
+  it("handles empty agent list", async () => {
+    const tracker = makeListAgentsTracker({ ok: true, value: [] });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     const code = await run(makeArgs());
@@ -137,7 +152,7 @@ describe("cmd-list-skills", () => {
     expect(code).toBe(EXIT_SUCCESS);
     expect(mockFormatResult).toHaveBeenCalledWith(
       expect.objectContaining({ resources: [], count: 0 }),
-      "skills",
+      "agents",
     );
   });
 });

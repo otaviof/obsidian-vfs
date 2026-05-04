@@ -1,4 +1,4 @@
-import type { DiscoveredSkill, LocalIndexTracker, VFSResult } from "@obsidian-vfs/core";
+import type { DiscoveredResource, LocalIndexTracker, VFSResult } from "@obsidian-vfs/core";
 import { vi } from "vitest";
 
 /** Default CLI option values shared across all command test factories. */
@@ -40,8 +40,10 @@ export function makeLocalIndexTrackerWith<K extends keyof LocalIndexTracker>(
   return { tracker, mock };
 }
 
-/** Build a `DiscoveredSkill` with sensible defaults, overridable per-field. */
-export function makeDiscoveredSkill(overrides: Partial<DiscoveredSkill> = {}): DiscoveredSkill {
+/** Build a `DiscoveredResource` with sensible defaults, overridable per-field. */
+export function makeDiscoveredResource(
+  overrides: Partial<DiscoveredResource> = {},
+): DiscoveredResource {
   return {
     name: "deploy",
     description: "Deploy helper",
@@ -51,7 +53,16 @@ export function makeDiscoveredSkill(overrides: Partial<DiscoveredSkill> = {}): D
 }
 
 /** Build a mock tracker whose `listSkills` resolves to the given result. */
-export function makeListSkillsTracker(listSkillsResult: VFSResult<DiscoveredSkill[]>) {
+export function makeListSkillsTracker(listSkillsResult: VFSResult<DiscoveredResource[]>) {
   const { tracker } = makeLocalIndexTrackerWith("listSkills", listSkillsResult);
+  return tracker;
+}
+
+/** Build a mock tracker whose `listAgents` resolves to the given result. */
+export function makeListAgentsTracker(
+  listAgentsResult: VFSResult<DiscoveredResource[]>,
+  extraMethods: Partial<Record<keyof LocalIndexTracker, ReturnType<typeof vi.fn>>> = {},
+) {
+  const { tracker } = makeLocalIndexTrackerWith("listAgents", listAgentsResult, extraMethods);
   return tracker;
 }

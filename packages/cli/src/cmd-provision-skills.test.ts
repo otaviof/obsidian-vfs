@@ -1,12 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { ProvisionSkillsArgs } from "./types.js";
+import type { ProvisionArgs } from "./types.js";
 import { EXIT_ERROR, EXIT_SUCCESS } from "./types.js";
 import {
   CLI_DEFAULTS,
   FORMAT_ERROR_STUB,
   FORMAT_VERBOSE_TIMING_STUB,
-  makeDiscoveredSkill,
+  makeDiscoveredResource,
   makeListSkillsTracker,
 } from "./test-helpers.js";
 
@@ -22,8 +22,8 @@ vi.mock("./bootstrap.js", () => ({
 
 vi.mock("./formatters.js", () => ({
   formatError: vi.fn(FORMAT_ERROR_STUB),
-  formatProvisionSkillsResult: vi.fn(() => "PROVISION_RESULT"),
-  formatProvisionSkillsJSON: vi.fn((o: unknown) => JSON.stringify(o)),
+  formatProvisionResult: vi.fn(() => "PROVISION_RESULT"),
+  formatProvisionJSON: vi.fn((o: unknown) => JSON.stringify(o)),
   formatVerboseTiming: vi.fn(FORMAT_VERBOSE_TIMING_STUB),
   writeStdout: vi.fn(),
   writeStderr: vi.fn(),
@@ -32,8 +32,8 @@ vi.mock("./formatters.js", () => ({
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { bootstrapTracker } from "./bootstrap.js";
 import {
-  formatProvisionSkillsJSON,
-  formatProvisionSkillsResult,
+  formatProvisionJSON,
+  formatProvisionResult,
   writeStderr,
   writeStdout,
 } from "./formatters.js";
@@ -45,10 +45,10 @@ const mockReadFile = vi.mocked(readFile as unknown as (...args: unknown[]) => Pr
 const mockWriteFile = vi.mocked(writeFile as unknown as (...args: unknown[]) => Promise<unknown>);
 const mockWriteStdout = vi.mocked(writeStdout);
 const mockWriteStderr = vi.mocked(writeStderr);
-const mockFormatResult = vi.mocked(formatProvisionSkillsResult);
-const mockFormatJSON = vi.mocked(formatProvisionSkillsJSON);
+const mockFormatResult = vi.mocked(formatProvisionResult);
+const mockFormatJSON = vi.mocked(formatProvisionJSON);
 
-function makeArgs(overrides: Partial<ProvisionSkillsArgs> = {}): ProvisionSkillsArgs {
+function makeArgs(overrides: Partial<ProvisionArgs> = {}): ProvisionArgs {
   return {
     dryRun: false,
     include: [],
@@ -73,7 +73,7 @@ describe("cmd-provision-skills", () => {
   });
 
   it("returns EXIT_SUCCESS with discovered skills", async () => {
-    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredSkill()] });
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     const code = await run(makeArgs());
@@ -84,7 +84,7 @@ describe("cmd-provision-skills", () => {
   });
 
   it("writes proxy SKILL.md with correct content", async () => {
-    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredSkill()] });
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     await run(makeArgs());
@@ -98,7 +98,7 @@ describe("cmd-provision-skills", () => {
   });
 
   it("skips write when content matches", async () => {
-    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredSkill()] });
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     const expectedContent = [
@@ -125,11 +125,12 @@ describe("cmd-provision-skills", () => {
     );
     expect(mockFormatResult).toHaveBeenCalledWith(
       expect.objectContaining({ written: [] }),
+      "skills",
     );
   });
 
   it("adds per-skill permissions for new skills", async () => {
-    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredSkill()] });
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     mockReadFile.mockImplementation((...args: unknown[]) => {
@@ -155,7 +156,7 @@ describe("cmd-provision-skills", () => {
   });
 
   it("--dry-run does not write files", async () => {
-    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredSkill()] });
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     await run(makeArgs({ dryRun: true }));
@@ -165,7 +166,7 @@ describe("cmd-provision-skills", () => {
   });
 
   it("outputs JSON with --json", async () => {
-    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredSkill()] });
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     await run(makeArgs({ json: true }));
@@ -199,7 +200,7 @@ describe("cmd-provision-skills", () => {
   });
 
   it("creates settings file when missing", async () => {
-    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredSkill()] });
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     await run(makeArgs());
@@ -216,7 +217,7 @@ describe("cmd-provision-skills", () => {
   });
 
   it("captures write error and returns EXIT_ERROR", async () => {
-    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredSkill()] });
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
     mockWriteFile.mockRejectedValueOnce(new Error("disk full"));
 
@@ -227,11 +228,12 @@ describe("cmd-provision-skills", () => {
       expect.objectContaining({
         errors: expect.arrayContaining([expect.stringContaining("disk full")]) as unknown[],
       }),
+      "skills",
     );
   });
 
   it("captures permission sync error and continues", async () => {
-    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredSkill()] });
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
     mockReadFile.mockImplementation((...args: unknown[]) => {
       const pathArg = String(args[0]);
@@ -255,11 +257,12 @@ describe("cmd-provision-skills", () => {
       expect.objectContaining({
         errors: expect.arrayContaining([expect.stringContaining("sync permissions")]) as unknown[],
       }),
+      "skills",
     );
   });
 
   it("writes verbose timing to stderr", async () => {
-    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredSkill()] });
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 42 } });
 
     await run(makeArgs({ verbose: true }));
@@ -299,7 +302,7 @@ describe("cmd-provision-skills", () => {
   });
 
   it("--dry-run lists all discovered skills as written", async () => {
-    const skills = [makeDiscoveredSkill(), makeDiscoveredSkill({ name: "review", description: "Reviewer" })];
+    const skills = [makeDiscoveredResource(), makeDiscoveredResource({ name: "review", description: "Reviewer" })];
     const tracker = makeListSkillsTracker({ ok: true, value: skills });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
@@ -310,14 +313,15 @@ describe("cmd-provision-skills", () => {
         written: ["deploy", "review"],
         dryRun: true,
       }),
+      "skills",
     );
   });
 
   it("handles multiple skills in a single run", async () => {
     const skills = [
-      makeDiscoveredSkill({ name: "deploy", description: "Deployer" }),
-      makeDiscoveredSkill({ name: "review", description: "Reviewer" }),
-      makeDiscoveredSkill({ name: "architect", description: "Architect" }),
+      makeDiscoveredResource({ name: "deploy", description: "Deployer" }),
+      makeDiscoveredResource({ name: "review", description: "Reviewer" }),
+      makeDiscoveredResource({ name: "architect", description: "Architect" }),
     ];
     const tracker = makeListSkillsTracker({ ok: true, value: skills });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
@@ -329,13 +333,14 @@ describe("cmd-provision-skills", () => {
       expect.objectContaining({
         written: expect.arrayContaining(["deploy", "review", "architect"]) as unknown[],
       }),
+      "skills",
     );
   });
 
   it("only reports newly written skills", async () => {
     const skills = [
-      makeDiscoveredSkill({ name: "deploy", description: "Deployer" }),
-      makeDiscoveredSkill({ name: "review", description: "Reviewer" }),
+      makeDiscoveredResource({ name: "deploy", description: "Deployer" }),
+      makeDiscoveredResource({ name: "review", description: "Reviewer" }),
     ];
     const tracker = makeListSkillsTracker({ ok: true, value: skills });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
@@ -361,13 +366,14 @@ describe("cmd-provision-skills", () => {
     expect(code).toBe(EXIT_SUCCESS);
     expect(mockFormatResult).toHaveBeenCalledWith(
       expect.objectContaining({ written: ["review"] }),
+      "skills",
     );
   });
 
   it("provisions only included skills", async () => {
     const skills = [
-      makeDiscoveredSkill({ name: "deploy", description: "Deployer" }),
-      makeDiscoveredSkill({ name: "review", description: "Reviewer" }),
+      makeDiscoveredResource({ name: "deploy", description: "Deployer" }),
+      makeDiscoveredResource({ name: "review", description: "Reviewer" }),
     ];
     const tracker = makeListSkillsTracker({ ok: true, value: skills });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
@@ -380,14 +386,15 @@ describe("cmd-provision-skills", () => {
         skipped: ["review"],
         filter: expect.objectContaining({ discoveredCount: 2, filteredCount: 1 }) as unknown,
       }),
+      "skills",
     );
   });
 
   it("provisions multiple included skills", async () => {
     const skills = [
-      makeDiscoveredSkill({ name: "deploy", description: "Deployer" }),
-      makeDiscoveredSkill({ name: "review", description: "Reviewer" }),
-      makeDiscoveredSkill({ name: "architect", description: "Architect" }),
+      makeDiscoveredResource({ name: "deploy", description: "Deployer" }),
+      makeDiscoveredResource({ name: "review", description: "Reviewer" }),
+      makeDiscoveredResource({ name: "architect", description: "Architect" }),
     ];
     const tracker = makeListSkillsTracker({ ok: true, value: skills });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
@@ -399,13 +406,14 @@ describe("cmd-provision-skills", () => {
         written: ["deploy", "review"],
         skipped: ["architect"],
       }),
+      "skills",
     );
   });
 
   it("excludes matching skills", async () => {
     const skills = [
-      makeDiscoveredSkill({ name: "deploy", description: "Deployer" }),
-      makeDiscoveredSkill({ name: "draft-notes", description: "Draft notes" }),
+      makeDiscoveredResource({ name: "deploy", description: "Deployer" }),
+      makeDiscoveredResource({ name: "draft-notes", description: "Draft notes" }),
     ];
     const tracker = makeListSkillsTracker({ ok: true, value: skills });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
@@ -417,11 +425,12 @@ describe("cmd-provision-skills", () => {
         written: ["deploy"],
         skipped: ["draft-notes"],
       }),
+      "skills",
     );
   });
 
   it("no filter provisions all skills with empty skipped", async () => {
-    const skills = [makeDiscoveredSkill()];
+    const skills = [makeDiscoveredResource()];
     const tracker = makeListSkillsTracker({ ok: true, value: skills });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
@@ -437,13 +446,14 @@ describe("cmd-provision-skills", () => {
           filteredCount: 1,
         }) as unknown,
       }),
+      "skills",
     );
   });
 
   it("--dry-run with include lists only matching skills", async () => {
     const skills = [
-      makeDiscoveredSkill({ name: "deploy", description: "Deployer" }),
-      makeDiscoveredSkill({ name: "review", description: "Reviewer" }),
+      makeDiscoveredResource({ name: "deploy", description: "Deployer" }),
+      makeDiscoveredResource({ name: "review", description: "Reviewer" }),
     ];
     const tracker = makeListSkillsTracker({ ok: true, value: skills });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
@@ -456,11 +466,12 @@ describe("cmd-provision-skills", () => {
         skipped: ["review"],
         dryRun: true,
       }),
+      "skills",
     );
   });
 
   it("include that matches nothing results in empty written", async () => {
-    const skills = [makeDiscoveredSkill()];
+    const skills = [makeDiscoveredResource()];
     const tracker = makeListSkillsTracker({ ok: true, value: skills });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
@@ -472,6 +483,7 @@ describe("cmd-provision-skills", () => {
         skipped: ["deploy"],
         filter: expect.objectContaining({ filteredCount: 0 }) as unknown,
       }),
+      "skills",
     );
   });
 });

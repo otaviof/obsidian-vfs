@@ -1,26 +1,11 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import type { DiscoveredSkill } from "@obsidian-vfs/core";
+import type { DiscoveredResource } from "@obsidian-vfs/core";
 
-import type { ProvisionSkillsArgs, ProvisionSkillsFilter, ProvisionSkillsOutput } from "./types.js";
-import { EXIT_ERROR, EXIT_SUCCESS } from "./types.js";
-import { bootstrapTracker } from "./bootstrap.js";
-import { filterSkills } from "./filter-skills.js";
-import {
-  formatError,
-  formatProvisionSkillsJSON,
-  formatProvisionSkillsResult,
-  formatVerboseTiming,
-  writeStderr,
-  writeStdout,
-} from "./formatters.js";
-
-/** Directory under project root where proxy skills are generated. */
-const PROXY_SKILLS_DIR = path.join(".claude", "skills");
-
-/** Settings file path relative to project root. */
-const SETTINGS_PATH = path.join(".claude", "settings.local.json");
+import type { ProvisionArgs } from "./types.js";
+import type { ProvisionStrategy } from "./cmd-provision-resources.js";
+import { CLAUDE_DIR, run as runProvision } from "./cmd-provision-resources.js";
 
 /** Relative path to the obs-read binary used in !command and permission rules. */
 const OBS_READ_BIN = "./bin/obs-read";
@@ -31,7 +16,7 @@ function buildPermissionRule(skillName: string): string {
 }
 
 /** Build the proxy SKILL.md content string for a given skill. */
-function buildProxyContent(skill: DiscoveredSkill): string {
+function buildProxyContent(skill: DiscoveredResource): string {
   return [
     "---",
     `name: ${skill.name}`,
@@ -45,7 +30,7 @@ function buildProxyContent(skill: DiscoveredSkill): string {
 
 /** Write a single proxy SKILL.md file, creating the directory if needed. */
 async function writeProxySkill(
-  skill: DiscoveredSkill,
+  skill: DiscoveredResource,
   skillsDir: string,
 ): Promise<"written" | "unchanged"> {
   const dir = path.join(skillsDir, skill.name);
@@ -123,111 +108,17 @@ async function countPermissionChanges(
   return { added };
 }
 
+/** Skill provisioning strategy. */
+const skillStrategy: ProvisionStrategy = {
+  resourceKind: "skills",
+  outputDir: path.join(CLAUDE_DIR, "skills"),
+  enumerate: (tracker) => tracker.listSkills(),
+  writeProxy: (resource, _tracker, outputDir) => writeProxySkill(resource, outputDir),
+  syncPermissions: syncSettingsPermissions,
+  countPermissions: countPermissionChanges,
+};
+
 /** Execute the provision-skills command. */
-export async function run(args: ProvisionSkillsArgs): Promise<number> {
-  const boot = await bootstrapTracker({ cliPath: args.cliPath, timeoutMs: args.timeoutMs });
-  if (!boot.ok) {
-    if (args.json) {
-      writeStdout(JSON.stringify({ ok: false, error: boot.error }, null, 2));
-    } else {
-      writeStderr(formatError(boot.error));
-    }
-    return EXIT_ERROR;
-  }
-
-  const { tracker, initMs } = boot.value;
-  const enumStart = performance.now();
-
-  const skillsResult = await tracker.listSkills();
-  if (!skillsResult.ok) {
-    if (args.json) {
-      writeStdout(JSON.stringify({ ok: false, error: skillsResult.error }, null, 2));
-    } else {
-      writeStderr(formatError(skillsResult.error));
-    }
-    return EXIT_ERROR;
-  }
-
-  const enumMs = performance.now() - enumStart;
-  const discovered = skillsResult.value;
-
-  const { matched, skipped } = filterSkills(discovered, {
-    include: args.include,
-    exclude: args.exclude,
-  });
-
-  const filter: ProvisionSkillsFilter = {
-    include: args.include,
-    exclude: args.exclude,
-    discoveredCount: discovered.length,
-    filteredCount: matched.length,
-  };
-
-  const cwd = process.cwd();
-  const skillsDir = path.join(cwd, PROXY_SKILLS_DIR);
-  const settingsPath = path.join(cwd, SETTINGS_PATH);
-
-  const written: string[] = [];
-  const errors: string[] = [];
-
-  if (!args.dryRun) {
-    for (const skill of matched) {
-      try {
-        const status = await writeProxySkill(skill, skillsDir);
-        if (status === "written") written.push(skill.name);
-      } catch (err) {
-        errors.push(`Failed to write proxy for ${skill.name}: ${(err as Error).message}`);
-      }
-    }
-  } else {
-    for (const skill of matched) {
-      written.push(skill.name);
-    }
-  }
-
-  let permissionsAdded = 0;
-
-  if (!args.dryRun) {
-    try {
-      const result = await syncSettingsPermissions(
-        settingsPath,
-        matched.map((s) => s.name),
-      );
-      permissionsAdded = result.added;
-    } catch (err) {
-      errors.push(`Failed to sync permissions: ${(err as Error).message}`);
-    }
-  } else {
-    try {
-      const result = await countPermissionChanges(
-        settingsPath,
-        matched.map((s) => s.name),
-      );
-      permissionsAdded = result.added;
-    } catch {
-      permissionsAdded = matched.length;
-    }
-  }
-
-  const output: ProvisionSkillsOutput = {
-    written,
-    skipped,
-    permissionsAdded,
-    dryRun: args.dryRun,
-    errors,
-    filter,
-  };
-
-  if (args.json) {
-    writeStdout(formatProvisionSkillsJSON(output));
-  } else {
-    writeStdout(formatProvisionSkillsResult(output));
-  }
-
-  if (args.verbose) {
-    writeStderr(formatVerboseTiming("Enumeration", enumMs));
-    writeStderr(formatVerboseTiming("Init", initMs));
-  }
-
-  return errors.length > 0 ? EXIT_ERROR : EXIT_SUCCESS;
+export async function run(args: ProvisionArgs): Promise<number> {
+  return runProvision(args, skillStrategy);
 }

@@ -11,7 +11,7 @@ Obsidian VFS, is read-only `obs://` protocol exposing an Obsidian vault. Three e
 - **`packages/core`** — Resolves `obs://` URIs, LRU cache, Obsidian CLI wrapper (`ObsidianCLI`), file reads via `node:fs`. CLI calls serialized (one subprocess at a time).
 - **`packages/vscode`** — `FileSystemProvider` for `obs://`. Reads->disk, mutations->CLI. CJS output, ESM source.
 - **`packages/claude-plugin`** — Agent SDK plugin. `UserPromptSubmit` hook resolves `@obs:` (context) and `/obs:` (skill-only) mentions into `additionalContext`. Can be loaded via `--plugin-dir` or via a settings hook (see README).
-- **`packages/cli`** — `npx obsidian-vfs` diagnostics and provisioning: `inspect`, `resolve`, `list-skills`, `provision-skills`.
+- **`packages/cli`** — `npx obsidian-vfs` diagnostics and provisioning: `inspect`, `resolve`, `list-skills`, `provision-skills`, `list-agents`, `provision-agents`.
 
 No cross-dependencies between vscode, claude-plugin, cli.
 

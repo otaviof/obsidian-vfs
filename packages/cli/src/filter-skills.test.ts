@@ -1,9 +1,14 @@
-import type { DiscoveredSkill } from "@obsidian-vfs/core";
 import { describe, expect, it } from "vitest";
 
 import { filterSkills, globToRegExp } from "./filter-skills.js";
 
-function makeSkill(overrides: Partial<DiscoveredSkill> = {}): DiscoveredSkill {
+interface NamedItem {
+  readonly name: string;
+  readonly description: string;
+  readonly vaultRelativePath: string;
+}
+
+function makeResource(overrides: Partial<NamedItem> = {}): NamedItem {
   return {
     name: "deploy",
     description: "Deploy helper",
@@ -41,58 +46,68 @@ describe("globToRegExp", () => {
 });
 
 describe("filterSkills", () => {
-  const skills = [
-    makeSkill(),
-    makeSkill({ name: "review", description: "Reviewer" }),
-    makeSkill({ name: "draft-notes", description: "Draft notes" }),
-    makeSkill({ name: "draft-review", description: "Draft review" }),
+  const resources = [
+    makeResource(),
+    makeResource({ name: "review", description: "Reviewer" }),
+    makeResource({ name: "draft-notes", description: "Draft notes" }),
+    makeResource({ name: "draft-review", description: "Draft review" }),
   ];
 
-  it("returns all skills when no filter is set", () => {
-    const result = filterSkills(skills, { include: [], exclude: [] });
-    expect(result.matched).toEqual(skills);
+  it("returns all items when no filter is set", () => {
+    const result = filterSkills(resources, { include: [], exclude: [] });
+    expect(result.matched).toEqual(resources);
     expect(result.skipped).toEqual([]);
   });
 
-  it("includes a single skill", () => {
-    const result = filterSkills(skills, { include: ["deploy"], exclude: [] });
+  it("includes a single item", () => {
+    const result = filterSkills(resources, { include: ["deploy"], exclude: [] });
     expect(result.matched.map((s) => s.name)).toEqual(["deploy"]);
     expect(result.skipped).toEqual(["review", "draft-notes", "draft-review"]);
   });
 
-  it("includes multiple skills", () => {
-    const result = filterSkills(skills, { include: ["deploy", "review"], exclude: [] });
+  it("includes multiple items", () => {
+    const result = filterSkills(resources, { include: ["deploy", "review"], exclude: [] });
     expect(result.matched.map((s) => s.name)).toEqual(["deploy", "review"]);
     expect(result.skipped).toEqual(["draft-notes", "draft-review"]);
   });
 
   it("includes with glob pattern", () => {
-    const result = filterSkills(skills, { include: ["draft-*"], exclude: [] });
+    const result = filterSkills(resources, { include: ["draft-*"], exclude: [] });
     expect(result.matched.map((s) => s.name)).toEqual(["draft-notes", "draft-review"]);
     expect(result.skipped).toEqual(["deploy", "review"]);
   });
 
-  it("excludes a single skill", () => {
-    const result = filterSkills(skills, { include: [], exclude: ["deploy"] });
+  it("excludes a single item", () => {
+    const result = filterSkills(resources, { include: [], exclude: ["deploy"] });
     expect(result.matched.map((s) => s.name)).toEqual(["review", "draft-notes", "draft-review"]);
     expect(result.skipped).toEqual(["deploy"]);
   });
 
   it("excludes with glob pattern", () => {
-    const result = filterSkills(skills, { include: [], exclude: ["draft-*"] });
+    const result = filterSkills(resources, { include: [], exclude: ["draft-*"] });
     expect(result.matched.map((s) => s.name)).toEqual(["deploy", "review"]);
     expect(result.skipped).toEqual(["draft-notes", "draft-review"]);
   });
 
   it("returns empty matched when include matches nothing", () => {
-    const result = filterSkills(skills, { include: ["nonexistent"], exclude: [] });
+    const result = filterSkills(resources, { include: ["nonexistent"], exclude: [] });
     expect(result.matched).toEqual([]);
     expect(result.skipped).toEqual(["deploy", "review", "draft-notes", "draft-review"]);
   });
 
   it("returns all matched when exclude matches nothing", () => {
-    const result = filterSkills(skills, { include: [], exclude: ["nonexistent"] });
-    expect(result.matched).toEqual(skills);
+    const result = filterSkills(resources, { include: [], exclude: ["nonexistent"] });
+    expect(result.matched).toEqual(resources);
     expect(result.skipped).toEqual([]);
+  });
+
+  it("works with generic named items (agent-shaped)", () => {
+    const agents = [
+      { name: "architect", description: "Architect", vaultRelativePath: "agents/architect.md" },
+      { name: "reviewer", description: "Reviewer", vaultRelativePath: "agents/reviewer.md" },
+    ];
+    const result = filterSkills(agents, { include: ["architect"], exclude: [] });
+    expect(result.matched.map((a) => a.name)).toEqual(["architect"]);
+    expect(result.skipped).toEqual(["reviewer"]);
   });
 });

@@ -7,19 +7,29 @@ import { DEFAULT_CLI_PATH, DEFAULT_TIMEOUT_MS } from "@obsidian-vfs/core";
 import type {
   CLIOptions,
   InspectArgs,
-  ListSkillsArgs,
-  ProvisionSkillsArgs,
+  ListResourcesArgs,
+  ProvisionArgs,
   ResolveArgs,
 } from "./types.js";
 import { EXIT_ERROR, EXIT_SUCCESS, EXIT_USAGE } from "./types.js";
 import { run as runInspect } from "./cmd-inspect.js";
 import { run as runListSkills } from "./cmd-list-skills.js";
+import { run as runListAgents } from "./cmd-list-agents.js";
 import { run as runProvisionSkills } from "./cmd-provision-skills.js";
+import { run as runProvisionAgents } from "./cmd-provision-agents.js";
 import { run as runResolve } from "./cmd-resolve.js";
 import { formatHelp, formatUsageError, writeStderr, writeStdout } from "./formatters.js";
 
 /** Valid command names for dispatch. */
-const VALID_COMMANDS = new Set(["inspect", "resolve", "provision-skills", "list-skills", "help"]);
+const VALID_COMMANDS = new Set([
+  "inspect",
+  "resolve",
+  "provision-skills",
+  "list-skills",
+  "provision-agents",
+  "list-agents",
+  "help",
+]);
 
 /** Parse process.argv into structured CLI options. */
 export function parseGlobalArgs(
@@ -143,24 +153,24 @@ function buildResolveArgs(options: CLIOptions, positionals: readonly string[]): 
   };
 }
 
-/** Build ProvisionSkillsArgs from parsed options. */
-function buildProvisionSkillsArgs(options: CLIOptions): ProvisionSkillsArgs {
+/** Build ListResourcesArgs from parsed options. */
+function buildListResourcesArgs(options: CLIOptions): ListResourcesArgs {
+  return {
+    json: options.json,
+    verbose: options.verbose,
+    cliPath: options.cliPath,
+    timeoutMs: options.timeoutMs,
+  };
+}
+
+/** Build ProvisionArgs from parsed options. */
+function buildProvisionArgs(options: CLIOptions): ProvisionArgs {
   return {
     dryRun: options.dryRun,
     json: options.json,
     verbose: options.verbose,
     include: options.include,
     exclude: options.exclude,
-    cliPath: options.cliPath,
-    timeoutMs: options.timeoutMs,
-  };
-}
-
-/** Build ListSkillsArgs from parsed options. */
-function buildListSkillsArgs(options: CLIOptions): ListSkillsArgs {
-  return {
-    json: options.json,
-    verbose: options.verbose,
     cliPath: options.cliPath,
     timeoutMs: options.timeoutMs,
   };
@@ -186,10 +196,16 @@ async function dispatch(options: CLIOptions, positionals: readonly string[]): Pr
     }
 
     case "list-skills":
-      return runListSkills(buildListSkillsArgs(options));
+      return runListSkills(buildListResourcesArgs(options));
 
     case "provision-skills":
-      return runProvisionSkills(buildProvisionSkillsArgs(options));
+      return runProvisionSkills(buildProvisionArgs(options));
+
+    case "list-agents":
+      return runListAgents(buildListResourcesArgs(options));
+
+    case "provision-agents":
+      return runProvisionAgents(buildProvisionArgs(options));
   }
 }
 

@@ -1,4 +1,4 @@
-import type { DiscoveredSkill } from "@obsidian-vfs/core";
+import type { DiscoveredResource } from "@obsidian-vfs/core";
 
 /** Exit code for successful command execution. */
 export const EXIT_SUCCESS = 0;
@@ -11,7 +11,14 @@ export const EXIT_USAGE = 2;
 
 /** Global options parsed from process.argv. */
 export interface CLIOptions {
-  readonly command: "inspect" | "resolve" | "provision-skills" | "list-skills" | "help";
+  readonly command:
+    | "inspect"
+    | "resolve"
+    | "provision-skills"
+    | "list-skills"
+    | "provision-agents"
+    | "list-agents"
+    | "help";
   readonly json: boolean;
   readonly verbose: boolean;
   readonly full: boolean;
@@ -34,22 +41,22 @@ export interface InspectArgs {
   readonly timeoutMs: number;
 }
 
-/** Arguments for the list-skills command. */
-export interface ListSkillsArgs {
+/** Arguments for listing resources (skills or agents). */
+export interface ListResourcesArgs {
   readonly json: boolean;
   readonly verbose: boolean;
   readonly cliPath: string;
   readonly timeoutMs: number;
 }
 
-/** Structured output of the list-skills command. */
-export interface ListSkillsOutput {
-  readonly skills: readonly DiscoveredSkill[];
+/** Structured output of a list-resources command (skills or agents). */
+export interface ListResourcesOutput {
+  readonly resources: readonly DiscoveredResource[];
   readonly count: number;
 }
 
-/** Arguments for the provision-skills command. */
-export interface ProvisionSkillsArgs {
+/** Arguments for provisioning resources (skills or agents). */
+export interface ProvisionArgs {
   readonly dryRun: boolean;
   readonly json: boolean;
   readonly verbose: boolean;
@@ -59,22 +66,22 @@ export interface ProvisionSkillsArgs {
   readonly timeoutMs: number;
 }
 
-/** Metadata about skill filtering applied during provisioning. */
-export interface ProvisionSkillsFilter {
+/** Metadata about filtering applied during provisioning. */
+export interface ProvisionFilter {
   readonly include: readonly string[];
   readonly exclude: readonly string[];
   readonly discoveredCount: number;
   readonly filteredCount: number;
 }
 
-/** Structured output of the provision-skills command. */
-export interface ProvisionSkillsOutput {
+/** Structured output of a provision command (skills or agents). */
+export interface ProvisionOutput {
   readonly written: readonly string[];
   readonly skipped: readonly string[];
   readonly permissionsAdded: number;
   readonly dryRun: boolean;
   readonly errors: readonly string[];
-  readonly filter: ProvisionSkillsFilter;
+  readonly filter: ProvisionFilter;
 }
 
 /** Arguments for the resolve command. */
