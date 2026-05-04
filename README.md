@@ -171,6 +171,34 @@ Same add-only behavior as skills. The command never removes proxy files or permi
 
 The `resolve` command uses the Obsidian CLI's `search` with `file:<name>` to find candidates, then picks the exact basename match. This differs from the raw search order — Obsidian's search returns results in its own relevance ranking, which may place partial matches before exact ones. For example, `file:system` may return `["Landscaper vs. System Testing.md", "system.md", "base-system.md"]`, but `resolve` selects `system.md` because its basename matches exactly. When multiple files share the same basename, the shortest vault-relative path wins.
 
+## `bin/` Executables
+
+Two standalone Node.js scripts in `bin/` at the repo root, auto-discovered by Claude Code and added to the Bash PATH at runtime:
+
+| Executable | Purpose |
+|------------|---------|
+| `bin/obs-read` | Resolve a vault mention and output content to stdout |
+| `bin/obs-hook-handler` | Wrapper for the compiled `UserPromptSubmit` hook handler |
+
+### `obs-read`
+
+Bootstraps a tracker, resolves a mention through the core pipeline (resolve, read, section slice, wikilink scrub), and writes the content to stdout. Accepts any mention format:
+
+```sh
+obs-read "architect"             # Bare name → @obs:architect
+obs-read "@obs:note#Section"     # Existing prefix preserved
+obs-read "/obs:deploy"           # Skill resolution
+obs-read "10-projects/plan.md"   # Vault-relative path
+```
+
+Exit codes: `0` success, `1` resolution error, `2` usage error. Errors go to stderr; content to stdout.
+
+Used by skill proxies (`!`command`` in `SKILL.md`) via `./bin/obs-read` (relative path, since the `!`command`` preprocessor does not have the plugin PATH) and by Claude's Bash tool at runtime via bare `obs-read` (on PATH).
+
+### `obs-hook-handler`
+
+Thin wrapper that locates `packages/claude-plugin/dist/hook-handler.js` via `import.meta.url` and dynamically imports it. Replaces the inline `node ${CLAUDE_PLUGIN_ROOT}/...` command in `hooks/hooks.json` with a self-resolving executable.
+
 ## Claude Plugin
 
 The Claude Code plugin intercepts every `UserPromptSubmit` hook, scans for `@obs:` and `/obs:` mentions, resolves each through the vault, and injects the content as `additionalContext`.

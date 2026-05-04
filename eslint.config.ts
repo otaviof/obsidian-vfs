@@ -32,6 +32,7 @@ export default defineConfig(
       "**/*.d.ts",
       ".claude/skills/",
       ".claude/agents/",
+      "bin/",
     ],
   },
   prettier,

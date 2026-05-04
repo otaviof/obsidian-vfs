@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node ${CLAUDE_PLUGIN_ROOT}/packages/claude-plugin/dist/hook-handler.js",
+            "command": "${CLAUDE_PLUGIN_ROOT}/bin/obs-hook-handler",
             "timeout": 30
           }
         ]
