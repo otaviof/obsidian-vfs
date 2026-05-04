@@ -25,7 +25,7 @@ export default defineConfig(
     extends: [tseslint.configs.disableTypeChecked],
   },
   {
-    ignores: ["**/node_modules/", "**/dist/", "**/coverage/", "**/*.d.ts"],
+    ignores: ["**/node_modules/", "**/dist/", "**/coverage/", "**/*.d.ts", ".claude/skills/"],
   },
   prettier,
 );

@@ -9,12 +9,13 @@ export const EXIT_USAGE = 2;
 
 /** Global options parsed from process.argv. */
 export interface CLIOptions {
-  readonly command: "inspect" | "resolve" | "help";
+  readonly command: "inspect" | "resolve" | "provision-skills" | "help";
   readonly json: boolean;
   readonly verbose: boolean;
   readonly full: boolean;
+  readonly body: boolean;
+  readonly dryRun: boolean;
   readonly cliPath: string;
-
   readonly timeoutMs: number;
 }
 
@@ -24,9 +25,26 @@ export interface InspectArgs {
   readonly json: boolean;
   readonly verbose: boolean;
   readonly full: boolean;
+  readonly body: boolean;
   readonly cliPath: string;
-
   readonly timeoutMs: number;
+}
+
+/** Arguments for the provision-skills command. */
+export interface ProvisionSkillsArgs {
+  readonly dryRun: boolean;
+  readonly json: boolean;
+  readonly verbose: boolean;
+  readonly cliPath: string;
+  readonly timeoutMs: number;
+}
+
+/** Structured output of the provision-skills command. */
+export interface ProvisionSkillsOutput {
+  readonly written: readonly string[];
+  readonly permissionsAdded: number;
+  readonly dryRun: boolean;
+  readonly errors: readonly string[];
 }
 
 /** Arguments for the resolve command. */

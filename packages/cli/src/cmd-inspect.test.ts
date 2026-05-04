@@ -51,6 +51,7 @@ function makeArgs(overrides: Partial<InspectArgs> = {}): InspectArgs {
     json: false,
     verbose: false,
     full: false,
+    body: false,
     cliPath: "obsidian",
     timeoutMs: 10_000,
     ...overrides,
@@ -267,5 +268,85 @@ describe("cmd-inspect", () => {
     const code = await run(makeArgs({ mention: "/obs:missing" }));
 
     expect(code).toBe(EXIT_ERROR);
+  });
+
+  it("outputs only content with --body", async () => {
+    const mention = makeMentionResult({ content: "Raw body content" });
+    const { tracker } = makeTracker({ ok: true, value: mention });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    const code = await run(makeArgs({ body: true }));
+
+    expect(code).toBe(EXIT_SUCCESS);
+    expect(mockWriteStdout).toHaveBeenCalledWith("Raw body content");
+    expect(mockFormatInspectResult).not.toHaveBeenCalled();
+    expect(mockFormatInspectJSON).not.toHaveBeenCalled();
+  });
+
+  it("--body still writes verbose to stderr", async () => {
+    const { tracker } = makeTracker({ ok: true, value: makeMentionResult() });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 42 } });
+
+    await run(makeArgs({ body: true, verbose: true }));
+
+    expect(mockFormatVerboseTiming).toHaveBeenCalledWith("Resolution", expect.any(Number));
+    expect(mockFormatVerboseTiming).toHaveBeenCalledWith("Init", 42);
+    expect(mockWriteStderr).toHaveBeenCalled();
+  });
+
+  it("--body on error behaves normally", async () => {
+    const { tracker } = makeTracker({
+      ok: false,
+      error: { code: "FILE_NOT_FOUND", message: "missing" },
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    const code = await run(makeArgs({ body: true }));
+
+    expect(code).toBe(EXIT_ERROR);
+    expect(mockWriteStderr).toHaveBeenCalled();
+  });
+
+  it("--body takes precedence over --json", async () => {
+    const mention = makeMentionResult({ content: "Raw content wins" });
+    const { tracker } = makeTracker({ ok: true, value: mention });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    const code = await run(makeArgs({ body: true, json: true }));
+
+    expect(code).toBe(EXIT_SUCCESS);
+    expect(mockWriteStdout).toHaveBeenCalledWith("Raw content wins");
+    expect(mockFormatInspectJSON).not.toHaveBeenCalled();
+  });
+
+  it("--body with /obs: skill mention outputs raw content", async () => {
+    const { tracker } = makeTracker({ ok: true, value: makeMentionResult() });
+    mockResolveSkillMention.mockResolvedValueOnce({
+      ok: true,
+      value: {
+        targetType: "skill",
+        resolvedPath: "skills/deploy/SKILL.md",
+        vaultName: "My Vault",
+        content: "Skill body only",
+        section: undefined,
+      },
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    const code = await run(makeArgs({ mention: "/obs:deploy", body: true }));
+
+    expect(code).toBe(EXIT_SUCCESS);
+    expect(mockWriteStdout).toHaveBeenCalledWith("Skill body only");
+  });
+
+  it("--body with empty content outputs empty string", async () => {
+    const mention = makeMentionResult({ content: "" });
+    const { tracker } = makeTracker({ ok: true, value: mention });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    const code = await run(makeArgs({ body: true }));
+
+    expect(code).toBe(EXIT_SUCCESS);
+    expect(mockWriteStdout).toHaveBeenCalledWith("");
   });
 });

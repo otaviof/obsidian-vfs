@@ -7,6 +7,7 @@ export type { BacklinkEntry, ObsidianCLI, SearchMatch } from "./cli.js";
  * Foundational data structures: error codes, result union, config, and resolution.
  */
 export type {
+  DiscoveredSkill,
   Disposable,
   ErrorCode,
   MentionResult,

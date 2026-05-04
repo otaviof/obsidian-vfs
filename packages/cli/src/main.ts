@@ -4,14 +4,15 @@ import { parseArgs } from "node:util";
 
 import { DEFAULT_CLI_PATH, DEFAULT_TIMEOUT_MS } from "@obsidian-vfs/core";
 
-import type { CLIOptions, InspectArgs, ResolveArgs } from "./types.js";
+import type { CLIOptions, InspectArgs, ProvisionSkillsArgs, ResolveArgs } from "./types.js";
 import { EXIT_ERROR, EXIT_SUCCESS, EXIT_USAGE } from "./types.js";
 import { run as runInspect } from "./cmd-inspect.js";
+import { run as runProvisionSkills } from "./cmd-provision-skills.js";
 import { run as runResolve } from "./cmd-resolve.js";
 import { formatHelp, formatUsageError, writeStderr, writeStdout } from "./formatters.js";
 
 /** Valid command names for dispatch. */
-const VALID_COMMANDS = new Set(["inspect", "resolve", "help"]);
+const VALID_COMMANDS = new Set(["inspect", "resolve", "provision-skills", "help"]);
 
 /** Parse process.argv into structured CLI options. */
 export function parseGlobalArgs(
@@ -27,6 +28,8 @@ export function parseGlobalArgs(
         json: { type: "boolean", default: false },
         verbose: { type: "boolean", short: "v", default: false },
         full: { type: "boolean", default: false },
+        body: { type: "boolean", default: false },
+        "dry-run": { type: "boolean", default: false },
         "cli-path": { type: "string", default: DEFAULT_CLI_PATH },
         timeout: { type: "string", default: String(DEFAULT_TIMEOUT_MS) },
         help: { type: "boolean", short: "h", default: false },
@@ -49,6 +52,8 @@ export function parseGlobalArgs(
         json: false,
         verbose: false,
         full: false,
+        body: false,
+        dryRun: false,
         cliPath: DEFAULT_CLI_PATH,
         timeoutMs: DEFAULT_TIMEOUT_MS,
       },
@@ -76,6 +81,8 @@ export function parseGlobalArgs(
       json: parsed.values.json as boolean,
       verbose: parsed.values.verbose as boolean,
       full: parsed.values.full as boolean,
+      body: parsed.values.body as boolean,
+      dryRun: parsed.values["dry-run"] as boolean,
       cliPath: parsed.values["cli-path"] as string,
       timeoutMs,
     },
@@ -94,8 +101,8 @@ function buildInspectArgs(options: CLIOptions, positionals: readonly string[]): 
     json: options.json,
     verbose: options.verbose,
     full: options.full,
+    body: options.body,
     cliPath: options.cliPath,
-
     timeoutMs: options.timeoutMs,
   };
 }
@@ -112,6 +119,17 @@ function buildResolveArgs(options: CLIOptions, positionals: readonly string[]): 
     verbose: options.verbose,
     cliPath: options.cliPath,
 
+    timeoutMs: options.timeoutMs,
+  };
+}
+
+/** Build ProvisionSkillsArgs from parsed options. */
+function buildProvisionSkillsArgs(options: CLIOptions): ProvisionSkillsArgs {
+  return {
+    dryRun: options.dryRun,
+    json: options.json,
+    verbose: options.verbose,
+    cliPath: options.cliPath,
     timeoutMs: options.timeoutMs,
   };
 }
@@ -134,6 +152,9 @@ async function dispatch(options: CLIOptions, positionals: readonly string[]): Pr
       if (!args) return EXIT_USAGE;
       return runResolve(args);
     }
+
+    case "provision-skills":
+      return runProvisionSkills(buildProvisionSkillsArgs(options));
   }
 }
 

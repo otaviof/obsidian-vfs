@@ -159,4 +159,62 @@ describe("parseGlobalArgs", () => {
       expect(result.options.full).toBe(true);
     }
   });
+
+  it("parses provision-skills command", () => {
+    const result = parseGlobalArgs(["provision-skills"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.command).toBe("provision-skills");
+    }
+  });
+
+  it("parses --body flag", () => {
+    const result = parseGlobalArgs(["inspect", "mention", "--body"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.body).toBe(true);
+    }
+  });
+
+  it("--body defaults to false", () => {
+    const result = parseGlobalArgs(["inspect", "mention"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.body).toBe(false);
+    }
+  });
+
+  it("parses --dry-run flag", () => {
+    const result = parseGlobalArgs(["provision-skills", "--dry-run"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.dryRun).toBe(true);
+    }
+  });
+
+  it("--dry-run defaults to false", () => {
+    const result = parseGlobalArgs(["provision-skills"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.dryRun).toBe(false);
+    }
+  });
+
+  it("parses --body and --dry-run together", () => {
+    const result = parseGlobalArgs(["inspect", "mention", "--body", "--dry-run"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.body).toBe(true);
+      expect(result.options.dryRun).toBe(true);
+    }
+  });
+
+  it("accepts --dry-run with non-provision commands", () => {
+    const result = parseGlobalArgs(["inspect", "mention", "--dry-run"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.command).toBe("inspect");
+      expect(result.options.dryRun).toBe(true);
+    }
+  });
 });

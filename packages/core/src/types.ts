@@ -95,3 +95,12 @@ export interface MentionResult {
   readonly content: string;
   readonly section?: string;
 }
+
+/**
+ * Metadata for a single vault skill discovered during enumeration.
+ */
+export interface DiscoveredSkill {
+  readonly name: string;
+  readonly description: string;
+  readonly vaultRelativePath: string;
+}

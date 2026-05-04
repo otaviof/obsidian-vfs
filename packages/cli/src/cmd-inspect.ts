@@ -62,7 +62,9 @@ export async function run(args: InspectArgs): Promise<number> {
     content: result.value.content,
   };
 
-  if (args.json) {
+  if (args.body) {
+    writeStdout(output.content);
+  } else if (args.json) {
     writeStdout(formatInspectJSON({ ok: true, data: output }));
   } else {
     writeStdout(formatInspectResult(output, { full: args.full }));

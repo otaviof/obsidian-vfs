@@ -1,12 +1,14 @@
 import type { VFSError } from "@obsidian-vfs/core";
 import { describe, expect, it } from "vitest";
 
-import type { InspectOutput, ResolveOutput } from "./types.js";
+import type { InspectOutput, ProvisionSkillsOutput, ResolveOutput } from "./types.js";
 import {
   formatError,
   formatHelp,
   formatInspectJSON,
   formatInspectResult,
+  formatProvisionSkillsJSON,
+  formatProvisionSkillsResult,
   formatResolveCandidates,
   formatResolveJSON,
   formatResolveResult,
@@ -201,14 +203,96 @@ describe("formatVerboseTiming", () => {
   });
 });
 
+describe("formatProvisionSkillsResult", () => {
+  const baseOutput: ProvisionSkillsOutput = {
+    written: ["deploy", "review"],
+    permissionsAdded: 2,
+    dryRun: false,
+    errors: [],
+  };
+
+  it("renders written skills and permissions", () => {
+    const result = formatProvisionSkillsResult(baseOutput);
+    expect(result).toContain("deploy, review");
+    expect(result).toContain("added 2");
+  });
+
+  it("shows correct count in header", () => {
+    const result = formatProvisionSkillsResult(baseOutput);
+    expect(result).toContain("Wrote 2 skills");
+  });
+
+  it("shows (none) when no skills written", () => {
+    const result = formatProvisionSkillsResult({ ...baseOutput, written: [] });
+    expect(result).toContain("(none)");
+  });
+
+  it("prefixes with [dry-run] when dryRun is true", () => {
+    const result = formatProvisionSkillsResult({ ...baseOutput, dryRun: true });
+    expect(result).toContain("[dry-run]");
+  });
+
+  it("includes errors when present", () => {
+    const result = formatProvisionSkillsResult({
+      ...baseOutput,
+      errors: ["Failed to write proxy"],
+    });
+    expect(result).toContain("error: Failed to write proxy");
+  });
+
+  it("renders correctly when all operations fail", () => {
+    const result = formatProvisionSkillsResult({
+      written: [],
+      permissionsAdded: 0,
+      dryRun: false,
+      errors: ["Error A", "Error B"],
+    });
+    expect(result).toContain("Wrote 0 skills");
+    expect(result).toContain("error: Error A");
+    expect(result).toContain("error: Error B");
+  });
+});
+
+describe("formatProvisionSkillsJSON", () => {
+  it("serializes output as JSON", () => {
+    const output: ProvisionSkillsOutput = {
+      written: ["deploy"],
+      permissionsAdded: 1,
+      dryRun: false,
+      errors: [],
+    };
+    const json = formatProvisionSkillsJSON(output);
+    const parsed = JSON.parse(json) as ProvisionSkillsOutput;
+    expect(parsed.written).toEqual(["deploy"]);
+    expect(parsed.permissionsAdded).toBe(1);
+    expect(parsed.dryRun).toBe(false);
+  });
+
+  it("serializes dry-run output with errors", () => {
+    const output: ProvisionSkillsOutput = {
+      written: ["a"],
+      permissionsAdded: 1,
+      dryRun: true,
+      errors: ["some error"],
+    };
+    const json = formatProvisionSkillsJSON(output);
+    const parsed = JSON.parse(json) as ProvisionSkillsOutput;
+    expect(parsed.dryRun).toBe(true);
+    expect(parsed.errors).toEqual(["some error"]);
+  });
+});
+
 describe("formatHelp", () => {
   it("contains all command names", () => {
     const help = formatHelp();
     expect(help).toContain("inspect");
     expect(help).toContain("resolve");
+    expect(help).toContain("provision-skills");
     expect(help).toContain("--json");
     expect(help).toContain("--verbose");
     expect(help).toContain("--full");
+    expect(help).toContain("--body");
+    expect(help).toContain("--dry-run");
     expect(help).toContain("--cli-path");
     expect(help).toContain("--timeout");
     expect(help).toContain("--help");

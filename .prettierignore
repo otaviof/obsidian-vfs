@@ -1,6 +1,7 @@
 node_modules/
 dist/
 coverage/
+.claude/skills/
 *.d.ts
 *.md
 *.tsbuildinfo

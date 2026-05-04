@@ -3,6 +3,7 @@ import path from "node:path";
 
 import type { ObsidianCLI } from "./cli.js";
 import type {
+  DiscoveredSkill,
   Disposable,
   MentionResult,
   VaultContext,
@@ -34,6 +35,24 @@ export interface LocalIndexTrackerOptions {
 const DEFAULT_CACHE_MAX_SIZE = 500;
 const CONFIG_FILENAME = "obsidian-vfs.json";
 const CONFIG_DIR = ".obsidian";
+const SKILL_FILENAME = "SKILL.md";
+
+/** Allowed characters in skill directory names (alphanumeric, hyphens, underscores, dots). */
+const SAFE_SKILL_NAME_RE = /^[a-zA-Z0-9._-]+$/;
+
+/** Pattern to extract `description:` from YAML frontmatter. */
+const DESCRIPTION_RE = /^description:\s*(.+)$/m;
+
+/** Extract the `description` value from YAML frontmatter, or `undefined`. */
+function extractFrontmatterDescription(content: string): string | undefined {
+  if (!content.startsWith("---\n")) return undefined;
+  const end = content.indexOf("\n---\n", 4);
+  if (end === -1) return undefined;
+  const frontmatter = content.slice(4, end);
+  const match = DESCRIPTION_RE.exec(frontmatter);
+  const value = match?.[1]?.trim();
+  return value !== "" ? value : undefined;
+}
 
 /**
  * Central orchestrator atop `ObsidianCLI`. Provides vault discovery, config
@@ -198,6 +217,34 @@ export class LocalIndexTracker {
   /** Get file or directory metadata. */
   async stat(virtualPath: string): Promise<VFSResult<VFSFileStat>> {
     return statVirtualFile(virtualPath, this.#securityOptions);
+  }
+
+  /** Enumerate all skills from configured skillsDirs with deduplication. */
+  async listSkills(): Promise<VFSResult<DiscoveredSkill[]>> {
+    const { skillsDirs } = this.context.vfsConfig;
+    const seen = new Set<string>();
+    const skills: DiscoveredSkill[] = [];
+
+    for (const dir of skillsDirs) {
+      const entries = await this.readDirectory(dir);
+      if (!entries.ok) continue;
+
+      for (const [name, type] of entries.value) {
+        if (type !== "directory" || seen.has(name) || !SAFE_SKILL_NAME_RE.test(name)) continue;
+        seen.add(name);
+
+        const skillPath = path.join(dir, name, SKILL_FILENAME);
+        const content = await this.readFile(skillPath);
+        if (!content.ok) continue;
+
+        const description =
+          extractFrontmatterDescription(content.value) ?? `Obsidian vault skill: ${name}`;
+
+        skills.push({ name, description, vaultRelativePath: skillPath });
+      }
+    }
+
+    return { ok: true, value: skills };
   }
 
   /** Start watching the vault for file changes. Returns a Disposable to stop. */

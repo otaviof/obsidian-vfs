@@ -9,7 +9,7 @@ Read-only virtual filesystem exposing an [Obsidian](https://obsidian.md) vault v
 | `packages/core` | `obs://` URI resolution, LRU cache, Obsidian CLI wrapper, direct file reads via `node:fs` |
 | `packages/vscode` | VS Code `FileSystemProvider` for `obs://` — reads from disk, mutations through CLI |
 | `packages/claude-plugin` | Agent SDK plugin resolving `@obs:` and `/obs:` mentions into context via `UserPromptSubmit` hook |
-| `packages/cli` | `npx obsidian-vfs` diagnostics — `inspect`, `resolve`, `status` |
+| `packages/cli` | `npx obsidian-vfs` diagnostics and provisioning — `inspect`, `resolve`, `provision-skills` |
 
 The consumer packages (`vscode`, `claude-plugin`, `cli`) depend on `core` but have no cross-dependencies between each other.
 
@@ -48,6 +48,9 @@ pnpm cli inspect "architect"
 pnpm cli inspect "10-projects/plan.md#Architecture"
 pnpm cli inspect "/obs:obsidian"
 
+# Output only the raw content body (no metadata headers, no truncation)
+pnpm cli inspect "/obs:deploy" --body
+
 # Machine-readable output
 pnpm cli resolve "Note" --json
 
@@ -56,6 +59,56 @@ pnpm cli inspect "agent" --verbose
 ```
 
 Use `--cli-path` if the `obsidian` binary is not on your `PATH`, and `--timeout` to adjust the CLI timeout (default 10 000 ms).
+
+### Provisioning Vault Skills
+
+#### The problem
+
+Obsidian vault skills live outside the project directory (e.g. `30-resources/ai/skills/deploy/SKILL.md`). Claude Code can only discover skills from project-level `.claude/skills/`, it has no mechanism to reach into an arbitrary vault path. The Claude plugin's `@obs:` hook can inject vault content at prompt time via `additionalContext`, but that path lacks native skill features: no `/` autocomplete, no `context: fork`, no compaction re-attachment, no `$ARGUMENTS`. Content injected through `additionalContext` is treated as passive context, not actionable instructions.
+
+#### The approach
+
+The subcommand `provision-skills` generates thin proxy files that Claude Code treats as native skills. Each proxy contains a "!`command`" directive that fetches live content from the vault at invocation time via `obs-read`:
+
+```
+---
+name: deploy
+description: Deploy helper
+---
+
+!`./bin/obs-read "/obs:deploy"`
+```
+
+The proxy lives at `.claude/skills/deploy/SKILL.md` — a project-level path that Claude Code discovers natively. When the skill is invoked, the `!`command`` preprocessor runs `obs-read`, which bootstraps the core tracker, resolves the skill from the vault's `skillsDirs`, and outputs the content to stdout. Claude receives this as the skill body with full native lifecycle: frontmatter metadata, autocomplete, forked context, compaction survival.
+
+The proxies are placed at `.claude/skills/` (project-level) rather than the plugin's `skills/` directory. Plugin skills get namespaced (`/obsidian-vfs:skill-name`), while project-level skills get bare names (`/skill-name`) with live change detection.
+
+#### Why "!`command`" with `./bin/obs-read`
+
+Several constraints dictate the specific mechanism:
+
+- **No `${}` expansions.** The `!`command`` preprocessor blocks shell variable expansions like `${CLAUDE_PLUGIN_ROOT}`, so the command must use a relative path from the project root.
+- **No plugin PATH in preprocessor.** Plugin `bin/` directories are on PATH for Claude's Bash tool at runtime, but the "!`command`" preprocessor runs in a separate shell context without plugin `${PATH}`. The proxy must use `./bin/obs-read` (relative from CWD), not bare `obs-read`.
+- **Explicit permissions required.** Each "!`command`" needs an allow rule in `.claude/settings.local.json`. The command generates per-skill rules like `Bash(./bin/obs-read "/obs:deploy")` automatically.
+
+At runtime (after skill invocation), Claude follows wikilinks in skill content by calling bare `obs-read` via the Bash tool — this works because the plugin's `bin/` directory is on PATH in that context. The global `Bash(obs-read *)` permission covers these runtime calls.
+
+#### Usage
+
+```sh
+# Generate proxy skills under .claude/skills/
+pnpm cli provision-skills
+
+# Preview without writing
+pnpm cli provision-skills --dry-run
+
+# Machine-readable output
+pnpm cli provision-skills --json
+```
+
+The command enumerates every `skillsDir` configured in `.obsidian/obsidian-vfs.json`, finds subdirectories containing a `SKILL.md`, extracts frontmatter metadata, and writes proxy files. Writes are idempotent — if a proxy already exists with identical content, it is skipped. Skill names are validated against `/^[a-zA-Z0-9._-]+$/`; names with shell metacharacters are rejected. When multiple `skillsDirs` contain a skill with the same name, the first directory wins.
+
+The command only adds — it never removes proxy files or permission rules. Proxies are cheap to regenerate, and accidental deletion of a manually-tweaked proxy or permission rule is more disruptive than a stale file on disk. To remove a deprovisioned skill, delete its `.claude/skills/<name>/` directory and the corresponding rule from `.claude/settings.local.json` manually.
 
 ### Wikilink Resolution
 

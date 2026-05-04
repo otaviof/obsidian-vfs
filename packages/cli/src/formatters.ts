@@ -1,6 +1,6 @@
 import type { VFSError } from "@obsidian-vfs/core";
 
-import type { InspectOutput, ResolveOutput } from "./types.js";
+import type { InspectOutput, ProvisionSkillsOutput, ResolveOutput } from "./types.js";
 
 /** Maximum number of lines shown in inspect content preview. */
 const INSPECT_MAX_LINES = 80;
@@ -142,27 +142,58 @@ export function formatVerboseTiming(label: string, ms: number): string {
   return `[verbose] ${label}: ${ms.toFixed(1)}ms`;
 }
 
+/** Format the provision-skills result for terminal display. */
+export function formatProvisionSkillsResult(output: ProvisionSkillsOutput): string {
+  const prefix = output.dryRun ? "[dry-run] " : "";
+  const lines: string[] = [
+    `${prefix}Wrote ${output.written.length} skills:`,
+    "",
+    labelLine("written", output.written.join(", ") || "(none)"),
+    labelLine("permissions", `added ${output.permissionsAdded} in .claude/settings.local.json`),
+  ];
+
+  if (output.errors.length > 0) {
+    lines.push("");
+    for (const err of output.errors) {
+      lines.push(`  error: ${err}`);
+    }
+  }
+
+  return lines.join("\n");
+}
+
+/** Format the provision-skills result as JSON. */
+export function formatProvisionSkillsJSON(output: ProvisionSkillsOutput): string {
+  return JSON.stringify(output, null, 2);
+}
+
 /** Format the help/usage text. */
 export function formatHelp(): string {
   return `Usage: obsidian-vfs <command> [options]
 
 Commands:
-  inspect <mention>    Resolve an @obs: mention and show the result
-  resolve <wikilink>   Resolve a [[wikilink]] to its vault path
+  inspect <mention>       Resolve an @obs: mention and show the result
+  resolve <wikilink>      Resolve a [[wikilink]] to its vault path
+  provision-skills        Generate proxy SKILL.md files from vault skills
 
 Options:
-  --json               Output as JSON
-  -v, --verbose        Show timing and diagnostics
-  --full               Show full content (inspect only, no truncation)
-  --cli-path <path>    Path to Obsidian CLI binary (default: obsidian)
-  --timeout <ms>       CLI timeout in milliseconds (default: 10000)
-  -h, --help           Show this help message
+  --json                  Output as JSON
+  -v, --verbose           Show timing and diagnostics
+  --full                  Show full content (inspect only, no truncation)
+  --body                  Output only the content body (inspect only)
+  --dry-run               Show what would change without writing (provision-skills)
+  --cli-path <path>       Path to Obsidian CLI binary (default: obsidian)
+  --timeout <ms>          CLI timeout in milliseconds (default: 10000)
+  -h, --help              Show this help message
 
 Examples:
   obsidian-vfs inspect "@obs:architect"
+  obsidian-vfs inspect "/obs:deploy" --body
   obsidian-vfs inspect "10-projects/plan.md#Architecture"
   obsidian-vfs resolve "Project Plan"
-  obsidian-vfs resolve "[[Project Plan]]"`;
+  obsidian-vfs resolve "[[Project Plan]]"
+  obsidian-vfs provision-skills
+  obsidian-vfs provision-skills --dry-run`;
 }
 
 /** Format a usage error with the correct usage hint. */
