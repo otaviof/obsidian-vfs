@@ -1,13 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("vscode", () => ({
-  FileSystemError: {
-    FileNotFound: vi.fn((uri: unknown) => new Error(`FileNotFound: ${String(uri)}`)),
-    NoPermissions: vi.fn((msg: unknown) => new Error(`NoPermissions: ${String(msg)}`)),
-    Unavailable: vi.fn((uri: unknown) => new Error(`Unavailable: ${String(uri)}`)),
-    FileExists: vi.fn((uri: unknown) => new Error(`FileExists: ${String(uri)}`)),
-  },
-}));
+import { createVscodeMock } from "./test-mocks.js";
+
+vi.mock("vscode", () => createVscodeMock({ fileSystemError: true }));
 
 import * as vscode from "vscode";
 
@@ -22,7 +17,7 @@ const mockUnavailable = vi.mocked(vscode.FileSystemError.Unavailable);
 // eslint-disable-next-line @typescript-eslint/unbound-method
 const mockFileExists = vi.mocked(vscode.FileSystemError.FileExists);
 
-const fakeUri = { toString: () => "obs://vault/file.md" } as never;
+const fakeErrorUri = { toString: () => "obs://vault/file.md" } as never;
 
 describe("throwVFSError", () => {
   it("throws FileNotFound for FILE_NOT_FOUND", () => {
@@ -30,8 +25,8 @@ describe("throwVFSError", () => {
       ok: false as const,
       error: { code: "FILE_NOT_FOUND" as const, message: "gone" },
     };
-    expect(() => throwVFSError(result, fakeUri)).toThrow("FileNotFound");
-    expect(mockFileNotFound).toHaveBeenCalledWith(fakeUri);
+    expect(() => throwVFSError(result, fakeErrorUri)).toThrow("FileNotFound");
+    expect(mockFileNotFound).toHaveBeenCalledWith(fakeErrorUri);
   });
 
   it("throws NoPermissions for PERMISSION_DENIED", () => {
@@ -39,8 +34,8 @@ describe("throwVFSError", () => {
       ok: false as const,
       error: { code: "PERMISSION_DENIED" as const, message: "denied" },
     };
-    expect(() => throwVFSError(result, fakeUri)).toThrow("NoPermissions");
-    expect(mockNoPermissions).toHaveBeenCalledWith(fakeUri);
+    expect(() => throwVFSError(result, fakeErrorUri)).toThrow("NoPermissions");
+    expect(mockNoPermissions).toHaveBeenCalledWith(fakeErrorUri);
   });
 
   it("throws NoPermissions for NOT_IMPLEMENTED", () => {
@@ -48,7 +43,7 @@ describe("throwVFSError", () => {
       ok: false as const,
       error: { code: "NOT_IMPLEMENTED" as const, message: "not yet" },
     };
-    expect(() => throwVFSError(result, fakeUri)).toThrow("NoPermissions");
+    expect(() => throwVFSError(result, fakeErrorUri)).toThrow("NoPermissions");
     expect(mockNoPermissions).toHaveBeenCalledWith("not yet");
   });
 
@@ -57,8 +52,8 @@ describe("throwVFSError", () => {
       ok: false as const,
       error: { code: "CLI_UNAVAILABLE" as const, message: "missing" },
     };
-    expect(() => throwVFSError(result, fakeUri)).toThrow("Unavailable");
-    expect(mockUnavailable).toHaveBeenCalledWith(fakeUri);
+    expect(() => throwVFSError(result, fakeErrorUri)).toThrow("Unavailable");
+    expect(mockUnavailable).toHaveBeenCalledWith(fakeErrorUri);
   });
 
   it("throws Unavailable for unknown error codes", () => {
@@ -66,13 +61,13 @@ describe("throwVFSError", () => {
       ok: false as const,
       error: { code: "PARSE_ERROR" as const, message: "bad data" },
     };
-    expect(() => throwVFSError(result, fakeUri)).toThrow("Unavailable");
+    expect(() => throwVFSError(result, fakeErrorUri)).toThrow("Unavailable");
   });
 });
 
 describe("throwFileExists", () => {
   it("throws FileExists error", () => {
-    expect(() => throwFileExists(fakeUri)).toThrow("FileExists");
-    expect(mockFileExists).toHaveBeenCalledWith(fakeUri);
+    expect(() => throwFileExists(fakeErrorUri)).toThrow("FileExists");
+    expect(mockFileExists).toHaveBeenCalledWith(fakeErrorUri);
   });
 });

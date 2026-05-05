@@ -1,12 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("vscode", () => ({
-  workspace: {
-    getConfiguration: vi.fn().mockReturnValue({
-      get: vi.fn((_key: string, defaultValue: unknown) => defaultValue),
-    }),
-  },
-}));
+import { createVscodeMock } from "./test-mocks.js";
+
+vi.mock("vscode", () => createVscodeMock({ workspace: true }));
 
 vi.mock("@obsidian-vfs/core", () => ({
   DEFAULT_CLI_PATH: "obsidian",
@@ -26,6 +22,7 @@ describe("readConfig", () => {
     const config = readConfig();
     expect(config.cliPath).toBe("obsidian");
     expect(config.timeoutMs).toBe(10_000);
+    expect(config.autoMount).toEqual([]);
   });
 
   it("reads values from VSCode configuration", () => {
@@ -33,6 +30,7 @@ describe("readConfig", () => {
       get: vi.fn((key: string) => {
         if (key === "cliPath") return "/usr/bin/obsidian";
         if (key === "timeoutMs") return 5000;
+        if (key === "autoMount") return ["10-projects", "20-areas"];
         return undefined;
       }),
     } as never);
@@ -40,6 +38,7 @@ describe("readConfig", () => {
     const config = readConfig();
     expect(config.cliPath).toBe("/usr/bin/obsidian");
     expect(config.timeoutMs).toBe(5000);
+    expect(config.autoMount).toEqual(["10-projects", "20-areas"]);
   });
 });
 

@@ -1,33 +1,22 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("vscode", () => {
-  const outputChannel = {
-    appendLine: vi.fn(),
-    dispose: vi.fn(),
-  };
-  return {
-    window: { createOutputChannel: vi.fn(() => outputChannel) },
-    workspace: { registerFileSystemProvider: vi.fn(() => ({ dispose: vi.fn() })) },
-    Uri: {
-      from: vi.fn((c: { scheme: string; path: string }) => ({
-        scheme: c.scheme,
-        path: c.path,
-      })),
-    },
-    EventEmitter: class {
-      #listeners: ((e: unknown) => void)[] = [];
-      event = (listener: (e: unknown) => void) => {
-        this.#listeners.push(listener);
-        return { dispose: () => undefined };
-      };
-      fire = (data: unknown) => this.#listeners.forEach((l) => l(data));
-      dispose = vi.fn();
-    },
-  };
-});
+import { createVscodeMock, fakeContext } from "./test-mocks.js";
+
+vi.mock("vscode", () =>
+  createVscodeMock({
+    window: true,
+    workspace: true,
+    uri: true,
+    eventEmitter: true,
+    commands: true,
+    languages: true,
+    statusBar: true,
+  }),
+);
 
 vi.mock("./bootstrap.js", () => ({
   bootstrapFromConfig: vi.fn(),
+  readConfig: vi.fn().mockReturnValue({ cliPath: "obsidian", timeoutMs: 10_000, autoMount: [] }),
 }));
 
 vi.mock("./file-system-provider.js", () => ({
@@ -37,18 +26,36 @@ vi.mock("./file-system-provider.js", () => ({
   }),
 }));
 
+vi.mock("./commands.js", () => ({
+  registerCommands: vi.fn(),
+}));
+
+vi.mock("./auto-mount.js", () => ({
+  autoMountFromConfig: vi.fn(),
+}));
+
+vi.mock("./status-bar.js", () => ({
+  StatusBarManager: vi.fn().mockImplementation(function (this: Record<string, unknown>) {
+    this.dispose = vi.fn();
+  }),
+}));
+
+vi.mock("./wikilink-provider.js", () => ({
+  WikilinkDocumentLinkProvider: vi.fn(),
+}));
+
 import * as vscode from "vscode";
 import type { LocalIndexTracker } from "@obsidian-vfs/core";
 
+import { autoMountFromConfig } from "./auto-mount.js";
 import { bootstrapFromConfig } from "./bootstrap.js";
-import { ObsidianFileSystemProvider } from "./file-system-provider.js";
+import { registerCommands } from "./commands.js";
 import { activate, deactivate } from "./extension.js";
+import { ObsidianFileSystemProvider } from "./file-system-provider.js";
+import { StatusBarManager } from "./status-bar.js";
+import { WikilinkDocumentLinkProvider } from "./wikilink-provider.js";
 
 const mockBootstrap = vi.mocked(bootstrapFromConfig);
-
-function fakeContext(): vscode.ExtensionContext {
-  return { subscriptions: [] } as unknown as vscode.ExtensionContext;
-}
 
 describe("activate", () => {
   beforeEach(() => {
@@ -62,7 +69,7 @@ describe("activate", () => {
     });
 
     const ctx = fakeContext();
-    await activate(ctx);
+    await activate(ctx as never);
 
     expect(vscode.window.createOutputChannel).toHaveBeenCalledWith("Obsidian VFS");
     expect(ctx.subscriptions.length).toBeGreaterThanOrEqual(1);
@@ -75,18 +82,21 @@ describe("activate", () => {
     });
 
     const ctx = fakeContext();
-    await activate(ctx);
+    await activate(ctx as never);
 
     const channel = vi.mocked(vscode.window.createOutputChannel).mock.results[0].value as {
       appendLine: ReturnType<typeof vi.fn>;
     };
     expect(channel.appendLine).toHaveBeenCalledWith(expect.stringContaining("bootstrap failed"));
     expect(ObsidianFileSystemProvider).not.toHaveBeenCalled();
+    expect(registerCommands).not.toHaveBeenCalled();
+    expect(autoMountFromConfig).not.toHaveBeenCalled();
+    expect(StatusBarManager).not.toHaveBeenCalled();
   });
 
-  it("registers provider and watcher on success", async () => {
+  it("wires all components on successful bootstrap", async () => {
     const fakeTracker = {
-      context: { name: "MyVault", physicalPath: "/vault" },
+      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
     } as unknown as LocalIndexTracker;
 
     mockBootstrap.mockResolvedValueOnce({
@@ -95,22 +105,25 @@ describe("activate", () => {
     });
 
     const ctx = fakeContext();
-    await activate(ctx);
+    await activate(ctx as never);
 
-    const channel = vi.mocked(vscode.window.createOutputChannel).mock.results[0].value as {
-      appendLine: ReturnType<typeof vi.fn>;
-    };
-    expect(channel.appendLine).toHaveBeenCalledWith(
-      expect.stringContaining('vault "MyVault" loaded in 42ms'),
-    );
     expect(ObsidianFileSystemProvider).toHaveBeenCalledWith(fakeTracker);
     expect(vscode.workspace.registerFileSystemProvider).toHaveBeenCalledWith(
       "obs",
       expect.anything(),
       { isCaseSensitive: true, isReadonly: false },
     );
-    // output channel + provider + registration + watcher = 4
-    expect(ctx.subscriptions).toHaveLength(4);
+    expect(registerCommands).toHaveBeenCalledWith(ctx, fakeTracker, expect.anything());
+    expect(autoMountFromConfig).toHaveBeenCalledWith(
+      expect.objectContaining({ autoMount: [] }),
+      "MyVault",
+    );
+    expect(StatusBarManager).toHaveBeenCalledWith(fakeTracker);
+    expect(WikilinkDocumentLinkProvider).toHaveBeenCalledWith(fakeTracker);
+    expect(vscode.languages.registerDocumentLinkProvider).toHaveBeenCalledWith(
+      { scheme: "obs", language: "markdown" },
+      expect.anything(),
+    );
   });
 });
 

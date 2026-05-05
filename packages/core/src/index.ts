@@ -94,6 +94,13 @@ export { LocalIndexTracker } from "./local-index-tracker.js";
 export { resolveWikilink } from "./resolve-wikilink.js";
 export { resolveResource, resolveSkillResource } from "./resolve-resource.js";
 export { sliceContent, scrubWikilinks, processContent } from "./content-slice.js";
+export {
+  parseMarkdownLinks,
+  normalizeWikilink,
+  classifyInput,
+  resolveEmbeds,
+} from "./markdown-links.js";
+export type { ParsedLink, EmbedResolver } from "./markdown-links.js";
 export { VaultFileWatcher } from "./file-watcher.js";
 export { readDirectory, statVirtualFile } from "./fs-enumeration.js";
 export {

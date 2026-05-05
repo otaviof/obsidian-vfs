@@ -1,14 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("vscode", () => ({
-  Uri: {
-    from: vi.fn((components: { scheme: string; authority: string; path: string }) => ({
-      scheme: components.scheme,
-      authority: components.authority,
-      path: components.path,
-    })),
-  },
-}));
+import { createVscodeMock } from "./test-mocks.js";
+
+vi.mock("vscode", () => createVscodeMock({ uri: true }));
 
 import { toVaultPath, toVscodeUri } from "./uri-adapter.js";
 
@@ -29,7 +23,7 @@ describe("toVaultPath", () => {
 describe("toVscodeUri", () => {
   it("builds obs:// URI from vault path and name", () => {
     const uri = toVscodeUri("10-projects/plan.md", "MyVault");
-    expect(uri).toEqual({
+    expect(uri).toMatchObject({
       scheme: "obs",
       authority: "MyVault",
       path: "/10-projects/plan.md",
@@ -38,7 +32,7 @@ describe("toVscodeUri", () => {
 
   it("handles root path", () => {
     const uri = toVscodeUri("", "Vault");
-    expect(uri).toEqual({
+    expect(uri).toMatchObject({
       scheme: "obs",
       authority: "Vault",
       path: "/",

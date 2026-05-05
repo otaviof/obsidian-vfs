@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { MENTION_PREFIX, SKILL_PREFIX } from "@obsidian-vfs/core";
+import { classifyInput, normalizeWikilink, SKILL_PREFIX } from "@obsidian-vfs/core";
 import type { VFSError } from "@obsidian-vfs/core";
 
 import type { ResolveArgs, ResolveOutput } from "./types.js";
@@ -16,26 +16,6 @@ import {
   writeStderr,
   writeStdout,
 } from "./formatters.js";
-
-/** Strip [[brackets]] and |alias from wikilink input. */
-function normalizeWikilink(input: string): string {
-  let cleaned = input.trim();
-  if (cleaned.startsWith("[[") && cleaned.endsWith("]]")) {
-    cleaned = cleaned.slice(2, -2);
-  }
-  const pipeIndex = cleaned.indexOf("|");
-  if (pipeIndex !== -1) {
-    cleaned = cleaned.slice(0, pipeIndex);
-  }
-  return cleaned.trim();
-}
-
-/** Classify the input reference type. */
-function classifyInput(raw: string): "mention" | "skill" | "wikilink" {
-  if (raw.startsWith(MENTION_PREFIX)) return "mention";
-  if (raw.startsWith(SKILL_PREFIX)) return "skill";
-  return "wikilink";
-}
 
 /** Write an error result to the appropriate output stream. */
 function emitError(error: VFSError, json: boolean): number {

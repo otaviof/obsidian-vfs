@@ -2,4 +2,5 @@
 export interface ExtensionConfig {
   readonly cliPath: string;
   readonly timeoutMs: number;
+  readonly autoMount: readonly string[];
 }

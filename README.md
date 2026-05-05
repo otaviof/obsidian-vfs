@@ -40,9 +40,25 @@ The `packages/vscode` extension registers an `obs://` virtual file system provid
 | Edit existing files | Working | `node:fs.writeFile` after path security validation |
 | Create directories | Working | `node:fs.mkdir` after path security validation |
 | File watching | Working | Core `VaultFileWatcher` with prefix filtering |
+| Mount vault folder | Working | Command palette + `updateWorkspaceFolders` |
+| Unmount vault folder | Working | Command palette + `updateWorkspaceFolders` |
+| Auto-mount from settings | Working | `obsidianVFS.autoMount` config at activation |
+| Open in Obsidian | Working | `obsidianVFS.openInObsidian` via CLI `open` |
+| Status bar | Working | Vault name + mode (`full`/`degraded`) |
+| Wikilink navigation | Working | `DocumentLinkProvider` for `[[links]]` in `obs://` Markdown |
 | Create new files | Deferred | Requires CLI mutations (preserves wikilinks) |
 | Delete files | Deferred | Requires CLI mutations |
 | Rename/move files | Deferred | Requires CLI mutations |
+
+### Commands
+
+Available via the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`):
+
+| Command | Description |
+|---------|-------------|
+| `Obsidian VFS: Mount Folder` | Pick a top-level vault folder and add it as an `obs://` workspace folder |
+| `Obsidian VFS: Unmount Folder` | Remove a mounted `obs://` workspace folder |
+| `Obsidian VFS: Open in Obsidian` | Open the active `obs://` file in the Obsidian app |
 
 ### Extension Settings
 
@@ -52,6 +68,7 @@ Configure via VS Code Settings UI or `settings.json`:
 |---------|------|---------|-------------|
 | `obsidianVFS.cliPath` | `string` | `"obsidian"` | Path to the Obsidian CLI binary |
 | `obsidianVFS.timeoutMs` | `number` | `10000` | CLI operation timeout in milliseconds |
+| `obsidianVFS.autoMount` | `string[]` | `[]` | Vault-relative folders to auto-mount as workspace folders on activation |
 
 ### Installing Locally
 
@@ -128,12 +145,18 @@ If no `launch.json` exists, create `.vscode/launch.json`:
 #### Manual Testing Checklist
 
 1. **Verify activation** -- Output panel > "Obsidian VFS" > confirm vault loaded message
-2. **Browse files** -- Explorer sidebar shows `obs://` workspace entries
-3. **Read file** -- Open any `.md` file from the virtual workspace
-4. **Directory listing** -- Expand folders in the Explorer sidebar
-5. **Edit existing file** -- Modify and save a vault file (writes via `node:fs`)
-6. **Create file guard** -- New file creation shows "NoPermissions" (deferred to CLI)
-7. **Delete/rename guard** -- Deletion and rename show "NoPermissions" (deferred)
+2. **Mount folder** -- Command Palette > "Obsidian VFS: Mount Folder" > pick a vault folder > appears in Explorer
+3. **Browse files** -- Explorer sidebar shows `obs://` workspace entries
+4. **Read file** -- Open any `.md` file from the virtual workspace
+5. **Directory listing** -- Expand folders in the Explorer sidebar
+6. **Wikilink navigation** -- `[[wikilinks]]` in `obs://` Markdown files are clickable links
+7. **Status bar** -- Bottom left shows `$(book) VaultName (full)` -- click opens mount picker
+8. **Open in Obsidian** -- With an `obs://` file active, Command Palette > "Open in Obsidian"
+9. **Unmount folder** -- Command Palette > "Obsidian VFS: Unmount Folder" > pick and confirm removal
+10. **Auto-mount** -- Set `obsidianVFS.autoMount` in settings, reload > folders mount automatically
+11. **Edit existing file** -- Modify and save a vault file (writes via `node:fs`)
+12. **Create file guard** -- New file creation shows "NoPermissions" (deferred to CLI)
+13. **Delete/rename guard** -- Deletion and rename show "NoPermissions" (deferred)
 
 ## CLI (Development)
 

@@ -10,11 +10,12 @@ export function readConfig(): ExtensionConfig {
   return {
     cliPath: cfg.get<string>("cliPath", DEFAULT_CLI_PATH),
     timeoutMs: cfg.get<number>("timeoutMs", DEFAULT_TIMEOUT_MS),
+    autoMount: cfg.get<string[]>("autoMount", []),
   };
 }
 
 /** Bootstrap a `LocalIndexTracker` using VSCode settings. */
 export async function bootstrapFromConfig(): Promise<VFSResult<BootstrapResult>> {
   const config = readConfig();
-  return bootstrapTracker(config);
+  return bootstrapTracker({ cliPath: config.cliPath, timeoutMs: config.timeoutMs });
 }

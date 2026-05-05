@@ -16,6 +16,20 @@
   ],
   "main": "./dist/extension.js",
   "contributes": {
+    "commands": [
+      {
+        "command": "obsidianVFS.mount",
+        "title": "Obsidian VFS: Mount Folder"
+      },
+      {
+        "command": "obsidianVFS.unmount",
+        "title": "Obsidian VFS: Unmount Folder"
+      },
+      {
+        "command": "obsidianVFS.openInObsidian",
+        "title": "Obsidian VFS: Open in Obsidian"
+      }
+    ],
     "configuration": {
       "title": "Obsidian VFS",
       "properties": {
@@ -28,6 +42,14 @@
           "type": "number",
           "default": 10000,
           "description": "CLI operation timeout in milliseconds"
+        },
+        "obsidianVFS.autoMount": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Vault-relative folders to auto-mount as workspace folders on activation"
         }
       }
     }
