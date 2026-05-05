@@ -1,10 +1,10 @@
 import * as vscode from "vscode";
 
-import { autoMountFromConfig } from "./auto-mount.js";
-import { bootstrapFromConfig, readConfig } from "./bootstrap.js";
+import { bootstrapFromConfig } from "./bootstrap.js";
 import { registerCommands } from "./commands.js";
 import { ObsidianFileSystemProvider } from "./file-system-provider.js";
 import { StatusBarManager } from "./status-bar.js";
+import { VaultTreeDataProvider } from "./vault-tree-provider.js";
 import { WikilinkDocumentLinkProvider } from "./wikilink-provider.js";
 
 /** Activate the Obsidian VFS extension. */
@@ -37,10 +37,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const watcher = provider.watch(vscode.Uri.from({ scheme: "obs", path: "/" }));
   context.subscriptions.push(watcher);
 
-  registerCommands(context, tracker, outputChannel);
+  const treeProvider = new VaultTreeDataProvider(tracker);
+  context.subscriptions.push(treeProvider);
+  const treeView = vscode.window.createTreeView("obsidianVFS", { treeDataProvider: treeProvider });
+  const cfg = vscode.workspace.getConfiguration("obsidianVFS");
+  treeView.title = cfg.get<string>("treeViewTitle", "") || `Obsidian: ${tracker.context.name}`;
+  context.subscriptions.push(treeView);
 
-  const config = readConfig();
-  autoMountFromConfig(config, tracker.context.name);
+  await vscode.commands.executeCommand("setContext", "obsidianVFS.active", true);
+
+  registerCommands(context, tracker, treeProvider, outputChannel);
 
   const statusBar = new StatusBarManager(tracker);
   context.subscriptions.push(statusBar);

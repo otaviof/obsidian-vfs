@@ -61,8 +61,10 @@ export function createVscodeMock(
     commands?: boolean;
     languages?: boolean;
     statusBar?: boolean;
+    treeView?: boolean;
     documentLink?: boolean;
     range?: boolean;
+    configurationTarget?: boolean;
   } = {},
 ): Record<string, unknown> {
   const mock: Record<string, unknown> = {};
@@ -102,6 +104,10 @@ export function createVscodeMock(
       (mock.window as Record<string, unknown>).createStatusBarItem = vi.fn(() => statusBarItem);
       mock.StatusBarAlignment = { Left: 1, Right: 2 };
     }
+    if (parts.treeView) {
+      const treeView = { dispose: vi.fn() };
+      (mock.window as Record<string, unknown>).createTreeView = vi.fn(() => treeView);
+    }
   }
   if (parts.workspace) {
     mock.workspace = {
@@ -114,7 +120,7 @@ export function createVscodeMock(
     };
   }
   if (parts.commands) {
-    mock.commands = { registerCommand: vi.fn() };
+    mock.commands = { registerCommand: vi.fn(), executeCommand: vi.fn() };
   }
   if (parts.languages) {
     mock.languages = { registerDocumentLinkProvider: vi.fn(() => ({ dispose: vi.fn() })) };
@@ -126,6 +132,23 @@ export function createVscodeMock(
       constructor(range: unknown, target?: unknown) {
         this.range = range;
         this.target = target;
+      }
+    };
+  }
+  if (parts.configurationTarget) {
+    mock.ConfigurationTarget = { Global: 1, Workspace: 2, WorkspaceFolder: 3 };
+  }
+  if (parts.treeView) {
+    mock.TreeItemCollapsibleState = { None: 0, Collapsed: 1, Expanded: 2 };
+    mock.TreeItem = class {
+      label: string;
+      collapsibleState: number;
+      resourceUri: unknown;
+      contextValue: string | undefined;
+      command: unknown;
+      constructor(label: string, collapsibleState = 0) {
+        this.label = label;
+        this.collapsibleState = collapsibleState;
       }
     };
   }

@@ -11,6 +11,7 @@ vi.mock("vscode", () =>
     commands: true,
     languages: true,
     statusBar: true,
+    treeView: true,
   }),
 );
 
@@ -30,8 +31,11 @@ vi.mock("./commands.js", () => ({
   registerCommands: vi.fn(),
 }));
 
-vi.mock("./auto-mount.js", () => ({
-  autoMountFromConfig: vi.fn(),
+vi.mock("./vault-tree-provider.js", () => ({
+  VaultTreeDataProvider: vi.fn().mockImplementation(function (this: Record<string, unknown>) {
+    this.dispose = vi.fn();
+    this.refresh = vi.fn();
+  }),
 }));
 
 vi.mock("./status-bar.js", () => ({
@@ -47,12 +51,12 @@ vi.mock("./wikilink-provider.js", () => ({
 import * as vscode from "vscode";
 import type { LocalIndexTracker } from "@obsidian-vfs/core";
 
-import { autoMountFromConfig } from "./auto-mount.js";
 import { bootstrapFromConfig } from "./bootstrap.js";
 import { registerCommands } from "./commands.js";
 import { activate, deactivate } from "./extension.js";
 import { ObsidianFileSystemProvider } from "./file-system-provider.js";
 import { StatusBarManager } from "./status-bar.js";
+import { VaultTreeDataProvider } from "./vault-tree-provider.js";
 import { WikilinkDocumentLinkProvider } from "./wikilink-provider.js";
 
 const mockBootstrap = vi.mocked(bootstrapFromConfig);
@@ -90,7 +94,7 @@ describe("activate", () => {
     expect(channel.appendLine).toHaveBeenCalledWith(expect.stringContaining("bootstrap failed"));
     expect(ObsidianFileSystemProvider).not.toHaveBeenCalled();
     expect(registerCommands).not.toHaveBeenCalled();
-    expect(autoMountFromConfig).not.toHaveBeenCalled();
+    expect(VaultTreeDataProvider).not.toHaveBeenCalled();
     expect(StatusBarManager).not.toHaveBeenCalled();
   });
 
@@ -113,10 +117,22 @@ describe("activate", () => {
       expect.anything(),
       { isCaseSensitive: true, isReadonly: false },
     );
-    expect(registerCommands).toHaveBeenCalledWith(ctx, fakeTracker, expect.anything());
-    expect(autoMountFromConfig).toHaveBeenCalledWith(
-      expect.objectContaining({ autoMount: [] }),
-      "MyVault",
+    expect(VaultTreeDataProvider).toHaveBeenCalledWith(fakeTracker);
+    expect(vscode.window.createTreeView).toHaveBeenCalledWith("obsidianVFS", expect.anything());
+    const treeView = vi.mocked(vscode.window.createTreeView).mock.results[0].value as {
+      title: string;
+    };
+    expect(treeView.title).toBe("Obsidian: MyVault");
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      "setContext",
+      "obsidianVFS.active",
+      true,
+    );
+    expect(registerCommands).toHaveBeenCalledWith(
+      ctx,
+      fakeTracker,
+      expect.anything(),
+      expect.anything(),
     );
     expect(StatusBarManager).toHaveBeenCalledWith(fakeTracker);
     expect(WikilinkDocumentLinkProvider).toHaveBeenCalledWith(fakeTracker);

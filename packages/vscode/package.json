@@ -12,7 +12,8 @@
     "Other"
   ],
   "activationEvents": [
-    "onFileSystem:obs"
+    "onFileSystem:obs",
+    "onStartupFinished"
   ],
   "main": "./dist/extension.js",
   "contributes": {
@@ -30,6 +31,30 @@
         "title": "Obsidian VFS: Open in Obsidian"
       }
     ],
+    "views": {
+      "explorer": [
+        {
+          "id": "obsidianVFS",
+          "name": "Obsidian VFS",
+          "when": "obsidianVFS.active"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "obsidianVFS",
+        "contents": "No vault folders mounted.\n[Mount Folder](command:obsidianVFS.mount)"
+      }
+    ],
+    "menus": {
+      "view/item/context": [
+        {
+          "command": "obsidianVFS.openInObsidian",
+          "when": "viewItem == obsFile",
+          "group": "navigation"
+        }
+      ]
+    },
     "configuration": {
       "title": "Obsidian VFS",
       "properties": {
@@ -43,13 +68,18 @@
           "default": 10000,
           "description": "CLI operation timeout in milliseconds"
         },
+        "obsidianVFS.treeViewTitle": {
+          "type": "string",
+          "default": "",
+          "description": "Custom title for the Explorer tree view (defaults to \"Obsidian: <vault_name>\")"
+        },
         "obsidianVFS.autoMount": {
           "type": "array",
           "items": {
             "type": "string"
           },
           "default": [],
-          "description": "Vault-relative folders to auto-mount as workspace folders on activation"
+          "description": "Vault-relative folders to display in the Explorer tree view"
         }
       }
     }

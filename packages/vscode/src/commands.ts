@@ -1,54 +1,60 @@
 import * as vscode from "vscode";
 import type { LocalIndexTracker } from "@obsidian-vfs/core";
 
-import { toVaultPath, toVscodeUri } from "./uri-adapter.js";
+import { toVaultPath } from "./uri-adapter.js";
+import type { VaultTreeDataProvider } from "./vault-tree-provider.js";
+import { readAutoMount } from "./vault-tree-provider.js";
 
-async function mountCommand(tracker: LocalIndexTracker): Promise<void> {
+/** Add a folder to `obsidianVFS.autoMount` and refresh the tree. */
+async function mountCommand(
+  tracker: LocalIndexTracker,
+  treeProvider: VaultTreeDataProvider,
+): Promise<void> {
   const result = await tracker.readDirectory("");
   if (!result.ok) return;
 
   const folders = result.value.filter(([, type]) => type === "directory").map(([name]) => name);
-
   if (folders.length === 0) return;
 
-  const picked = await vscode.window.showQuickPick(folders, {
+  const mounted = new Set(readAutoMount());
+  const available = folders.filter((f) => !mounted.has(f));
+  if (available.length === 0) return;
+
+  const picked = await vscode.window.showQuickPick(available, {
     placeHolder: "Select a vault folder to mount",
   });
   if (!picked) return;
 
-  const vaultName = tracker.context.name;
-  const uri = toVscodeUri(picked, vaultName);
+  const updated = [...mounted, picked];
+  await vscode.workspace
+    .getConfiguration("obsidianVFS")
+    .update("autoMount", updated, vscode.ConfigurationTarget.Workspace);
 
-  const existing = vscode.workspace.workspaceFolders ?? [];
-  const alreadyMounted = existing.some(
-    (wf) => wf.uri.scheme === "obs" && toVaultPath(wf.uri) === picked,
-  );
-  if (alreadyMounted) return;
-
-  vscode.workspace.updateWorkspaceFolders(existing.length, 0, {
-    uri,
-    name: `Obsidian: ${picked}`,
-  });
+  treeProvider.refresh();
 }
 
-async function unmountCommand(): Promise<void> {
-  const existing = vscode.workspace.workspaceFolders ?? [];
-  const obsFolders = existing.filter((wf) => wf.uri.scheme === "obs");
-
-  if (obsFolders.length === 0) {
+/** Remove a folder from `obsidianVFS.autoMount` and refresh the tree. */
+async function unmountCommand(treeProvider: VaultTreeDataProvider): Promise<void> {
+  const mounted = readAutoMount();
+  if (mounted.length === 0) {
     await vscode.window.showInformationMessage("No Obsidian VFS folders mounted");
     return;
   }
 
-  const items = obsFolders.map((wf) => ({ label: wf.name, index: wf.index }));
-  const picked = await vscode.window.showQuickPick(items, {
+  const picked = await vscode.window.showQuickPick(mounted, {
     placeHolder: "Select a folder to unmount",
   });
   if (!picked) return;
 
-  vscode.workspace.updateWorkspaceFolders(picked.index, 1);
+  const updated = mounted.filter((f) => f !== picked);
+  await vscode.workspace
+    .getConfiguration("obsidianVFS")
+    .update("autoMount", updated, vscode.ConfigurationTarget.Workspace);
+
+  treeProvider.refresh();
 }
 
+/** Open the active `obs://` file in the Obsidian desktop app. */
 async function openInObsidianCommand(
   tracker: LocalIndexTracker,
   outputChannel: vscode.OutputChannel,
@@ -71,11 +77,12 @@ async function openInObsidianCommand(
 export function registerCommands(
   context: vscode.ExtensionContext,
   tracker: LocalIndexTracker,
+  treeProvider: VaultTreeDataProvider,
   outputChannel: vscode.OutputChannel,
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand("obsidianVFS.mount", () => mountCommand(tracker)),
-    vscode.commands.registerCommand("obsidianVFS.unmount", () => unmountCommand()),
+    vscode.commands.registerCommand("obsidianVFS.mount", () => mountCommand(tracker, treeProvider)),
+    vscode.commands.registerCommand("obsidianVFS.unmount", () => unmountCommand(treeProvider)),
     vscode.commands.registerCommand("obsidianVFS.openInObsidian", () =>
       openInObsidianCommand(tracker, outputChannel),
     ),
