@@ -63,11 +63,9 @@ export class VaultTreeDataProvider
   }
 
   /** Read configured `autoMount` folders as root tree nodes. */
-  async #getRootChildren(): Promise<VaultTreeItem[]> {
+  #getRootChildren(): VaultTreeItem[] {
     const mounted = readAutoMount();
-    if (mounted.length === 0) {
-      return this.#readChildren("");
-    }
+    if (mounted.length === 0) return [];
 
     const vaultName = this.#tracker.context.name;
     return mounted.map(

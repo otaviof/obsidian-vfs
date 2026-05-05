@@ -48,25 +48,12 @@ describe("VaultTreeDataProvider", () => {
     resetConfigMock();
   });
 
-  it("returns root children from readDirectory when autoMount is empty", async () => {
-    const tracker = mockTracker({
-      readDirectory: vi.fn().mockResolvedValue({
-        ok: true,
-        value: [
-          ["projects", "directory"],
-          ["note.md", "file"],
-        ],
-      }),
-    });
-
+  it("returns empty tree when autoMount is empty", async () => {
+    const tracker = mockTracker();
     const provider = new VaultTreeDataProvider(tracker);
     const children = await provider.getChildren();
 
-    expect(children).toHaveLength(2);
-    expect(children[0].label).toBe("projects");
-    expect(children[0].contextValue).toBe("obsFolder");
-    expect(children[1].label).toBe("note.md");
-    expect(children[1].contextValue).toBe("obsFile");
+    expect(children).toEqual([]);
 
     provider.dispose();
   });
@@ -127,7 +114,8 @@ describe("VaultTreeDataProvider", () => {
     });
 
     const provider = new VaultTreeDataProvider(tracker);
-    const children = await provider.getChildren();
+    const parent = new VaultTreeItem("root", "root", "directory", "TestVault");
+    const children = await provider.getChildren(parent);
     const labels = children.map((c) => c.label);
 
     expect(labels).toEqual(["a-folder", "b-folder", "a-file.md", "z-file.md"]);
@@ -144,7 +132,8 @@ describe("VaultTreeDataProvider", () => {
     });
 
     const provider = new VaultTreeDataProvider(tracker);
-    const children = await provider.getChildren();
+    const parent = new VaultTreeItem("root", "root", "directory", "TestVault");
+    const children = await provider.getChildren(parent);
 
     expect(children).toEqual([]);
 
