@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { MENTION_PREFIX, SKILL_PREFIX, resolveSkillMention } from "@obsidian-vfs/core";
+import { SKILL_PREFIX, normalizeMention, resolveSkillMention } from "@obsidian-vfs/core";
 import type { VFSError } from "@obsidian-vfs/core";
 
 import type { InspectArgs, InspectOutput } from "./types.js";
@@ -14,14 +14,6 @@ import {
   writeStderr,
   writeStdout,
 } from "./formatters.js";
-
-/** Add the @obs: prefix if the user omitted it; preserve existing prefixes. */
-function normalizeMention(input: string): string {
-  if (input.startsWith(MENTION_PREFIX) || input.startsWith(SKILL_PREFIX)) {
-    return input;
-  }
-  return MENTION_PREFIX + input;
-}
 
 /** Write an error result to the appropriate output stream. */
 function emitError(error: VFSError, json: boolean): number {

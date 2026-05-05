@@ -6,6 +6,7 @@ vi.mock("@obsidian-vfs/core", () => {
     LocalIndexTracker: {
       create: vi.fn(),
     },
+    bootstrapTracker: vi.fn(),
     MENTION_PREFIX: "@obs:",
     SKILL_PREFIX: "/obs:",
     resolveMention: vi.fn(),
@@ -16,16 +17,14 @@ vi.mock("@obsidian-vfs/core", () => {
   };
 });
 
-import { LocalIndexTracker, resolveMention, resolveSkillMention } from "@obsidian-vfs/core";
-import type { MentionResult, VFSResult } from "@obsidian-vfs/core";
+import { bootstrapTracker, resolveMention, resolveSkillMention } from "@obsidian-vfs/core";
+import type { LocalIndexTracker, MentionResult, VFSResult } from "@obsidian-vfs/core";
 
 import { extractMentions } from "./mention-extractor.js";
 import { formatContext } from "./context-formatter.js";
-import { bootstrapTracker } from "./bootstrap.js";
 import { parseInput } from "./hook-handler.js";
 
-// eslint-disable-next-line @typescript-eslint/unbound-method
-const mockCreate = vi.mocked(LocalIndexTracker.create);
+const mockBootstrap = vi.mocked(bootstrapTracker);
 const mockResolveMention = vi.mocked(resolveMention);
 const mockResolveSkillMention = vi.mocked(resolveSkillMention);
 
@@ -45,7 +44,7 @@ describe("hook-handler", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockCreate.mockResolvedValue({ ok: true, value: fakeTracker });
+    mockBootstrap.mockResolvedValue({ ok: true, value: { tracker: fakeTracker, initMs: 1 } });
   });
 
   describe("parseInput", () => {
@@ -218,7 +217,7 @@ describe("hook-handler", () => {
 
   describe("bootstrap failure", () => {
     it("reports error for all mentions when bootstrap fails", async () => {
-      mockCreate.mockResolvedValueOnce({
+      mockBootstrap.mockResolvedValueOnce({
         ok: false,
         error: { code: "VAULT_NOT_FOUND", message: "Vault not found" },
       });

@@ -1,7 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LocalIndexTracker } from "./local-index-tracker.js";
-import { parseSection, resolveMention, resolveSkillMention } from "./resolve-mention.js";
+import {
+  normalizeMention,
+  parseSection,
+  resolveMention,
+  resolveSkillMention,
+} from "./resolve-mention.js";
 import { mockCLI, mockFsFunction } from "./test-helpers.js";
 
 vi.mock("node:fs/promises", () => ({
@@ -361,5 +366,23 @@ describe("resolveSkillMention", () => {
     const result = await resolveSkillMention("/obs:#Heading", tracker);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("INVALID_URI");
+  });
+});
+
+describe("normalizeMention", () => {
+  it("adds @obs: prefix to bare reference", () => {
+    expect(normalizeMention("notes/plan.md")).toBe("@obs:notes/plan.md");
+  });
+
+  it("preserves existing @obs: prefix", () => {
+    expect(normalizeMention("@obs:notes/plan.md")).toBe("@obs:notes/plan.md");
+  });
+
+  it("preserves existing /obs: prefix", () => {
+    expect(normalizeMention("/obs:my-skill")).toBe("/obs:my-skill");
+  });
+
+  it("handles empty string", () => {
+    expect(normalizeMention("")).toBe("@obs:");
   });
 });

@@ -54,7 +54,8 @@ const agentDefaults = {
   vaultRelativePath: "agents/architect.md",
 };
 
-const vaultContent = "---\ndescription: System architect\ntools: Read, Grep\n---\n\nYou are an architect. See [[Design]].\n";
+const vaultContent =
+  "---\ndescription: System architect\ntools: Read, Grep\n---\n\nYou are an architect. See [[Design]].\n";
 
 function makeArgs(overrides: Partial<ProvisionArgs> = {}): ProvisionArgs {
   return {
@@ -68,24 +69,27 @@ function makeArgs(overrides: Partial<ProvisionArgs> = {}): ProvisionArgs {
 
 function makeAgentTracker(
   agents = [makeDiscoveredResource(agentDefaults)],
-  readFileResult: { ok: true; value: string } | { ok: false; error: { code: string; message: string } } = {
+  readFileResult:
+    | { ok: true; value: string }
+    | { ok: false; error: { code: string; message: string } } = {
     ok: true,
     value: vaultContent,
   },
 ) {
   const readFileMock = vi.fn().mockResolvedValue(readFileResult);
-  const tracker = makeListAgentsTracker({ ok: true, value: agents }, {
-    readFile: readFileMock,
-  });
+  const tracker = makeListAgentsTracker(
+    { ok: true, value: agents },
+    {
+      readFile: readFileMock,
+    },
+  );
   return tracker;
 }
 
 describe("cmd-provision-agents", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockReadFile.mockRejectedValue(
-      Object.assign(new Error("ENOENT"), { code: "ENOENT" }),
-    );
+    mockReadFile.mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
     mockWriteFile.mockResolvedValue(undefined);
     mockMkdir.mockResolvedValue(undefined);
   });
@@ -137,9 +141,7 @@ describe("cmd-provision-agents", () => {
 
     await run(makeArgs());
 
-    const writeCall = mockWriteFile.mock.calls.find(
-      (c) => String(c[0]).endsWith("architect.md"),
-    );
+    const writeCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("architect.md"));
     expect(writeCall).toBeDefined();
     const content = String(writeCall![1]);
     expect(content).toContain("[Design](obs://My%20Vault/Design)");
@@ -147,17 +149,15 @@ describe("cmd-provision-agents", () => {
   });
 
   it("proxy content handles no frontmatter", async () => {
-    const tracker = makeAgentTracker(
-      [makeDiscoveredResource(agentDefaults)],
-      { ok: true, value: "Just body content with [[Link]].\n" },
-    );
+    const tracker = makeAgentTracker([makeDiscoveredResource(agentDefaults)], {
+      ok: true,
+      value: "Just body content with [[Link]].\n",
+    });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     await run(makeArgs());
 
-    const writeCall = mockWriteFile.mock.calls.find(
-      (c) => String(c[0]).endsWith("architect.md"),
-    );
+    const writeCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("architect.md"));
     expect(writeCall).toBeDefined();
     const content = String(writeCall![1]);
     expect(content).toContain("name: architect");
@@ -169,7 +169,8 @@ describe("cmd-provision-agents", () => {
     const tracker = makeAgentTracker();
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
-    const expectedContent = "---\nname: architect\ndescription: System architect\ntools: Read, Grep\n---\n\nYou are an architect. See [Design](obs://My%20Vault/Design).\n";
+    const expectedContent =
+      "---\nname: architect\ndescription: System architect\ntools: Read, Grep\n---\n\nYou are an architect. See [Design](obs://My%20Vault/Design).\n";
     mockReadFile.mockImplementation((...args: unknown[]) => {
       const pathArg = String(args[0]);
       if (pathArg.endsWith("architect.md")) return Promise.resolve(expectedContent);
@@ -203,8 +204,8 @@ describe("cmd-provision-agents", () => {
 
     await run(makeArgs());
 
-    const settingsCall = mockWriteFile.mock.calls.find(
-      (c) => String(c[0]).endsWith("settings.local.json"),
+    const settingsCall = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).endsWith("settings.local.json"),
     );
     expect(settingsCall).toBeDefined();
     const written = JSON.parse(String(settingsCall![1])) as {
@@ -220,9 +221,7 @@ describe("cmd-provision-agents", () => {
     mockReadFile.mockImplementation((...args: unknown[]) => {
       const pathArg = String(args[0]);
       if (pathArg.endsWith("settings.local.json")) {
-        return Promise.resolve(
-          JSON.stringify({ permissions: { allow: ["Bash(obs-read *)"] } }),
-        );
+        return Promise.resolve(JSON.stringify({ permissions: { allow: ["Bash(obs-read *)"] } }));
       }
       return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
     });
@@ -293,15 +292,23 @@ describe("cmd-provision-agents", () => {
 
   it("captures readFile failure in errors and continues", async () => {
     const agents = [
-      makeDiscoveredResource({ name: "broken", description: "Broken", vaultRelativePath: "agents/broken.md" }),
+      makeDiscoveredResource({
+        name: "broken",
+        description: "Broken",
+        vaultRelativePath: "agents/broken.md",
+      }),
       makeDiscoveredResource(agentDefaults),
     ];
-    const readFileMock = vi.fn()
+    const readFileMock = vi
+      .fn()
       .mockResolvedValueOnce({ ok: false, error: { code: "FILE_NOT_FOUND", message: "missing" } })
       .mockResolvedValueOnce({ ok: true, value: vaultContent });
-    const tracker = makeListAgentsTracker({ ok: true, value: agents }, {
-      readFile: readFileMock,
-    });
+    const tracker = makeListAgentsTracker(
+      { ok: true, value: agents },
+      {
+        readFile: readFileMock,
+      },
+    );
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     const code = await run(makeArgs());
@@ -319,12 +326,19 @@ describe("cmd-provision-agents", () => {
   it("provisions only included agents", async () => {
     const agents = [
       makeDiscoveredResource(agentDefaults),
-      makeDiscoveredResource({ name: "reviewer", description: "Reviewer", vaultRelativePath: "agents/reviewer.md" }),
+      makeDiscoveredResource({
+        name: "reviewer",
+        description: "Reviewer",
+        vaultRelativePath: "agents/reviewer.md",
+      }),
     ];
     const readFileMock = vi.fn().mockResolvedValue({ ok: true, value: vaultContent });
-    const tracker = makeListAgentsTracker({ ok: true, value: agents }, {
-      readFile: readFileMock,
-    });
+    const tracker = makeListAgentsTracker(
+      { ok: true, value: agents },
+      {
+        readFile: readFileMock,
+      },
+    );
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     await run(makeArgs({ include: ["architect"] }));
@@ -342,12 +356,19 @@ describe("cmd-provision-agents", () => {
   it("excludes matching agents", async () => {
     const agents = [
       makeDiscoveredResource(agentDefaults),
-      makeDiscoveredResource({ name: "draft-agent", description: "Draft", vaultRelativePath: "agents/draft-agent.md" }),
+      makeDiscoveredResource({
+        name: "draft-agent",
+        description: "Draft",
+        vaultRelativePath: "agents/draft-agent.md",
+      }),
     ];
     const readFileMock = vi.fn().mockResolvedValue({ ok: true, value: vaultContent });
-    const tracker = makeListAgentsTracker({ ok: true, value: agents }, {
-      readFile: readFileMock,
-    });
+    const tracker = makeListAgentsTracker(
+      { ok: true, value: agents },
+      {
+        readFile: readFileMock,
+      },
+    );
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     await run(makeArgs({ exclude: ["draft-*"] }));
@@ -376,13 +397,24 @@ describe("cmd-provision-agents", () => {
 
   it("multiple agents in single run", async () => {
     const agents = [
-      makeDiscoveredResource({ name: "architect", description: "Architect", vaultRelativePath: "agents/architect.md" }),
-      makeDiscoveredResource({ name: "reviewer", description: "Reviewer", vaultRelativePath: "agents/reviewer.md" }),
+      makeDiscoveredResource({
+        name: "architect",
+        description: "Architect",
+        vaultRelativePath: "agents/architect.md",
+      }),
+      makeDiscoveredResource({
+        name: "reviewer",
+        description: "Reviewer",
+        vaultRelativePath: "agents/reviewer.md",
+      }),
     ];
     const readFileMock = vi.fn().mockResolvedValue({ ok: true, value: vaultContent });
-    const tracker = makeListAgentsTracker({ ok: true, value: agents }, {
-      readFile: readFileMock,
-    });
+    const tracker = makeListAgentsTracker(
+      { ok: true, value: agents },
+      {
+        readFile: readFileMock,
+      },
+    );
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 
     const code = await run(makeArgs());

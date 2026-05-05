@@ -1,5 +1,8 @@
 import type { DiscoveredResource, LocalIndexTracker, VFSResult } from "@obsidian-vfs/core";
-import { vi } from "vitest";
+import type { Mock } from "vitest";
+import { makeLocalIndexTrackerWith } from "@obsidian-vfs/core/testing";
+
+export { makeLocalIndexTrackerWith, makeDiscoveredResource } from "@obsidian-vfs/core/testing";
 
 /** Default CLI option values shared across all command test factories. */
 export const CLI_DEFAULTS = {
@@ -16,42 +19,6 @@ export const FORMAT_ERROR_STUB = (err: { message: string }) => `ERROR: ${err.mes
 export const FORMAT_VERBOSE_TIMING_STUB = (label: string, ms: number) =>
   `[verbose] ${label}: ${ms.toFixed(1)}ms`;
 
-/** Default vault context used by tracker factories. */
-const DEFAULT_TRACKER_CONTEXT = { physicalPath: "/Users/me/vault", name: "My Vault" };
-
-/**
- * Build a mock `LocalIndexTracker` whose single method resolves to the given result.
- *
- * Each command uses a different tracker method (`resolveMention`, `resolveWikilink`,
- * `listSkills`, etc.), so the caller specifies the method name and the value it should
- * resolve to. Extra method stubs can be supplied via `extraMethods`.
- */
-export function makeLocalIndexTrackerWith<K extends keyof LocalIndexTracker>(
-  methodName: K,
-  result: VFSResult<unknown>,
-  extraMethods: Partial<Record<keyof LocalIndexTracker, ReturnType<typeof vi.fn>>> = {},
-): { tracker: LocalIndexTracker; mock: ReturnType<typeof vi.fn> } {
-  const mock = vi.fn().mockResolvedValue(result);
-  const tracker = {
-    context: DEFAULT_TRACKER_CONTEXT,
-    [methodName]: mock,
-    ...extraMethods,
-  } as unknown as LocalIndexTracker;
-  return { tracker, mock };
-}
-
-/** Build a `DiscoveredResource` with sensible defaults, overridable per-field. */
-export function makeDiscoveredResource(
-  overrides: Partial<DiscoveredResource> = {},
-): DiscoveredResource {
-  return {
-    name: "deploy",
-    description: "Deploy helper",
-    vaultRelativePath: "skills/deploy/SKILL.md",
-    ...overrides,
-  };
-}
-
 /** Build a mock tracker whose `listSkills` resolves to the given result. */
 export function makeListSkillsTracker(listSkillsResult: VFSResult<DiscoveredResource[]>) {
   const { tracker } = makeLocalIndexTrackerWith("listSkills", listSkillsResult);
@@ -61,7 +28,7 @@ export function makeListSkillsTracker(listSkillsResult: VFSResult<DiscoveredReso
 /** Build a mock tracker whose `listAgents` resolves to the given result. */
 export function makeListAgentsTracker(
   listAgentsResult: VFSResult<DiscoveredResource[]>,
-  extraMethods: Partial<Record<keyof LocalIndexTracker, ReturnType<typeof vi.fn>>> = {},
+  extraMethods: Partial<Record<keyof LocalIndexTracker, Mock>> = {},
 ) {
   const { tracker } = makeLocalIndexTrackerWith("listAgents", listAgentsResult, extraMethods);
   return tracker;

@@ -1,0 +1,51 @@
+{
+  "name": "obsidian-vfs",
+  "displayName": "Obsidian VFS",
+  "description": "Virtual file system bridging Obsidian vaults into VSCode",
+  "version": "0.0.0",
+  "private": true,
+  "publisher": "obsidian-vfs",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onFileSystem:obs"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "Obsidian VFS",
+      "properties": {
+        "obsidianVFS.cliPath": {
+          "type": "string",
+          "default": "obsidian",
+          "description": "Path to the Obsidian CLI binary"
+        },
+        "obsidianVFS.timeoutMs": {
+          "type": "number",
+          "default": 10000,
+          "description": "CLI operation timeout in milliseconds"
+        }
+      }
+    }
+  },
+  "capabilities": {
+    "virtualWorkspaces": true
+  },
+  "scripts": {
+    "build": "tsc --noEmit && node esbuild.mjs",
+    "package": "vsce package --no-dependencies --allow-missing-repository -o obsidian-vfs.vsix",
+    "clean": "rm -rf dist *.vsix"
+  },
+  "dependencies": {
+    "@obsidian-vfs/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.100.0",
+    "@vscode/vsce": "^3.0.0",
+    "esbuild": "^0.25.0"
+  }
+}

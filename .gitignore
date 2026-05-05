@@ -1,5 +1,6 @@
 .claude
 *.tsbuildinfo
+*.vsix
 coverage/
 dist/
 node_modules/

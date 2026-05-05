@@ -47,14 +47,7 @@ function buildProxyContent(
     return `---\n${fm}\n---\n${scrubbedBody}`;
   }
 
-  return [
-    "---",
-    `name: ${name}`,
-    `description: ${description}`,
-    "---",
-    "",
-    scrubbedBody,
-  ].join("\n");
+  return ["---", `name: ${name}`, `description: ${description}`, "---", "", scrubbedBody].join("\n");
 }
 
 /** Write a single proxy agent file, creating the directory if needed. */
@@ -78,9 +71,7 @@ async function writeProxyAgent(
 }
 
 /** Ensure the global obs-read permission rule exists. Returns how many were added (0 or 1). */
-async function ensureObsReadPermission(
-  settingsPath: string,
-): Promise<{ added: number }> {
+async function ensureObsReadPermission(settingsPath: string): Promise<{ added: number }> {
   let data: { permissions?: { allow?: string[] } };
 
   try {

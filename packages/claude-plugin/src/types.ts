@@ -1,5 +1,3 @@
-import type { LocalIndexTracker } from "@obsidian-vfs/core";
-
 /** JSON input received from Claude Code on stdin for the UserPromptSubmit hook. */
 export interface HookInput {
   readonly hook_event_name: "UserPromptSubmit";
@@ -44,8 +42,3 @@ export type ResolvedMention =
       readonly mention: ExtractedMention;
       readonly errorMessage: string;
     };
-
-/** Successful bootstrap result with the tracker. */
-export interface BootstrapResult {
-  readonly tracker: LocalIndexTracker;
-}

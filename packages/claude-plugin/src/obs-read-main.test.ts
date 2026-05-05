@@ -1,33 +1,27 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@obsidian-vfs/core", () => {
+vi.mock("@obsidian-vfs/core", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
   return {
-    ObsidianCLIImpl: vi.fn(),
-    LocalIndexTracker: {
-      create: vi.fn(),
-    },
-    MENTION_PREFIX: "@obs:",
-    SKILL_PREFIX: "/obs:",
+    ...actual,
+    bootstrapTracker: vi.fn(),
     resolveMention: vi.fn(),
     resolveSkillMention: vi.fn(),
     resolveExecConfig: vi.fn().mockReturnValue({ cliPath: "obsidian", timeoutMs: 10_000 }),
-    DEFAULT_CLI_PATH: "obsidian",
-    DEFAULT_TIMEOUT_MS: 10_000,
   };
 });
 
 import {
-  LocalIndexTracker,
+  bootstrapTracker,
   resolveMention,
   resolveExecConfig,
   resolveSkillMention,
 } from "@obsidian-vfs/core";
-import type { LocalIndexTracker as TrackerType, MentionResult, VFSResult } from "@obsidian-vfs/core";
+import type { LocalIndexTracker, MentionResult, VFSResult } from "@obsidian-vfs/core";
 
 import { run } from "./obs-read-main.js";
 
-// eslint-disable-next-line @typescript-eslint/unbound-method
-const mockCreate = vi.mocked(LocalIndexTracker.create);
+const mockBootstrap = vi.mocked(bootstrapTracker);
 const mockResolveMention = vi.mocked(resolveMention);
 const mockResolveSkillMention = vi.mocked(resolveSkillMention);
 const mockResolveExecConfig = vi.mocked(resolveExecConfig);
@@ -61,12 +55,12 @@ function mentionResult(content: string): VFSResult<MentionResult> {
 }
 
 describe("obs-read-main", () => {
-  const fakeTracker = { context: { name: "Vault" } } as unknown as TrackerType;
+  const fakeTracker = { context: { name: "Vault" } } as unknown as LocalIndexTracker;
 
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
-    mockCreate.mockResolvedValue({ ok: true, value: fakeTracker });
+    mockBootstrap.mockResolvedValue({ ok: true, value: { tracker: fakeTracker, initMs: 1 } });
   });
 
   it("exits 2 with usage message when no argument", async () => {
@@ -131,7 +125,7 @@ describe("obs-read-main", () => {
   });
 
   it("writes error to stderr on bootstrap failure", async () => {
-    mockCreate.mockResolvedValueOnce({
+    mockBootstrap.mockResolvedValueOnce({
       ok: false,
       error: { code: "VAULT_NOT_FOUND", message: "Vault not found" },
     });
@@ -141,7 +135,7 @@ describe("obs-read-main", () => {
   });
 
   it("returns 1 on bootstrap failure", async () => {
-    mockCreate.mockResolvedValueOnce({
+    mockBootstrap.mockResolvedValueOnce({
       ok: false,
       error: { code: "VAULT_NOT_FOUND", message: "Vault not found" },
     });

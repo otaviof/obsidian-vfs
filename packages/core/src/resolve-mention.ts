@@ -13,6 +13,14 @@ export const MENTION_PREFIX = "@obs:";
 /** Prefix for skill-only mentions (`/obs:name`). */
 export const SKILL_PREFIX = "/obs:";
 
+/** Add the `@obs:` prefix if the user omitted it; preserve existing prefixes. */
+export function normalizeMention(input: string): string {
+  if (input.startsWith(MENTION_PREFIX) || input.startsWith(SKILL_PREFIX)) {
+    return input;
+  }
+  return MENTION_PREFIX + input;
+}
+
 /** Split a reference on the first `#` into name and optional section. */
 export function parseSection(reference: string): {
   namePart: string;

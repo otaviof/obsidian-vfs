@@ -1,29 +1,15 @@
 import {
-  MENTION_PREFIX,
+  EXIT_ERROR,
+  EXIT_SUCCESS,
+  EXIT_USAGE,
   SKILL_PREFIX,
+  normalizeMention,
   resolveMention,
-  resolveSkillMention,
   resolveExecConfig,
+  resolveSkillMention,
 } from "@obsidian-vfs/core";
 
 import { bootstrapTracker } from "./bootstrap.js";
-
-/** Exit code for successful resolution. */
-const EXIT_SUCCESS = 0;
-
-/** Exit code for resolution or bootstrap failure. */
-const EXIT_ERROR = 1;
-
-/** Exit code for usage errors (missing argument). */
-const EXIT_USAGE = 2;
-
-/** Add the @obs: prefix if the user omitted it; preserve existing prefixes. */
-function normalizeMention(input: string): string {
-  if (input.startsWith(MENTION_PREFIX) || input.startsWith(SKILL_PREFIX)) {
-    return input;
-  }
-  return MENTION_PREFIX + input;
-}
 
 /** Resolve a vault mention and write the content to stdout. */
 export async function run(args: readonly string[]): Promise<number> {

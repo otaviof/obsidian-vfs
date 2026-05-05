@@ -385,9 +385,7 @@ describe("LocalIndexTracker", () => {
       ]);
 
       readFileMock
-        .mockResolvedValueOnce(
-          Buffer.from("---\ndescription: Deploy helper\n---\nDeploy content"),
-        )
+        .mockResolvedValueOnce(Buffer.from("---\ndescription: Deploy helper\n---\nDeploy content"))
         .mockResolvedValueOnce(Buffer.from("---\ndescription: Code reviewer\n---\nReview content"));
 
       const result = await tracker.listSkills();
@@ -438,9 +436,7 @@ describe("LocalIndexTracker", () => {
       ]);
 
       readFileMock
-        .mockRejectedValueOnce(
-          Object.assign(new Error("ENOENT"), { code: "ENOENT" }),
-        )
+        .mockRejectedValueOnce(Object.assign(new Error("ENOENT"), { code: "ENOENT" }))
         .mockResolvedValueOnce(Buffer.from("---\ndescription: Valid skill\n---\nContent"));
 
       const result = await tracker.listSkills();
@@ -484,9 +480,7 @@ describe("LocalIndexTracker", () => {
         { name: "actual-skill", isDirectory: () => true },
       ]);
 
-      readFileMock.mockResolvedValueOnce(
-        Buffer.from("---\ndescription: Actual\n---\nContent"),
-      );
+      readFileMock.mockResolvedValueOnce(Buffer.from("---\ndescription: Actual\n---\nContent"));
 
       const result = await tracker.listSkills();
       expect(result.ok).toBe(true);
@@ -548,9 +542,7 @@ describe("LocalIndexTracker", () => {
         { name: "has spaces", isDirectory: () => true },
       ]);
 
-      readFileMock.mockResolvedValueOnce(
-        Buffer.from("---\ndescription: Good\n---\nContent"),
-      );
+      readFileMock.mockResolvedValueOnce(Buffer.from("---\ndescription: Good\n---\nContent"));
 
       const result = await tracker.listSkills();
       expect(result.ok).toBe(true);
@@ -583,9 +575,7 @@ describe("LocalIndexTracker", () => {
       const readdirMock = mockFsFunction(readdir);
       readdirMock.mockResolvedValueOnce([{ name: "empty-desc", isDirectory: () => true }]);
 
-      readFileMock.mockResolvedValueOnce(
-        Buffer.from("---\ndescription:   \n---\nContent"),
-      );
+      readFileMock.mockResolvedValueOnce(Buffer.from("---\ndescription:   \n---\nContent"));
 
       const result = await tracker.listSkills();
       expect(result.ok).toBe(true);
@@ -655,9 +645,7 @@ describe("LocalIndexTracker", () => {
         .mockResolvedValueOnce(
           Buffer.from("---\ndescription: System architect\n---\nArchitect content"),
         )
-        .mockResolvedValueOnce(
-          Buffer.from("---\ndescription: Code reviewer\n---\nReview content"),
-        );
+        .mockResolvedValueOnce(Buffer.from("---\ndescription: Code reviewer\n---\nReview content"));
 
       const result = await tracker.listAgents();
       expect(result.ok).toBe(true);
@@ -706,9 +694,7 @@ describe("LocalIndexTracker", () => {
         { name: "valid.md", isDirectory: () => false },
       ]);
 
-      readFileMock.mockResolvedValueOnce(
-        Buffer.from("---\ndescription: Valid agent\n---\nContent"),
-      );
+      readFileMock.mockResolvedValueOnce(Buffer.from("---\ndescription: Valid agent\n---\nContent"));
 
       const result = await tracker.listAgents();
       expect(result.ok).toBe(true);
@@ -753,9 +739,7 @@ describe("LocalIndexTracker", () => {
         { name: "has spaces.md", isDirectory: () => false },
       ]);
 
-      readFileMock.mockResolvedValueOnce(
-        Buffer.from("---\ndescription: Good\n---\nContent"),
-      );
+      readFileMock.mockResolvedValueOnce(Buffer.from("---\ndescription: Good\n---\nContent"));
 
       const result = await tracker.listAgents();
       expect(result.ok).toBe(true);
@@ -810,13 +794,9 @@ describe("LocalIndexTracker", () => {
 
       const { readdir } = await import("node:fs/promises");
       const readdirMock = mockFsFunction(readdir);
-      readdirMock.mockResolvedValueOnce([
-        { name: "my-agent.md", isDirectory: () => false },
-      ]);
+      readdirMock.mockResolvedValueOnce([{ name: "my-agent.md", isDirectory: () => false }]);
 
-      readFileMock.mockResolvedValueOnce(
-        Buffer.from("---\ndescription: My agent\n---\nContent"),
-      );
+      readFileMock.mockResolvedValueOnce(Buffer.from("---\ndescription: My agent\n---\nContent"));
 
       const result = await tracker.listAgents();
       expect(result.ok).toBe(true);

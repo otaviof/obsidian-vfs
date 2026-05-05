@@ -58,6 +58,22 @@ export { DEFAULT_CLI_PATH, DEFAULT_TIMEOUT_MS, resolveExecConfig } from "./exec.
 export type { CLIExecOptions } from "./exec.js";
 
 /**
+ * Shared bootstrap: create a `LocalIndexTracker` from CLI options.
+ */
+export { bootstrapTracker } from "./bootstrap.js";
+export type { BootstrapResult } from "./bootstrap.js";
+
+/**
+ * Process exit codes shared across CLI and plugin packages.
+ */
+export { EXIT_SUCCESS, EXIT_ERROR, EXIT_USAGE } from "./exit-codes.js";
+
+/**
+ * Path security: canonicalize, validate, and check symlinks.
+ */
+export { validatePath, canonicalizePath } from "./path-security.js";
+
+/**
  * Concrete implementations — CLI wrapper and async queue.
  */
 export { ObsidianCLIImpl } from "./obsidian-cli.js";
@@ -83,6 +99,7 @@ export { readDirectory, statVirtualFile } from "./fs-enumeration.js";
 export {
   MENTION_PREFIX,
   SKILL_PREFIX,
+  normalizeMention,
   parseSection,
   resolveMention,
   resolveSkillMention,

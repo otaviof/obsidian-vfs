@@ -1,13 +1,6 @@
 import type { DiscoveredResource } from "@obsidian-vfs/core";
 
-/** Exit code for successful command execution. */
-export const EXIT_SUCCESS = 0;
-
-/** Exit code for runtime errors (vault not found, file not found, etc.). */
-export const EXIT_ERROR = 1;
-
-/** Exit code for usage errors (unknown command, missing argument, etc.). */
-export const EXIT_USAGE = 2;
+export { EXIT_SUCCESS, EXIT_ERROR, EXIT_USAGE } from "@obsidian-vfs/core";
 
 /** Global options parsed from process.argv. */
 export interface CLIOptions {

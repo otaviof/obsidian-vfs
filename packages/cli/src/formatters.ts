@@ -1,11 +1,6 @@
 import type { VFSError } from "@obsidian-vfs/core";
 
-import type {
-  InspectOutput,
-  ListResourcesOutput,
-  ProvisionOutput,
-  ResolveOutput,
-} from "./types.js";
+import type { InspectOutput, ListResourcesOutput, ProvisionOutput, ResolveOutput } from "./types.js";
 
 /** Maximum number of lines shown in inspect content preview. */
 const INSPECT_MAX_LINES = 80;

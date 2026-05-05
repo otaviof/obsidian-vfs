@@ -1,12 +1,7 @@
 import type { VFSError } from "@obsidian-vfs/core";
 import { describe, expect, it } from "vitest";
 
-import type {
-  InspectOutput,
-  ListResourcesOutput,
-  ProvisionOutput,
-  ResolveOutput,
-} from "./types.js";
+import type { InspectOutput, ListResourcesOutput, ProvisionOutput, ResolveOutput } from "./types.js";
 import {
   formatError,
   formatHelp,
@@ -237,7 +232,11 @@ describe("formatListResourcesResult", () => {
   it("renders agents with correct kind", () => {
     const output: ListResourcesOutput = {
       resources: [
-        { name: "architect", description: "System architect", vaultRelativePath: "agents/architect.md" },
+        {
+          name: "architect",
+          description: "System architect",
+          vaultRelativePath: "agents/architect.md",
+        },
       ],
       count: 1,
     };
@@ -263,7 +262,12 @@ describe("formatListResourcesJSON", () => {
 });
 
 describe("formatProvisionResult", () => {
-  const noFilter = { include: [] as string[], exclude: [] as string[], discoveredCount: 2, filteredCount: 2 };
+  const noFilter = {
+    include: [] as string[],
+    exclude: [] as string[],
+    discoveredCount: 2,
+    filteredCount: 2,
+  };
   const baseOutput: ProvisionOutput = {
     written: ["deploy", "review"],
     skipped: [],
@@ -295,43 +299,55 @@ describe("formatProvisionResult", () => {
   });
 
   it("includes errors when present", () => {
-    const result = formatProvisionResult({
-      ...baseOutput,
-      errors: ["Failed to write proxy"],
-    }, "skills");
+    const result = formatProvisionResult(
+      {
+        ...baseOutput,
+        errors: ["Failed to write proxy"],
+      },
+      "skills",
+    );
     expect(result).toContain("error: Failed to write proxy");
   });
 
   it("renders correctly when all operations fail", () => {
-    const result = formatProvisionResult({
-      ...baseOutput,
-      written: [],
-      permissionsAdded: 0,
-      errors: ["Error A", "Error B"],
-    }, "skills");
+    const result = formatProvisionResult(
+      {
+        ...baseOutput,
+        written: [],
+        permissionsAdded: 0,
+        errors: ["Error A", "Error B"],
+      },
+      "skills",
+    );
     expect(result).toContain("Wrote 0 skills");
     expect(result).toContain("error: Error A");
     expect(result).toContain("error: Error B");
   });
 
   it("shows skipped when present", () => {
-    const result = formatProvisionResult({
-      ...baseOutput,
-      written: ["deploy"],
-      skipped: ["draft-notes", "draft-review"],
-      filter: { include: [], exclude: ["draft-*"], discoveredCount: 3, filteredCount: 1 },
-    }, "skills");
+    const result = formatProvisionResult(
+      {
+        ...baseOutput,
+        written: ["deploy"],
+        skipped: ["draft-notes", "draft-review"],
+        filter: { include: [], exclude: ["draft-*"], discoveredCount: 3, filteredCount: 1 },
+      },
+      "skills",
+    );
     expect(result).toContain("skipped:");
     expect(result).toContain("draft-notes, draft-review");
   });
 
   it("shows filter summary when filter is active", () => {
-    const result = formatProvisionResult({
-      ...baseOutput,
-      written: ["deploy"],
-      skipped: ["draft-notes", "draft-review"],
-      filter: { include: [], exclude: ["draft-*"], discoveredCount: 3, filteredCount: 1 },
-    }, "skills");
+    const result = formatProvisionResult(
+      {
+        ...baseOutput,
+        written: ["deploy"],
+        skipped: ["draft-notes", "draft-review"],
+        filter: { include: [], exclude: ["draft-*"], discoveredCount: 3, filteredCount: 1 },
+      },
+      "skills",
+    );
     expect(result).toContain("filter:");
     expect(result).toContain('--exclude "draft-*"');
     expect(result).toContain("3 discovered, 1 provisioned");
@@ -350,7 +366,12 @@ describe("formatProvisionResult", () => {
 });
 
 describe("formatProvisionJSON", () => {
-  const noFilter = { include: [] as string[], exclude: [] as string[], discoveredCount: 1, filteredCount: 1 };
+  const noFilter = {
+    include: [] as string[],
+    exclude: [] as string[],
+    discoveredCount: 1,
+    filteredCount: 1,
+  };
 
   it("serializes output as JSON", () => {
     const output: ProvisionOutput = {

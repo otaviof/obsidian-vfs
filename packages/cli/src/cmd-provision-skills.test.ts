@@ -61,9 +61,7 @@ function makeArgs(overrides: Partial<ProvisionArgs> = {}): ProvisionArgs {
 describe("cmd-provision-skills", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockReadFile.mockRejectedValue(
-      Object.assign(new Error("ENOENT"), { code: "ENOENT" }),
-    );
+    mockReadFile.mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
     mockWriteFile.mockResolvedValue(undefined);
     mockMkdir.mockResolvedValue(undefined);
   });
@@ -143,16 +141,14 @@ describe("cmd-provision-skills", () => {
 
     await run(makeArgs());
 
-    const settingsCall = mockWriteFile.mock.calls.find(
-      (c) => String(c[0]).endsWith("settings.local.json"),
+    const settingsCall = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).endsWith("settings.local.json"),
     );
     expect(settingsCall).toBeDefined();
     const written = JSON.parse(String(settingsCall![1])) as {
       permissions: { allow: string[] };
     };
-    expect(written.permissions.allow).toContainEqual(
-      'Bash(./bin/obs-read "/obs:deploy")',
-    );
+    expect(written.permissions.allow).toContainEqual('Bash(./bin/obs-read "/obs:deploy")');
   });
 
   it("--dry-run does not write files", async () => {
@@ -205,10 +201,7 @@ describe("cmd-provision-skills", () => {
 
     await run(makeArgs());
 
-    expect(mockMkdir).toHaveBeenCalledWith(
-      expect.stringContaining(".claude"),
-      { recursive: true },
-    );
+    expect(mockMkdir).toHaveBeenCalledWith(expect.stringContaining(".claude"), { recursive: true });
     expect(mockWriteFile).toHaveBeenCalledWith(
       expect.stringContaining("settings.local.json"),
       expect.any(String),
@@ -302,7 +295,10 @@ describe("cmd-provision-skills", () => {
   });
 
   it("--dry-run lists all discovered skills as written", async () => {
-    const skills = [makeDiscoveredResource(), makeDiscoveredResource({ name: "review", description: "Reviewer" })];
+    const skills = [
+      makeDiscoveredResource(),
+      makeDiscoveredResource({ name: "review", description: "Reviewer" }),
+    ];
     const tracker = makeListSkillsTracker({ ok: true, value: skills });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
 

@@ -73,11 +73,10 @@ function makeMentionTracker(mentionResult: VFSResult<MentionResult>) {
 }
 
 function makeSkillTracker(skillResult: VFSResult<string>) {
-  const { tracker, mock: resolveSkill } = makeLocalIndexTrackerWith(
-    "resolveSkill",
-    skillResult,
-    { resolveWikilink: vi.fn(), resolveMention: vi.fn() },
-  );
+  const { tracker, mock: resolveSkill } = makeLocalIndexTrackerWith("resolveSkill", skillResult, {
+    resolveWikilink: vi.fn(),
+    resolveMention: vi.fn(),
+  });
   return { tracker, resolveSkill };
 }
 

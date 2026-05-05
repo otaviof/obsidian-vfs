@@ -26,6 +26,115 @@ pnpm build
 pnpm test
 ```
 
+## VS Code Extension
+
+The `packages/vscode` extension registers an `obs://` virtual file system provider, making Obsidian vault files browsable and editable directly in VS Code.
+
+### Current Capabilities
+
+| Operation | Status | Mechanism |
+|-----------|--------|-----------|
+| Read files | Working | `node:fs` via core `readVirtualFile` |
+| List directories | Working | Core `LocalIndexTracker` |
+| Stat files/dirs | Working | Core `LocalIndexTracker` |
+| Edit existing files | Working | `node:fs.writeFile` after path security validation |
+| Create directories | Working | `node:fs.mkdir` after path security validation |
+| File watching | Working | Core `VaultFileWatcher` with prefix filtering |
+| Create new files | Deferred | Requires CLI mutations (preserves wikilinks) |
+| Delete files | Deferred | Requires CLI mutations |
+| Rename/move files | Deferred | Requires CLI mutations |
+
+### Extension Settings
+
+Configure via VS Code Settings UI or `settings.json`:
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `obsidianVFS.cliPath` | `string` | `"obsidian"` | Path to the Obsidian CLI binary |
+| `obsidianVFS.timeoutMs` | `number` | `10000` | CLI operation timeout in milliseconds |
+
+### Installing Locally
+
+#### 1. Build and package the `.vsix`
+
+```sh
+pnpm install
+
+# Creates the "packages/vscode/obsidian-vfs.vsix" file.
+pnpm package:vscode
+```
+
+#### 2. Install in VS Code
+
+**Via the GUI:** Extensions sidebar > `···` menu > **Install from VSIX...** > select `packages/vscode/obsidian-vfs.vsix`
+
+**Via the CLI:**
+
+```sh
+code --install-extension packages/vscode/obsidian-vfs.vsix
+```
+
+#### 3. Reload VS Code
+
+After installing, reload the window (**Developer: Reload Window** from the Command Palette or `Cmd+Shift+P`).
+
+### Prerequisites
+
+- **Obsidian** running with the [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin
+- The `obsidian` CLI on PATH (or configure `obsidianVFS.cliPath` in VS Code settings)
+
+### Development Workflow
+
+#### Unit Tests
+
+```sh
+pnpm test                           # All tests (including VS Code)
+pnpm test -- packages/vscode        # VS Code package only
+```
+
+#### Building (without packaging)
+
+```sh
+pnpm build                          # Build all packages (core -> vscode)
+ls packages/vscode/dist/            # Verify extension.js + extension.js.map
+```
+
+#### Extension Development Host
+
+For iterating without re-packaging, use the Extension Development Host which loads the extension directly from the build output:
+
+1. Open the monorepo in VS Code
+2. Press `F5` (or **Run > Start Debugging**)
+3. Select **Extension Development Host** from the launch configuration
+
+If no `launch.json` exists, create `.vscode/launch.json`:
+
+```json
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": ["--extensionDevelopmentPath=${workspaceFolder}/packages/vscode"],
+      "outFiles": ["${workspaceFolder}/packages/vscode/dist/**/*.js"],
+      "preLaunchTask": "npm: build"
+    }
+  ]
+}
+```
+
+#### Manual Testing Checklist
+
+1. **Verify activation** -- Output panel > "Obsidian VFS" > confirm vault loaded message
+2. **Browse files** -- Explorer sidebar shows `obs://` workspace entries
+3. **Read file** -- Open any `.md` file from the virtual workspace
+4. **Directory listing** -- Expand folders in the Explorer sidebar
+5. **Edit existing file** -- Modify and save a vault file (writes via `node:fs`)
+6. **Create file guard** -- New file creation shows "NoPermissions" (deferred to CLI)
+7. **Delete/rename guard** -- Deletion and rename show "NoPermissions" (deferred)
+
 ## CLI (Development)
 
 During development, run the CLI via the root workspace script after building:
@@ -285,6 +394,7 @@ If the file is missing or empty (`{}`), the VFS operates with defaults (no agent
 | Command | Description |
 |---------|-------------|
 | `pnpm build` | Build all packages |
+| `pnpm package:vscode` | Build + package VS Code extension (`.vsix`) |
 | `pnpm lint` | Run ESLint |
 | `pnpm format` | Format with Prettier |
 | `pnpm format:check` | Check formatting without writing |
