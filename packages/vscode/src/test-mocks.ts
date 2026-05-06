@@ -116,6 +116,7 @@ export function createVscodeMock(
       }),
       registerFileSystemProvider: vi.fn(() => ({ dispose: vi.fn() })),
       updateWorkspaceFolders: vi.fn(),
+      onDidChangeConfiguration: vi.fn(() => ({ dispose: vi.fn() })),
       workspaceFolders: undefined,
     };
   }

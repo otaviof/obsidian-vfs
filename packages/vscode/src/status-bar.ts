@@ -10,7 +10,16 @@ export class StatusBarManager implements vscode.Disposable {
     this.#item.text = `$(book) ${tracker.context.name} (${tracker.context.mode})`;
     this.#item.tooltip = "Obsidian VFS — click to mount a folder";
     this.#item.command = "obsidianVFS.mount";
+  }
+
+  /** Show the status bar item. */
+  show(): void {
     this.#item.show();
+  }
+
+  /** Hide the status bar item. */
+  hide(): void {
+    this.#item.hide();
   }
 
   dispose(): void {

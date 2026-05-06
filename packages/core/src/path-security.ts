@@ -45,6 +45,9 @@ export function checkAllowedFolder(
     if (absolutePath === allowed || absolutePath.startsWith(allowed + path.sep)) {
       return { ok: true, value: absolutePath };
     }
+    if (allowed.startsWith(absolutePath + path.sep)) {
+      return { ok: true, value: absolutePath };
+    }
   }
 
   return {

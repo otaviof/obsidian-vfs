@@ -17,7 +17,14 @@ vi.mock("vscode", () =>
 
 vi.mock("./bootstrap.js", () => ({
   bootstrapFromConfig: vi.fn(),
-  readConfig: vi.fn().mockReturnValue({ cliPath: "obsidian", timeoutMs: 10_000, autoMount: [] }),
+  readConfig: vi.fn().mockReturnValue({
+    cliPath: "obsidian",
+    timeoutMs: 10_000,
+    autoMount: [],
+    explorer: true,
+    statusBar: true,
+    workspace: true,
+  }),
 }));
 
 vi.mock("./file-system-provider.js", () => ({
@@ -40,6 +47,8 @@ vi.mock("./vault-tree-provider.js", () => ({
 
 vi.mock("./status-bar.js", () => ({
   StatusBarManager: vi.fn().mockImplementation(function (this: Record<string, unknown>) {
+    this.show = vi.fn();
+    this.hide = vi.fn();
     this.dispose = vi.fn();
   }),
 }));
@@ -48,22 +57,32 @@ vi.mock("./wikilink-provider.js", () => ({
   WikilinkDocumentLinkProvider: vi.fn(),
 }));
 
+vi.mock("./workspace-folder.js", () => ({
+  addVaultWorkspaceFolder: vi.fn().mockReturnValue({ status: "added" }),
+  removeVaultWorkspaceFolders: vi.fn(),
+}));
+
 import * as vscode from "vscode";
 import type { LocalIndexTracker } from "@obsidian-vfs/core";
 
-import { bootstrapFromConfig } from "./bootstrap.js";
+import { bootstrapFromConfig, readConfig } from "./bootstrap.js";
 import { registerCommands } from "./commands.js";
 import { activate, deactivate } from "./extension.js";
 import { ObsidianFileSystemProvider } from "./file-system-provider.js";
 import { StatusBarManager } from "./status-bar.js";
 import { VaultTreeDataProvider } from "./vault-tree-provider.js";
 import { WikilinkDocumentLinkProvider } from "./wikilink-provider.js";
+import { addVaultWorkspaceFolder, removeVaultWorkspaceFolders } from "./workspace-folder.js";
 
 const mockBootstrap = vi.mocked(bootstrapFromConfig);
+const mockReadConfig = vi.mocked(readConfig);
+const mockAddWF = vi.mocked(addVaultWorkspaceFolder);
+const mockRemoveWF = vi.mocked(removeVaultWorkspaceFolders);
 
 describe("activate", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
+    vi.clearAllMocks();
   });
 
   it("creates an output channel and pushes it to subscriptions", async () => {
@@ -140,6 +159,451 @@ describe("activate", () => {
       { scheme: "obs", language: "markdown" },
       expect.anything(),
     );
+  });
+
+  it("adds workspace folder when workspace is true", async () => {
+    const fakeTracker = {
+      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+    } as unknown as LocalIndexTracker;
+
+    mockBootstrap.mockResolvedValueOnce({
+      ok: true,
+      value: { tracker: fakeTracker, initMs: 42 },
+    });
+    mockReadConfig.mockReturnValueOnce({
+      cliPath: "obsidian",
+      timeoutMs: 10_000,
+      autoMount: [],
+      explorer: true,
+      statusBar: true,
+      workspace: true,
+    });
+
+    await activate(fakeContext() as never);
+
+    expect(mockAddWF).toHaveBeenCalledWith("MyVault");
+  });
+
+  it("skips workspace folder when workspace is false", async () => {
+    const fakeTracker = {
+      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+    } as unknown as LocalIndexTracker;
+
+    mockBootstrap.mockResolvedValueOnce({
+      ok: true,
+      value: { tracker: fakeTracker, initMs: 42 },
+    });
+    mockReadConfig.mockReturnValueOnce({
+      cliPath: "obsidian",
+      timeoutMs: 10_000,
+      autoMount: [],
+      explorer: true,
+      statusBar: true,
+      workspace: false,
+    });
+
+    await activate(fakeContext() as never);
+
+    expect(mockAddWF).not.toHaveBeenCalled();
+  });
+
+  it("logs workspace folder result when workspace is true and added", async () => {
+    const fakeTracker = {
+      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+    } as unknown as LocalIndexTracker;
+
+    mockBootstrap.mockResolvedValueOnce({
+      ok: true,
+      value: { tracker: fakeTracker, initMs: 42 },
+    });
+    mockReadConfig.mockReturnValueOnce({
+      cliPath: "obsidian",
+      timeoutMs: 10_000,
+      autoMount: [],
+      explorer: true,
+      statusBar: true,
+      workspace: true,
+    });
+    mockAddWF.mockReturnValueOnce({ status: "added" });
+
+    await activate(fakeContext() as never);
+
+    const channel = vi.mocked(vscode.window.createOutputChannel).mock.results[0].value as {
+      appendLine: ReturnType<typeof vi.fn>;
+    };
+    expect(channel.appendLine).toHaveBeenCalledWith("Workspace folder: added");
+  });
+
+  it("logs workspace folder result when workspace is true and skipped", async () => {
+    const fakeTracker = {
+      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+    } as unknown as LocalIndexTracker;
+
+    mockBootstrap.mockResolvedValueOnce({
+      ok: true,
+      value: { tracker: fakeTracker, initMs: 42 },
+    });
+    mockReadConfig.mockReturnValueOnce({
+      cliPath: "obsidian",
+      timeoutMs: 10_000,
+      autoMount: [],
+      explorer: true,
+      statusBar: true,
+      workspace: true,
+    });
+    mockAddWF.mockReturnValueOnce({ status: "skipped", reason: "no local workspace folder open" });
+
+    await activate(fakeContext() as never);
+
+    const channel = vi.mocked(vscode.window.createOutputChannel).mock.results[0].value as {
+      appendLine: ReturnType<typeof vi.fn>;
+    };
+    expect(channel.appendLine).toHaveBeenCalledWith(
+      "Workspace folder: skipped — no local workspace folder open",
+    );
+  });
+
+  it("does not show status bar when statusBar is false", async () => {
+    const fakeTracker = {
+      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+    } as unknown as LocalIndexTracker;
+
+    mockBootstrap.mockResolvedValueOnce({
+      ok: true,
+      value: { tracker: fakeTracker, initMs: 42 },
+    });
+    mockReadConfig.mockReturnValueOnce({
+      cliPath: "obsidian",
+      timeoutMs: 10_000,
+      autoMount: [],
+      explorer: true,
+      statusBar: false,
+      workspace: false,
+    });
+
+    await activate(fakeContext() as never);
+
+    const statusBarInstance = vi.mocked(StatusBarManager).mock.results[0].value as {
+      show: ReturnType<typeof vi.fn>;
+    };
+    expect(statusBarInstance.show).not.toHaveBeenCalled();
+  });
+
+  it("shows status bar when statusBar is true", async () => {
+    const fakeTracker = {
+      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+    } as unknown as LocalIndexTracker;
+
+    mockBootstrap.mockResolvedValueOnce({
+      ok: true,
+      value: { tracker: fakeTracker, initMs: 42 },
+    });
+    mockReadConfig.mockReturnValueOnce({
+      cliPath: "obsidian",
+      timeoutMs: 10_000,
+      autoMount: [],
+      explorer: true,
+      statusBar: true,
+      workspace: false,
+    });
+
+    await activate(fakeContext() as never);
+
+    const statusBarInstance = vi.mocked(StatusBarManager).mock.results[0].value as {
+      show: ReturnType<typeof vi.fn>;
+    };
+    expect(statusBarInstance.show).toHaveBeenCalled();
+  });
+
+  it("does not set explorerEnabled context when explorer is false", async () => {
+    const fakeTracker = {
+      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+    } as unknown as LocalIndexTracker;
+
+    mockBootstrap.mockResolvedValueOnce({
+      ok: true,
+      value: { tracker: fakeTracker, initMs: 42 },
+    });
+    mockReadConfig.mockReturnValueOnce({
+      cliPath: "obsidian",
+      timeoutMs: 10_000,
+      autoMount: [],
+      explorer: false,
+      statusBar: true,
+      workspace: false,
+    });
+
+    await activate(fakeContext() as never);
+
+    const executeCommand = vi.mocked(vscode.commands.executeCommand);
+    expect(executeCommand).toHaveBeenCalledWith("setContext", "obsidianVFS.active", true);
+    expect(executeCommand).toHaveBeenCalledWith("setContext", "obsidianVFS.explorerEnabled", false);
+  });
+
+  it("sets explorerEnabled context when explorer is true", async () => {
+    const fakeTracker = {
+      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+    } as unknown as LocalIndexTracker;
+
+    mockBootstrap.mockResolvedValueOnce({
+      ok: true,
+      value: { tracker: fakeTracker, initMs: 42 },
+    });
+    mockReadConfig.mockReturnValueOnce({
+      cliPath: "obsidian",
+      timeoutMs: 10_000,
+      autoMount: [],
+      explorer: true,
+      statusBar: false,
+      workspace: false,
+    });
+
+    await activate(fakeContext() as never);
+
+    const executeCommand = vi.mocked(vscode.commands.executeCommand);
+    expect(executeCommand).toHaveBeenCalledWith("setContext", "obsidianVFS.active", true);
+    expect(executeCommand).toHaveBeenCalledWith("setContext", "obsidianVFS.explorerEnabled", true);
+  });
+});
+
+describe("configuration change listener", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+  });
+
+  it("registers onDidChangeConfiguration listener", async () => {
+    const fakeTracker = {
+      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+    } as unknown as LocalIndexTracker;
+
+    mockBootstrap.mockResolvedValueOnce({
+      ok: true,
+      value: { tracker: fakeTracker, initMs: 42 },
+    });
+
+    await activate(fakeContext() as never);
+
+    expect(vscode.workspace.onDidChangeConfiguration).toHaveBeenCalled();
+  });
+
+  it("updates explorerEnabled context when explorer config changes to true", async () => {
+    const fakeTracker = {
+      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+    } as unknown as LocalIndexTracker;
+
+    mockBootstrap.mockResolvedValueOnce({
+      ok: true,
+      value: { tracker: fakeTracker, initMs: 42 },
+    });
+
+    let configChangeListener:
+      | ((e: { affectsConfiguration: (key: string) => boolean }) => void)
+      | null = null;
+    vi.mocked(vscode.workspace.onDidChangeConfiguration).mockImplementation((callback) => {
+      configChangeListener = callback as typeof configChangeListener;
+      return { dispose: vi.fn() };
+    });
+
+    await activate(fakeContext() as never);
+
+    expect(configChangeListener).toBeTruthy();
+
+    mockReadConfig.mockReturnValueOnce({
+      cliPath: "obsidian",
+      timeoutMs: 10_000,
+      autoMount: [],
+      explorer: true,
+      statusBar: true,
+      workspace: false,
+    });
+
+    configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.explorer" });
+
+    const executeCommand = vi.mocked(vscode.commands.executeCommand);
+    expect(executeCommand).toHaveBeenCalledWith("setContext", "obsidianVFS.explorerEnabled", true);
+  });
+
+  it("updates explorerEnabled context when explorer config changes to false", async () => {
+    const fakeTracker = {
+      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+    } as unknown as LocalIndexTracker;
+
+    mockBootstrap.mockResolvedValueOnce({
+      ok: true,
+      value: { tracker: fakeTracker, initMs: 42 },
+    });
+
+    let configChangeListener:
+      | ((e: { affectsConfiguration: (key: string) => boolean }) => void)
+      | null = null;
+    vi.mocked(vscode.workspace.onDidChangeConfiguration).mockImplementation((callback) => {
+      configChangeListener = callback as typeof configChangeListener;
+      return { dispose: vi.fn() };
+    });
+
+    await activate(fakeContext() as never);
+
+    mockReadConfig.mockReturnValueOnce({
+      cliPath: "obsidian",
+      timeoutMs: 10_000,
+      autoMount: [],
+      explorer: false,
+      statusBar: true,
+      workspace: false,
+    });
+
+    configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.explorer" });
+
+    const executeCommand = vi.mocked(vscode.commands.executeCommand);
+    expect(executeCommand).toHaveBeenCalledWith("setContext", "obsidianVFS.explorerEnabled", false);
+  });
+
+  it("shows status bar when statusBar config changes to true", async () => {
+    const fakeTracker = {
+      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+    } as unknown as LocalIndexTracker;
+
+    mockBootstrap.mockResolvedValueOnce({
+      ok: true,
+      value: { tracker: fakeTracker, initMs: 42 },
+    });
+
+    let configChangeListener:
+      | ((e: { affectsConfiguration: (key: string) => boolean }) => void)
+      | null = null;
+    vi.mocked(vscode.workspace.onDidChangeConfiguration).mockImplementation((callback) => {
+      configChangeListener = callback as typeof configChangeListener;
+      return { dispose: vi.fn() };
+    });
+
+    await activate(fakeContext() as never);
+
+    mockReadConfig.mockReturnValueOnce({
+      cliPath: "obsidian",
+      timeoutMs: 10_000,
+      autoMount: [],
+      explorer: true,
+      statusBar: true,
+      workspace: false,
+    });
+
+    configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.statusBar" });
+
+    const statusBarInstance = vi.mocked(StatusBarManager).mock.results[0].value as {
+      show: ReturnType<typeof vi.fn>;
+      hide: ReturnType<typeof vi.fn>;
+    };
+    expect(statusBarInstance.show).toHaveBeenCalled();
+  });
+
+  it("hides status bar when statusBar config changes to false", async () => {
+    const fakeTracker = {
+      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+    } as unknown as LocalIndexTracker;
+
+    mockBootstrap.mockResolvedValueOnce({
+      ok: true,
+      value: { tracker: fakeTracker, initMs: 42 },
+    });
+
+    let configChangeListener:
+      | ((e: { affectsConfiguration: (key: string) => boolean }) => void)
+      | null = null;
+    vi.mocked(vscode.workspace.onDidChangeConfiguration).mockImplementation((callback) => {
+      configChangeListener = callback as typeof configChangeListener;
+      return { dispose: vi.fn() };
+    });
+
+    await activate(fakeContext() as never);
+
+    mockReadConfig.mockReturnValueOnce({
+      cliPath: "obsidian",
+      timeoutMs: 10_000,
+      autoMount: [],
+      explorer: true,
+      statusBar: false,
+      workspace: false,
+    });
+
+    configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.statusBar" });
+
+    const statusBarInstance = vi.mocked(StatusBarManager).mock.results[0].value as {
+      show: ReturnType<typeof vi.fn>;
+      hide: ReturnType<typeof vi.fn>;
+    };
+    expect(statusBarInstance.hide).toHaveBeenCalled();
+  });
+
+  it("adds workspace folder when workspace config changes to true", async () => {
+    const fakeTracker = {
+      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+    } as unknown as LocalIndexTracker;
+
+    mockBootstrap.mockResolvedValueOnce({
+      ok: true,
+      value: { tracker: fakeTracker, initMs: 42 },
+    });
+
+    let configChangeListener:
+      | ((e: { affectsConfiguration: (key: string) => boolean }) => void)
+      | null = null;
+    vi.mocked(vscode.workspace.onDidChangeConfiguration).mockImplementation((callback) => {
+      configChangeListener = callback as typeof configChangeListener;
+      return { dispose: vi.fn() };
+    });
+
+    await activate(fakeContext() as never);
+
+    vi.clearAllMocks();
+
+    mockReadConfig.mockReturnValueOnce({
+      cliPath: "obsidian",
+      timeoutMs: 10_000,
+      autoMount: [],
+      explorer: true,
+      statusBar: true,
+      workspace: true,
+    });
+    mockAddWF.mockReturnValueOnce({ status: "added" });
+
+    configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.workspace" });
+
+    expect(mockAddWF).toHaveBeenCalledWith("MyVault");
+  });
+
+  it("removes workspace folders when workspace config changes to false", async () => {
+    const fakeTracker = {
+      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+    } as unknown as LocalIndexTracker;
+
+    mockBootstrap.mockResolvedValueOnce({
+      ok: true,
+      value: { tracker: fakeTracker, initMs: 42 },
+    });
+
+    let configChangeListener:
+      | ((e: { affectsConfiguration: (key: string) => boolean }) => void)
+      | null = null;
+    vi.mocked(vscode.workspace.onDidChangeConfiguration).mockImplementation((callback) => {
+      configChangeListener = callback as typeof configChangeListener;
+      return { dispose: vi.fn() };
+    });
+
+    await activate(fakeContext() as never);
+
+    mockReadConfig.mockReturnValueOnce({
+      cliPath: "obsidian",
+      timeoutMs: 10_000,
+      autoMount: [],
+      explorer: true,
+      statusBar: true,
+      workspace: false,
+    });
+
+    configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.workspace" });
+
+    expect(mockRemoveWF).toHaveBeenCalled();
   });
 });
 

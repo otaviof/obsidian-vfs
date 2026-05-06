@@ -1,11 +1,13 @@
 import * as vscode from "vscode";
 
-import { bootstrapFromConfig } from "./bootstrap.js";
+import { bootstrapFromConfig, readConfig } from "./bootstrap.js";
+import { SCHEME } from "./uri-adapter.js";
 import { registerCommands } from "./commands.js";
 import { ObsidianFileSystemProvider } from "./file-system-provider.js";
 import { StatusBarManager } from "./status-bar.js";
 import { VaultTreeDataProvider } from "./vault-tree-provider.js";
 import { WikilinkDocumentLinkProvider } from "./wikilink-provider.js";
+import { addVaultWorkspaceFolder, removeVaultWorkspaceFolders } from "./workspace-folder.js";
 
 /** Activate the Obsidian VFS extension. */
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -28,13 +30,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(provider);
 
   context.subscriptions.push(
-    vscode.workspace.registerFileSystemProvider("obs", provider, {
+    vscode.workspace.registerFileSystemProvider(SCHEME, provider, {
       isCaseSensitive: true,
       isReadonly: false,
     }),
   );
 
-  const watcher = provider.watch(vscode.Uri.from({ scheme: "obs", path: "/" }));
+  const watcher = provider.watch(vscode.Uri.from({ scheme: SCHEME, path: "/" }));
   context.subscriptions.push(watcher);
 
   const treeProvider = new VaultTreeDataProvider(tracker);
@@ -54,9 +56,48 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const wikilinkProvider = new WikilinkDocumentLinkProvider(tracker);
   context.subscriptions.push(
     vscode.languages.registerDocumentLinkProvider(
-      { scheme: "obs", language: "markdown" },
+      { scheme: SCHEME, language: "markdown" },
       wikilinkProvider,
     ),
+  );
+
+  const config = readConfig();
+
+  await vscode.commands.executeCommand("setContext", "obsidianVFS.explorerEnabled", config.explorer);
+  if (config.statusBar) {
+    statusBar.show();
+  }
+  if (config.workspace) {
+    const wfResult = addVaultWorkspaceFolder(tracker.context.name);
+    const detail = "reason" in wfResult ? ` — ${wfResult.reason}` : "";
+    outputChannel.appendLine(`Workspace folder: ${wfResult.status}${detail}`);
+  }
+
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      const updated = readConfig();
+      if (e.affectsConfiguration("obsidianVFS.explorer")) {
+        void vscode.commands.executeCommand(
+          "setContext",
+          "obsidianVFS.explorerEnabled",
+          updated.explorer,
+        );
+      }
+      if (e.affectsConfiguration("obsidianVFS.statusBar")) {
+        if (updated.statusBar) {
+          statusBar.show();
+        } else {
+          statusBar.hide();
+        }
+      }
+      if (e.affectsConfiguration("obsidianVFS.workspace")) {
+        if (updated.workspace) {
+          addVaultWorkspaceFolder(tracker.context.name);
+        } else {
+          removeVaultWorkspaceFolders();
+        }
+      }
+    }),
   );
 }
 

@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { LocalIndexTracker } from "@obsidian-vfs/core";
 
-import { toVaultPath, toVscodeUri } from "./uri-adapter.js";
+import { SCHEME, toVaultPath, toVscodeUri } from "./uri-adapter.js";
 import type { VaultTreeDataProvider } from "./vault-tree-provider.js";
 import { readAutoMount } from "./vault-tree-provider.js";
 
@@ -60,7 +60,7 @@ async function openInObsidianCommand(
   outputChannel: vscode.OutputChannel,
 ): Promise<void> {
   const editor = vscode.window.activeTextEditor;
-  if (editor?.document.uri.scheme !== "obs") {
+  if (editor?.document.uri.scheme !== SCHEME) {
     await vscode.window.showInformationMessage("No Obsidian VFS file active");
     return;
   }

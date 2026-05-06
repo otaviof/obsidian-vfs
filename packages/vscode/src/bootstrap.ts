@@ -11,6 +11,9 @@ export function readConfig(): ExtensionConfig {
     cliPath: cfg.get<string>("cliPath", DEFAULT_CLI_PATH),
     timeoutMs: cfg.get<number>("timeoutMs", DEFAULT_TIMEOUT_MS),
     autoMount: cfg.get<string[]>("autoMount", []),
+    explorer: cfg.get<boolean>("explorer", true),
+    statusBar: cfg.get<boolean>("statusBar", true),
+    workspace: cfg.get<boolean>("workspace", true),
   };
 }
 

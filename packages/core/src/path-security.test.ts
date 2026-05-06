@@ -93,6 +93,22 @@ describe("checkAllowedFolder", () => {
     });
     expect(result).toEqual({ ok: true, value: "/vault/projects/active/todo.md" });
   });
+
+  it("accepts vault root when allowedFolders is non-empty", () => {
+    const result = checkAllowedFolder("/vault", {
+      vaultRoot: "/vault",
+      allowedFolders: ["notes", "agents"],
+    });
+    expect(result).toEqual({ ok: true, value: "/vault" });
+  });
+
+  it("accepts intermediate ancestor of allowed folder", () => {
+    const result = checkAllowedFolder("/vault/projects", {
+      vaultRoot: "/vault",
+      allowedFolders: ["projects/active"],
+    });
+    expect(result).toEqual({ ok: true, value: "/vault/projects" });
+  });
 });
 
 describe("checkSymlink", () => {
