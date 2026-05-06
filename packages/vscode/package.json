@@ -2,7 +2,7 @@
   "name": "obsidian-vfs",
   "displayName": "Obsidian VFS",
   "description": "Browse, search, and edit your Obsidian vault directly in VSCode via a virtual file system (obs://)",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "private": true,
   "publisher": "obsidian-vfs",
   "engines": {
@@ -97,7 +97,7 @@
             "type": "string"
           },
           "default": [],
-          "description": "Vault-relative folders to display in the Explorer tree view"
+          "description": "Vault-relative folders to display in the Explorer tree view and workspace folders"
         },
         "obsidianVFS.explorer": {
           "type": "boolean",

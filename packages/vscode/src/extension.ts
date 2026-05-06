@@ -68,7 +68,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     statusBar.show();
   }
   if (config.workspace) {
-    const wfResult = addVaultWorkspaceFolder(tracker.context.name);
+    const wfResult = addVaultWorkspaceFolder(tracker.context.name, config.autoMount);
     const detail = "reason" in wfResult ? ` — ${wfResult.reason}` : "";
     outputChannel.appendLine(`Workspace folder: ${wfResult.status}${detail}`);
   }
@@ -90,11 +90,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           statusBar.hide();
         }
       }
-      if (e.affectsConfiguration("obsidianVFS.workspace")) {
+      if (
+        e.affectsConfiguration("obsidianVFS.workspace") ||
+        e.affectsConfiguration("obsidianVFS.autoMount")
+      ) {
+        removeVaultWorkspaceFolders();
         if (updated.workspace) {
-          addVaultWorkspaceFolder(tracker.context.name);
-        } else {
-          removeVaultWorkspaceFolders();
+          addVaultWorkspaceFolder(tracker.context.name, updated.autoMount);
         }
       }
     }),

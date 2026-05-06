@@ -24,10 +24,17 @@ export function removeVaultWorkspaceFolders(): void {
 }
 
 /**
- * Add the Obsidian vault as a workspace folder for Explorer browsing.
+ * Add autoMount folders as individual workspace folders for Explorer browsing.
  * Appends at the end to avoid extension host restart.
  */
-export function addVaultWorkspaceFolder(vaultName: string): AddWorkspaceFolderResult {
+export function addVaultWorkspaceFolder(
+  vaultName: string,
+  autoMount: readonly string[],
+): AddWorkspaceFolderResult {
+  if (autoMount.length === 0) {
+    return { status: "skipped", reason: "no autoMount folders configured" };
+  }
+
   if (hasVaultWorkspaceFolder()) {
     return { status: "already-present" };
   }
@@ -37,11 +44,11 @@ export function addVaultWorkspaceFolder(vaultName: string): AddWorkspaceFolderRe
     return { status: "skipped", reason: "no local workspace folder open" };
   }
 
-  const uri = toVscodeUri("", vaultName);
-  vscode.workspace.updateWorkspaceFolders(folders.length, 0, {
-    uri,
-    name: `Obsidian: ${vaultName}`,
-  });
+  const newFolders = autoMount.map((folder) => ({
+    uri: toVscodeUri(folder, vaultName),
+    name: `Obsidian: ${folder}`,
+  }));
+  vscode.workspace.updateWorkspaceFolders(folders.length, 0, ...newFolders);
 
   return { status: "added" };
 }

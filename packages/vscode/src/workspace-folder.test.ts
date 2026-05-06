@@ -55,13 +55,21 @@ describe("addVaultWorkspaceFolder", () => {
     workspace.workspaceFolders = undefined;
   });
 
+  it("returns skipped when autoMount is empty", () => {
+    workspace.workspaceFolders = [{ uri: { scheme: "file" }, index: 0 }];
+
+    const result = addVaultWorkspaceFolder("MyVault", []);
+    expect(result).toEqual({ status: "skipped", reason: "no autoMount folders configured" });
+    expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
+  });
+
   it("returns already-present when obs:// folder exists", () => {
     workspace.workspaceFolders = [
       { uri: { scheme: "file" }, index: 0 },
       { uri: { scheme: "obs" }, index: 1 },
     ];
 
-    const result = addVaultWorkspaceFolder("MyVault");
+    const result = addVaultWorkspaceFolder("MyVault", ["Notes"]);
     expect(result).toEqual({ status: "already-present" });
     expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
   });
@@ -69,7 +77,7 @@ describe("addVaultWorkspaceFolder", () => {
   it("returns skipped when no workspace folders exist", () => {
     workspace.workspaceFolders = undefined;
 
-    const result = addVaultWorkspaceFolder("MyVault");
+    const result = addVaultWorkspaceFolder("MyVault", ["Notes"]);
     expect(result).toEqual({ status: "skipped", reason: "no local workspace folder open" });
     expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
   });
@@ -77,20 +85,28 @@ describe("addVaultWorkspaceFolder", () => {
   it("returns skipped when only non-file:// folders exist", () => {
     workspace.workspaceFolders = [{ uri: { scheme: "untitled" }, index: 0 }];
 
-    const result = addVaultWorkspaceFolder("MyVault");
+    const result = addVaultWorkspaceFolder("MyVault", ["Notes"]);
     expect(result).toEqual({ status: "skipped", reason: "no local workspace folder open" });
     expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
   });
 
-  it("appends workspace folder when file:// folder exists", () => {
+  it("adds one workspace folder per autoMount entry", () => {
     workspace.workspaceFolders = [{ uri: { scheme: "file" }, index: 0 }];
 
-    const result = addVaultWorkspaceFolder("MyVault");
+    const result = addVaultWorkspaceFolder("MyVault", ["Notes", "Projects"]);
     expect(result).toEqual({ status: "added" });
-    expect(workspace.updateWorkspaceFolders).toHaveBeenCalledWith(1, 0, {
-      uri: expect.objectContaining({ scheme: "obs", authority: "MyVault" }) as unknown,
-      name: "Obsidian: MyVault",
-    });
+    expect(workspace.updateWorkspaceFolders).toHaveBeenCalledWith(
+      1,
+      0,
+      {
+        uri: expect.objectContaining({ scheme: "obs", authority: "MyVault", path: "/Notes" }) as unknown,
+        name: "Obsidian: Notes",
+      },
+      {
+        uri: expect.objectContaining({ scheme: "obs", authority: "MyVault", path: "/Projects" }) as unknown,
+        name: "Obsidian: Projects",
+      },
+    );
   });
 
   it("appends at correct index when multiple file:// folders exist", () => {
@@ -99,19 +115,18 @@ describe("addVaultWorkspaceFolder", () => {
       { uri: { scheme: "file" }, index: 1 },
     ];
 
-    const result = addVaultWorkspaceFolder("MyVault");
+    const result = addVaultWorkspaceFolder("MyVault", ["Notes"]);
     expect(result).toEqual({ status: "added" });
-    // Should append at index 2 (end of list)
     expect(workspace.updateWorkspaceFolders).toHaveBeenCalledWith(2, 0, {
-      uri: expect.objectContaining({ scheme: "obs", authority: "MyVault" }) as unknown,
-      name: "Obsidian: MyVault",
+      uri: expect.objectContaining({ scheme: "obs", authority: "MyVault", path: "/Notes" }) as unknown,
+      name: "Obsidian: Notes",
     });
   });
 
   it("returns skipped when workspace folders is empty array", () => {
     workspace.workspaceFolders = [];
 
-    const result = addVaultWorkspaceFolder("MyVault");
+    const result = addVaultWorkspaceFolder("MyVault", ["Notes"]);
     expect(result).toEqual({ status: "skipped", reason: "no local workspace folder open" });
     expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
   });
