@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { Dirent } from "node:fs";
 
-import { readDirectory, statVirtualFile } from "./fs-enumeration.js";
+import { listMarkdownFiles, readDirectory, statVirtualFile } from "./fs-enumeration.js";
 import { mockFsFunction } from "./test-helpers.js";
 
 vi.mock("node:fs/promises", () => ({
@@ -112,6 +112,53 @@ describe("readDirectory", () => {
     const result = await readDirectory("restricted", OPTIONS);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("CLI_ERROR");
+  });
+});
+
+describe("listMarkdownFiles", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+  });
+
+  it("enumerates markdown files sorted alphabetically", async () => {
+    readdirMock.mockResolvedValueOnce(["b-note.md", "a-note.md", "image.png"]);
+    const result = await listMarkdownFiles(OPTIONS);
+    expect(result).toEqual({ ok: true, value: ["a-note.md", "b-note.md"] });
+  });
+
+  it("skips entries with dot-prefixed path segments", async () => {
+    readdirMock.mockResolvedValueOnce([".obsidian/plugins/note.md", "visible.md"]);
+    const result = await listMarkdownFiles(OPTIONS);
+    expect(result).toEqual({ ok: true, value: ["visible.md"] });
+  });
+
+  it("searches only allowedFolders when specified", async () => {
+    const options = { vaultRoot: "/vault", allowedFolders: ["notes", "docs"] };
+    readdirMock.mockResolvedValueOnce(["intro.md"]).mockResolvedValueOnce(["guide.md"]);
+    const result = await listMarkdownFiles(options);
+    expect(result).toEqual({
+      ok: true,
+      value: ["docs/guide.md", "notes/intro.md"],
+    });
+  });
+
+  it("returns empty array for empty vault", async () => {
+    readdirMock.mockResolvedValueOnce([]);
+    const result = await listMarkdownFiles(OPTIONS);
+    expect(result).toEqual({ ok: true, value: [] });
+  });
+
+  it("skips unreadable directories", async () => {
+    const options = { vaultRoot: "/vault", allowedFolders: ["bad", "good"] };
+    readdirMock.mockRejectedValueOnce(new Error("ENOENT")).mockResolvedValueOnce(["note.md"]);
+    const result = await listMarkdownFiles(options);
+    expect(result).toEqual({ ok: true, value: ["good/note.md"] });
+  });
+
+  it("handles nested subdirectories", async () => {
+    readdirMock.mockResolvedValueOnce(["sub/deep/note.md", "top.md"]);
+    const result = await listMarkdownFiles(OPTIONS);
+    expect(result).toEqual({ ok: true, value: ["sub/deep/note.md", "top.md"] });
   });
 });
 

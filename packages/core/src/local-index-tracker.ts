@@ -22,7 +22,11 @@ import { readVirtualFile } from "./read-file.js";
 import { resolveWikilink as resolveWikilinkFn } from "./resolve-wikilink.js";
 import { resolveResource, resolveSkillResource } from "./resolve-resource.js";
 import { resolveMention as resolveMentionFn } from "./resolve-mention.js";
-import { readDirectory as readDirectoryFn, statVirtualFile } from "./fs-enumeration.js";
+import {
+  listMarkdownFiles,
+  readDirectory as readDirectoryFn,
+  statVirtualFile,
+} from "./fs-enumeration.js";
 import { VaultFileWatcher } from "./file-watcher.js";
 
 /**
@@ -223,6 +227,11 @@ export class LocalIndexTracker {
   /** List directory contents with security enforcement. */
   async readDirectory(virtualPath: string): Promise<VFSResult<readonly [string, VFSFileType][]>> {
     return readDirectoryFn(virtualPath, this.#securityOptions);
+  }
+
+  /** Recursively enumerate all markdown files in the vault. */
+  async listFiles(): Promise<VFSResult<string[]>> {
+    return listMarkdownFiles(this.#securityOptions);
   }
 
   /** Get file or directory metadata. */

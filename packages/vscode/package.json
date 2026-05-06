@@ -2,7 +2,7 @@
   "name": "obsidian-vfs",
   "displayName": "Obsidian VFS",
   "description": "Virtual file system bridging Obsidian vaults into VSCode",
-  "version": "0.0.0",
+  "version": "0.1.0",
   "private": true,
   "publisher": "obsidian-vfs",
   "engines": {
@@ -29,6 +29,10 @@
       {
         "command": "obsidianVFS.openInObsidian",
         "title": "Obsidian VFS: Open in Obsidian"
+      },
+      {
+        "command": "obsidianVFS.searchNotes",
+        "title": "Obsidian VFS: Search Notes"
       }
     ],
     "views": {

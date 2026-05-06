@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { LocalIndexTracker } from "@obsidian-vfs/core";
 
-import { toVaultPath } from "./uri-adapter.js";
+import { toVaultPath, toVscodeUri } from "./uri-adapter.js";
 import type { VaultTreeDataProvider } from "./vault-tree-provider.js";
 import { readAutoMount } from "./vault-tree-provider.js";
 
@@ -73,6 +73,27 @@ async function openInObsidianCommand(
   }
 }
 
+/** Search vault notes via Quick Pick and open the selected file. */
+async function searchNotesCommand(tracker: LocalIndexTracker): Promise<void> {
+  const result = await tracker.listFiles();
+  if (!result.ok || result.value.length === 0) return;
+
+  const items = result.value.map((filePath) => ({
+    // Safe: split("/") always returns at least one element
+    label: filePath.replace(/\.md$/i, "").split("/").pop()!,
+    description: filePath,
+  }));
+
+  const picked = await vscode.window.showQuickPick(items, {
+    placeHolder: "Search vault notes",
+    matchOnDescription: true,
+  });
+  if (!picked) return;
+
+  const uri = toVscodeUri(picked.description, tracker.context.name);
+  await vscode.commands.executeCommand("vscode.open", uri);
+}
+
 /** Register all Obsidian VFS commands with the extension context. */
 export function registerCommands(
   context: vscode.ExtensionContext,
@@ -86,5 +107,6 @@ export function registerCommands(
     vscode.commands.registerCommand("obsidianVFS.openInObsidian", () =>
       openInObsidianCommand(tracker, outputChannel),
     ),
+    vscode.commands.registerCommand("obsidianVFS.searchNotes", () => searchNotesCommand(tracker)),
   );
 }

@@ -46,14 +46,14 @@ describe("registerCommands", () => {
     vi.clearAllMocks();
   });
 
-  it("registers three commands", () => {
+  it("registers four commands", () => {
     const ctx = fakeContext();
     const tracker = mockTracker();
     const tree = fakeTreeProvider();
     const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
     registerCommands(ctx as never, tracker, tree as never, channel);
 
-    expect(vscode.commands.registerCommand).toHaveBeenCalledTimes(3);
+    expect(vscode.commands.registerCommand).toHaveBeenCalledTimes(4);
     expect(vscode.commands.registerCommand).toHaveBeenCalledWith(
       "obsidianVFS.mount",
       expect.any(Function),
@@ -64,6 +64,10 @@ describe("registerCommands", () => {
     );
     expect(vscode.commands.registerCommand).toHaveBeenCalledWith(
       "obsidianVFS.openInObsidian",
+      expect.any(Function),
+    );
+    expect(vscode.commands.registerCommand).toHaveBeenCalledWith(
+      "obsidianVFS.searchNotes",
       expect.any(Function),
     );
   });
@@ -481,5 +485,109 @@ describe("openInObsidian command", () => {
       writable: true,
       configurable: true,
     });
+  });
+});
+
+describe("searchNotes command", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("shows Quick Pick with vault files and opens selected file", async () => {
+    const tracker = mockTracker({
+      listFiles: vi.fn().mockResolvedValue({
+        ok: true,
+        value: ["docs/overview.md", "notes/todo.md"],
+      }),
+    });
+
+    const ctx = fakeContext();
+    const tree = fakeTreeProvider();
+    const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
+    registerCommands(ctx as never, tracker, tree as never, channel);
+
+    vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
+      label: "overview",
+      description: "docs/overview.md",
+    });
+
+    const handler = vi
+      .mocked(vscode.commands.registerCommand)
+      .mock.calls.find((c) => c[0] === "obsidianVFS.searchNotes")![1] as () => Promise<void>;
+    await handler();
+
+    expect(vscode.window.showQuickPick).toHaveBeenCalledWith(
+      [
+        { label: "overview", description: "docs/overview.md" },
+        { label: "todo", description: "notes/todo.md" },
+      ],
+      expect.objectContaining({ matchOnDescription: true }),
+    );
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+      "vscode.open",
+      expect.objectContaining({ scheme: "obs", path: "/docs/overview.md" }),
+    );
+  });
+
+  it("does nothing when user cancels Quick Pick", async () => {
+    const tracker = mockTracker({
+      listFiles: vi.fn().mockResolvedValue({
+        ok: true,
+        value: ["notes/note.md"],
+      }),
+    });
+
+    const ctx = fakeContext();
+    const tree = fakeTreeProvider();
+    const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
+    registerCommands(ctx as never, tracker, tree as never, channel);
+
+    vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce(undefined);
+
+    const handler = vi
+      .mocked(vscode.commands.registerCommand)
+      .mock.calls.find((c) => c[0] === "obsidianVFS.searchNotes")![1] as () => Promise<void>;
+    await handler();
+
+    expect(vscode.commands.executeCommand).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when listFiles returns empty", async () => {
+    const tracker = mockTracker({
+      listFiles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+    });
+
+    const ctx = fakeContext();
+    const tree = fakeTreeProvider();
+    const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
+    registerCommands(ctx as never, tracker, tree as never, channel);
+
+    const handler = vi
+      .mocked(vscode.commands.registerCommand)
+      .mock.calls.find((c) => c[0] === "obsidianVFS.searchNotes")![1] as () => Promise<void>;
+    await handler();
+
+    expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when listFiles returns error", async () => {
+    const tracker = mockTracker({
+      listFiles: vi.fn().mockResolvedValue({
+        ok: false,
+        error: { code: "CLI_ERROR", message: "failed" },
+      }),
+    });
+
+    const ctx = fakeContext();
+    const tree = fakeTreeProvider();
+    const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
+    registerCommands(ctx as never, tracker, tree as never, channel);
+
+    const handler = vi
+      .mocked(vscode.commands.registerCommand)
+      .mock.calls.find((c) => c[0] === "obsidianVFS.searchNotes")![1] as () => Promise<void>;
+    await handler();
+
+    expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
   });
 });

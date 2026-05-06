@@ -1,7 +1,7 @@
-import { readdir } from "node:fs/promises";
 import path from "node:path";
 
 import type { ObsidianCLI } from "./cli.js";
+import { listMarkdownFiles } from "./fs-enumeration.js";
 import type { LRUCache } from "./lru-cache.js";
 import type { VFSResult, WikilinkResolution } from "./types.js";
 
@@ -21,26 +21,15 @@ async function globFallback(
   options: ResolveWikilinkOptions,
 ): Promise<string | undefined> {
   const target = normalizedName.toLowerCase();
-  const searchDirs =
-    options.allowedFolders.length > 0
-      ? options.allowedFolders.map((f) => path.resolve(options.vaultRoot, f))
-      : [options.vaultRoot];
+  const result = await listMarkdownFiles({
+    vaultRoot: options.vaultRoot,
+    allowedFolders: options.allowedFolders,
+  });
+  if (!result.ok) return undefined;
 
-  for (const dir of searchDirs) {
-    let entries: string[];
-    try {
-      entries = await readdir(dir, { recursive: true });
-    } catch {
-      continue;
-    }
-
-    for (const entry of entries) {
-      if (!entry.toLowerCase().endsWith(".md")) continue;
-      const basename = path.basename(entry, ".md").toLowerCase();
-      if (basename === target) {
-        const relative = path.relative(options.vaultRoot, path.join(dir, entry));
-        return relative;
-      }
+  for (const filePath of result.value) {
+    if (path.basename(filePath, ".md").toLowerCase() === target) {
+      return filePath;
     }
   }
 

@@ -53,6 +53,41 @@ export async function readDirectory(
   return { ok: true, value: tuples };
 }
 
+/** Check whether any path segment starts with a dot. */
+function hasDotSegment(relativePath: string): boolean {
+  return relativePath.split(path.sep).some((seg) => seg.startsWith("."));
+}
+
+/**
+ * Recursively enumerate all markdown files in the vault.
+ */
+export async function listMarkdownFiles(options: PathSecurityOptions): Promise<VFSResult<string[]>> {
+  const searchDirs =
+    options.allowedFolders.length > 0
+      ? options.allowedFolders.map((f) => path.resolve(options.vaultRoot, f))
+      : [options.vaultRoot];
+
+  const files: string[] = [];
+
+  for (const dir of searchDirs) {
+    let entries: string[];
+    try {
+      entries = await readdir(dir, { recursive: true });
+    } catch {
+      continue;
+    }
+
+    for (const entry of entries) {
+      if (!entry.toLowerCase().endsWith(".md")) continue;
+      if (hasDotSegment(entry)) continue;
+      files.push(path.relative(options.vaultRoot, path.join(dir, entry)));
+    }
+  }
+
+  files.sort();
+  return { ok: true, value: files };
+}
+
 /**
  * Return metadata for a single file or directory.
  */

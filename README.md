@@ -44,6 +44,7 @@ The `packages/vscode` extension registers an `obs://` virtual file system provid
 | Unmount vault folder | Working | Command palette + `updateWorkspaceFolders` |
 | Auto-mount from settings | Working | `obsidianVFS.autoMount` config at activation |
 | Open in Obsidian | Working | `obsidianVFS.openInObsidian` via CLI `open` |
+| Search notes | Working | Quick Pick over `listMarkdownFiles` enumeration |
 | Status bar | Working | Vault name + mode (`full`/`degraded`) |
 | Wikilink navigation | Working | `DocumentLinkProvider` for `[[links]]` in `obs://` Markdown |
 | Create new files | Deferred | Requires CLI mutations (preserves wikilinks) |
@@ -59,6 +60,7 @@ Available via the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`):
 | `Obsidian VFS: Mount Folder` | Pick a top-level vault folder and add it as an `obs://` workspace folder |
 | `Obsidian VFS: Unmount Folder` | Remove a mounted `obs://` workspace folder |
 | `Obsidian VFS: Open in Obsidian` | Open the active `obs://` file in the Obsidian app |
+| `Obsidian VFS: Search Notes` | Quick Pick search across all vault markdown files |
 
 ### Extension Settings
 
@@ -152,11 +154,12 @@ If no `launch.json` exists, create `.vscode/launch.json`:
 6. **Wikilink navigation** -- `[[wikilinks]]` in `obs://` Markdown files are clickable links
 7. **Status bar** -- Bottom left shows `$(book) VaultName (full)` -- click opens mount picker
 8. **Open in Obsidian** -- With an `obs://` file active, Command Palette > "Open in Obsidian"
-9. **Unmount folder** -- Command Palette > "Obsidian VFS: Unmount Folder" > pick and confirm removal
-10. **Auto-mount** -- Set `obsidianVFS.autoMount` in settings, reload > folders mount automatically
-11. **Edit existing file** -- Modify and save a vault file (writes via `node:fs`)
-12. **Create file guard** -- New file creation shows "NoPermissions" (deferred to CLI)
-13. **Delete/rename guard** -- Deletion and rename show "NoPermissions" (deferred)
+9. **Search Notes** -- Command Palette > "Obsidian VFS: Search Notes" > type to filter, select opens file
+10. **Unmount folder** -- Command Palette > "Obsidian VFS: Unmount Folder" > pick and confirm removal
+11. **Auto-mount** -- Set `obsidianVFS.autoMount` in settings, reload > folders mount automatically
+12. **Edit existing file** -- Modify and save a vault file (writes via `node:fs`)
+13. **Create file guard** -- New file creation shows "NoPermissions" (deferred to CLI)
+14. **Delete/rename guard** -- Deletion and rename show "NoPermissions" (deferred)
 
 ## CLI (Development)
 
