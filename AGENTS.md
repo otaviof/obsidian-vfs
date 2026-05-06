@@ -54,6 +54,7 @@ Shared ignores across `.gitignore`, `.prettierignore`, `eslint.config.ts`: `node
 - **Mutations through CLI**: `create`, `rename`, `move`, `delete` via CLI to preserve wikilinks.
 - **Degraded mode** (Obsidian not running): reads/enumeration via `node:fs`; search, wikilinks, mutations unavailable.
 - **Security**: `path.resolve` + vault-root prefix check on all I/O. Reject symlinks outside vault. `allowedFolders` enforced on all operations.
+- **VSCode plugin versioning**: bump `version` in `packages/vscode/package.json` following semver when changing plugin code. Patch for fixes, minor for new features, major for breaking changes.
 
 ### File layout
 

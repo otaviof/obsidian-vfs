@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="packages/vscode/obsidian-vfs.png" alt="Obsidian VFS" width="200" />
+</p>
+
 # Obsidian VFS
 
 Read-only virtual filesystem exposing an [Obsidian](https://obsidian.md) vault via the `obs://` protocol. Three entrypoints — a VS Code extension, a Claude plugin, and a CLI — built on a shared core engine.
@@ -28,138 +32,7 @@ pnpm test
 
 ## VS Code Extension
 
-The `packages/vscode` extension registers an `obs://` virtual file system provider, making Obsidian vault files browsable and editable directly in VS Code.
-
-### Current Capabilities
-
-| Operation | Status | Mechanism |
-|-----------|--------|-----------|
-| Read files | Working | `node:fs` via core `readVirtualFile` |
-| List directories | Working | Core `LocalIndexTracker` |
-| Stat files/dirs | Working | Core `LocalIndexTracker` |
-| Edit existing files | Working | `node:fs.writeFile` after path security validation |
-| Create directories | Working | `node:fs.mkdir` after path security validation |
-| File watching | Working | Core `VaultFileWatcher` with prefix filtering |
-| Mount vault folder | Working | Command palette + `updateWorkspaceFolders` |
-| Unmount vault folder | Working | Command palette + `updateWorkspaceFolders` |
-| Auto-mount from settings | Working | `obsidianVFS.autoMount` config at activation |
-| Open in Obsidian | Working | `obsidianVFS.openInObsidian` via CLI `open` |
-| Search notes | Working | Quick Pick over `listMarkdownFiles` enumeration |
-| Status bar | Working | Vault name + mode (`full`/`degraded`) |
-| Wikilink navigation | Working | `DocumentLinkProvider` for `[[links]]` in `obs://` Markdown |
-| Create new files | Deferred | Requires CLI mutations (preserves wikilinks) |
-| Delete files | Deferred | Requires CLI mutations |
-| Rename/move files | Deferred | Requires CLI mutations |
-
-### Commands
-
-Available via the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`):
-
-| Command | Description |
-|---------|-------------|
-| `Obsidian VFS: Mount Folder` | Pick a top-level vault folder and add it as an `obs://` workspace folder |
-| `Obsidian VFS: Unmount Folder` | Remove a mounted `obs://` workspace folder |
-| `Obsidian VFS: Open in Obsidian` | Open the active `obs://` file in the Obsidian app |
-| `Obsidian VFS: Search Notes` | Quick Pick search across all vault markdown files |
-
-### Extension Settings
-
-Configure via VS Code Settings UI or `settings.json`:
-
-| Setting | Type | Default | Description |
-|---------|------|---------|-------------|
-| `obsidianVFS.cliPath` | `string` | `"obsidian"` | Path to the Obsidian CLI binary |
-| `obsidianVFS.timeoutMs` | `number` | `10000` | CLI operation timeout in milliseconds |
-| `obsidianVFS.autoMount` | `string[]` | `[]` | Vault-relative folders to auto-mount as workspace folders on activation |
-
-### Installing Locally
-
-#### 1. Build and package the `.vsix`
-
-```sh
-pnpm install
-
-# Creates the "packages/vscode/obsidian-vfs.vsix" file.
-pnpm package:vscode
-```
-
-#### 2. Install in VS Code
-
-**Via the GUI:** Extensions sidebar > `···` menu > **Install from VSIX...** > select `packages/vscode/obsidian-vfs.vsix`
-
-**Via the CLI:**
-
-```sh
-code --install-extension packages/vscode/obsidian-vfs.vsix
-```
-
-#### 3. Reload VS Code
-
-After installing, reload the window (**Developer: Reload Window** from the Command Palette or `Cmd+Shift+P`).
-
-### Prerequisites
-
-- **Obsidian** running with the [Local REST API](https://github.com/coddingtonbear/obsidian-local-rest-api) plugin
-- The `obsidian` CLI on PATH (or configure `obsidianVFS.cliPath` in VS Code settings)
-
-### Development Workflow
-
-#### Unit Tests
-
-```sh
-pnpm test                           # All tests (including VS Code)
-pnpm test -- packages/vscode        # VS Code package only
-```
-
-#### Building (without packaging)
-
-```sh
-pnpm build                          # Build all packages (core -> vscode)
-ls packages/vscode/dist/            # Verify extension.js + extension.js.map
-```
-
-#### Extension Development Host
-
-For iterating without re-packaging, use the Extension Development Host which loads the extension directly from the build output:
-
-1. Open the monorepo in VS Code
-2. Press `F5` (or **Run > Start Debugging**)
-3. Select **Extension Development Host** from the launch configuration
-
-If no `launch.json` exists, create `.vscode/launch.json`:
-
-```json
-{
-  "version": "0.2.0",
-  "configurations": [
-    {
-      "name": "Run Extension",
-      "type": "extensionHost",
-      "request": "launch",
-      "args": ["--extensionDevelopmentPath=${workspaceFolder}/packages/vscode"],
-      "outFiles": ["${workspaceFolder}/packages/vscode/dist/**/*.js"],
-      "preLaunchTask": "npm: build"
-    }
-  ]
-}
-```
-
-#### Manual Testing Checklist
-
-1. **Verify activation** -- Output panel > "Obsidian VFS" > confirm vault loaded message
-2. **Mount folder** -- Command Palette > "Obsidian VFS: Mount Folder" > pick a vault folder > appears in Explorer
-3. **Browse files** -- Explorer sidebar shows `obs://` workspace entries
-4. **Read file** -- Open any `.md` file from the virtual workspace
-5. **Directory listing** -- Expand folders in the Explorer sidebar
-6. **Wikilink navigation** -- `[[wikilinks]]` in `obs://` Markdown files are clickable links
-7. **Status bar** -- Bottom left shows `$(book) VaultName (full)` -- click opens mount picker
-8. **Open in Obsidian** -- With an `obs://` file active, Command Palette > "Open in Obsidian"
-9. **Search Notes** -- Command Palette > "Obsidian VFS: Search Notes" > type to filter, select opens file
-10. **Unmount folder** -- Command Palette > "Obsidian VFS: Unmount Folder" > pick and confirm removal
-11. **Auto-mount** -- Set `obsidianVFS.autoMount` in settings, reload > folders mount automatically
-12. **Edit existing file** -- Modify and save a vault file (writes via `node:fs`)
-13. **Create file guard** -- New file creation shows "NoPermissions" (deferred to CLI)
-14. **Delete/rename guard** -- Deletion and rename show "NoPermissions" (deferred)
+Browse, search, and edit your Obsidian vault directly in VS Code via the `obs://` virtual file system. See the [extension documentation](packages/vscode/README.md) for features, commands, settings, and installation instructions.
 
 ## CLI (Development)
 

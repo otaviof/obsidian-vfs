@@ -1,8 +1,8 @@
 {
   "name": "obsidian-vfs",
   "displayName": "Obsidian VFS",
-  "description": "Virtual file system bridging Obsidian vaults into VSCode",
-  "version": "0.1.0",
+  "description": "Browse, search, and edit your Obsidian vault directly in VSCode via a virtual file system (obs://)",
+  "version": "0.0.1",
   "private": true,
   "publisher": "obsidian-vfs",
   "engines": {
@@ -11,10 +11,24 @@
   "categories": [
     "Other"
   ],
+  "keywords": [
+    "obsidian",
+    "vault",
+    "markdown",
+    "wikilinks",
+    "virtual-filesystem",
+    "knowledge-base"
+  ],
   "activationEvents": [
     "onFileSystem:obs",
     "onStartupFinished"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/otaviof/obsidian-vfs",
+    "directory": "packages/vscode"
+  },
+  "icon": "obsidian-vfs.png",
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
