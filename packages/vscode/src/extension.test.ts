@@ -57,10 +57,15 @@ vi.mock("./wikilink-provider.js", () => ({
   WikilinkDocumentLinkProvider: vi.fn(),
 }));
 
-vi.mock("./workspace-folder.js", () => ({
-  addVaultWorkspaceFolder: vi.fn().mockReturnValue({ status: "added" }),
-  removeVaultWorkspaceFolders: vi.fn(),
-}));
+vi.mock("./workspace-folder.js", async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    FOLDER_NAME_PREFIX: (actual as Record<string, unknown>).FOLDER_NAME_PREFIX,
+    addVaultWorkspaceFolder: vi.fn().mockReturnValue({ status: "added" }),
+    removeVaultWorkspaceFolders: vi.fn(),
+    hasVaultWorkspaceFolder: vi.fn(),
+  };
+});
 
 import * as vscode from "vscode";
 import type { LocalIndexTracker } from "@obsidian-vfs/core";
@@ -68,6 +73,7 @@ import type { LocalIndexTracker } from "@obsidian-vfs/core";
 import { bootstrapFromConfig, readConfig } from "./bootstrap.js";
 import { registerCommands } from "./commands.js";
 import { activate, deactivate } from "./extension.js";
+import { FOLDER_NAME_PREFIX } from "./workspace-folder.js";
 import { ObsidianFileSystemProvider } from "./file-system-provider.js";
 import { StatusBarManager } from "./status-bar.js";
 import { VaultTreeDataProvider } from "./vault-tree-provider.js";
@@ -141,7 +147,7 @@ describe("activate", () => {
     const treeView = vi.mocked(vscode.window.createTreeView).mock.results[0].value as {
       title: string;
     };
-    expect(treeView.title).toBe("Obsidian: MyVault");
+    expect(treeView.title).toBe(`${FOLDER_NAME_PREFIX}MyVault`);
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       "setContext",
       "obsidianVFS.active",
@@ -181,7 +187,7 @@ describe("activate", () => {
 
     await activate(fakeContext() as never);
 
-    expect(mockAddWF).toHaveBeenCalledWith("MyVault", ["Notes"]);
+    expect(mockAddWF).toHaveBeenCalledWith("/vault", ["Notes"]);
   });
 
   it("skips workspace folder when workspace is false", async () => {
@@ -569,8 +575,8 @@ describe("configuration change listener", () => {
 
     configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.workspace" });
 
-    expect(mockRemoveWF).toHaveBeenCalled();
-    expect(mockAddWF).toHaveBeenCalledWith("MyVault", ["Notes"]);
+    expect(mockRemoveWF).toHaveBeenCalledWith("/vault");
+    expect(mockAddWF).toHaveBeenCalledWith("/vault", ["Notes"]);
   });
 
   it("removes workspace folders when workspace config changes to false", async () => {
@@ -606,7 +612,7 @@ describe("configuration change listener", () => {
 
     configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.workspace" });
 
-    expect(mockRemoveWF).toHaveBeenCalled();
+    expect(mockRemoveWF).toHaveBeenCalledWith("/vault");
     expect(mockAddWF).not.toHaveBeenCalled();
   });
 
@@ -644,8 +650,8 @@ describe("configuration change listener", () => {
 
     configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.autoMount" });
 
-    expect(mockRemoveWF).toHaveBeenCalled();
-    expect(mockAddWF).toHaveBeenCalledWith("MyVault", ["Notes", "Projects"]);
+    expect(mockRemoveWF).toHaveBeenCalledWith("/vault");
+    expect(mockAddWF).toHaveBeenCalledWith("/vault", ["Notes", "Projects"]);
   });
 });
 

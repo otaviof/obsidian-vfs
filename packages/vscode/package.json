@@ -2,7 +2,7 @@
   "name": "obsidian-vfs",
   "displayName": "Obsidian VFS",
   "description": "Browse, search, and edit your Obsidian vault directly in VSCode via a virtual file system (obs://)",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "private": true,
   "publisher": "obsidian-vfs",
   "engines": {
@@ -89,7 +89,7 @@
         "obsidianVFS.treeViewTitle": {
           "type": "string",
           "default": "",
-          "description": "Custom title for the Explorer tree view (defaults to \"Obsidian: <vault_name>\")"
+          "description": "Custom title for the Explorer tree view (defaults to \"obs://<vault_name>\")"
         },
         "obsidianVFS.autoMount": {
           "type": "array",

@@ -34,16 +34,25 @@ export function createMockFileSystemError(): Record<
   };
 }
 
-/** Mock factory for `vscode.Uri.from`. */
+/** Mock factory for `vscode.Uri.from` and `vscode.Uri.file`. */
 export function createMockUri(): {
   from: Mock;
+  file: Mock;
 } {
   return {
     from: vi.fn((c: { scheme: string; authority?: string; path: string }) => ({
       scheme: c.scheme,
       authority: c.authority ?? "",
       path: c.path,
+      fsPath: c.path,
       toString: () => `${c.scheme}://${c.authority ?? ""}${c.path}`,
+    })),
+    file: vi.fn((filePath: string) => ({
+      scheme: "file",
+      authority: "",
+      path: filePath,
+      fsPath: filePath,
+      toString: () => `file://${filePath}`,
     })),
   };
 }

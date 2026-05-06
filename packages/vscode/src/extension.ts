@@ -7,7 +7,11 @@ import { ObsidianFileSystemProvider } from "./file-system-provider.js";
 import { StatusBarManager } from "./status-bar.js";
 import { VaultTreeDataProvider } from "./vault-tree-provider.js";
 import { WikilinkDocumentLinkProvider } from "./wikilink-provider.js";
-import { addVaultWorkspaceFolder, removeVaultWorkspaceFolders } from "./workspace-folder.js";
+import {
+  FOLDER_NAME_PREFIX,
+  addVaultWorkspaceFolder,
+  removeVaultWorkspaceFolders,
+} from "./workspace-folder.js";
 
 /** Activate the Obsidian VFS extension. */
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -43,7 +47,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   context.subscriptions.push(treeProvider);
   const treeView = vscode.window.createTreeView("obsidianVFS", { treeDataProvider: treeProvider });
   const cfg = vscode.workspace.getConfiguration("obsidianVFS");
-  treeView.title = cfg.get<string>("treeViewTitle", "") || `Obsidian: ${tracker.context.name}`;
+  treeView.title =
+    cfg.get<string>("treeViewTitle", "") || `${FOLDER_NAME_PREFIX}${tracker.context.name}`;
   context.subscriptions.push(treeView);
 
   await vscode.commands.executeCommand("setContext", "obsidianVFS.active", true);
@@ -68,7 +73,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     statusBar.show();
   }
   if (config.workspace) {
-    const wfResult = addVaultWorkspaceFolder(tracker.context.name, config.autoMount);
+    const wfResult = addVaultWorkspaceFolder(tracker.context.physicalPath, config.autoMount);
     const detail = "reason" in wfResult ? ` — ${wfResult.reason}` : "";
     outputChannel.appendLine(`Workspace folder: ${wfResult.status}${detail}`);
   }
@@ -94,9 +99,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         e.affectsConfiguration("obsidianVFS.workspace") ||
         e.affectsConfiguration("obsidianVFS.autoMount")
       ) {
-        removeVaultWorkspaceFolders();
+        removeVaultWorkspaceFolders(tracker.context.physicalPath);
         if (updated.workspace) {
-          addVaultWorkspaceFolder(tracker.context.name, updated.autoMount);
+          addVaultWorkspaceFolder(tracker.context.physicalPath, updated.autoMount);
         }
       }
     }),

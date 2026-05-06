@@ -12,7 +12,7 @@ Browse, search, and edit your [Obsidian](https://obsidian.md) vault directly in 
 - **Open in Obsidian**, jump to the current file in the Obsidian app
 - **Auto-mount** configured folders on startup
 - **Status bar** showing vault name and connection mode (`full` / `degraded`)
-- **Workspace folder**, vault browsable in Explorer alongside local project files
+- **Workspace folder**, vault browsable in Explorer with Quick Open (`Cmd+P`) and Search (`Ctrl+Shift+F`) support
 - **File watching**, changes in the vault are reflected in real time
 
 ## Commands
@@ -34,7 +34,7 @@ Configure via **Settings UI** or `settings.json`:
 |---------|------|---------|-------------|
 | `obsidianVFS.cliPath` | `string` | `"obsidian"` | Path to the Obsidian CLI binary |
 | `obsidianVFS.timeoutMs` | `number` | `10000` | CLI operation timeout in milliseconds |
-| `obsidianVFS.treeViewTitle` | `string` | `""` | Custom title for the Explorer tree view (defaults to `Obsidian: <vault>`) |
+| `obsidianVFS.treeViewTitle` | `string` | `""` | Custom title for the Explorer tree view (defaults to `obs://<vault>`) |
 | `obsidianVFS.autoMount` | `string[]` | `[]` | Vault-relative folders to display in the Explorer tree view on activation |
 | `obsidianVFS.explorer` | `boolean` | `true` | Show the Obsidian VFS tree view in the Explorer sidebar |
 | `obsidianVFS.statusBar` | `boolean` | `true` | Show vault name and mode in the status bar |
@@ -44,16 +44,17 @@ All three toggle settings (`explorer`, `statusBar`, `workspace`) take effect imm
 
 ### Workspace Folder
 
-When `obsidianVFS.workspace` is enabled, the extension adds the vault as a workspace folder named **Obsidian: \<vault\>**. This makes vault files browsable in the Explorer sidebar alongside your local project files.
+When `obsidianVFS.workspace` is enabled, the extension adds each `autoMount` folder as a `file://` workspace folder pointing to the actual directory on disk, named **obs://\<folder\>**. Because these are native file-system paths, VS Code's built-in file indexer (`ripgrep`) can index them — so vault files appear in **Quick Open** (`Cmd+P`) and **Search** (`Ctrl+Shift+F`).
+
+The `obs://` FileSystemProvider remains registered for the tree view, wikilink navigation, and document links.
 
 **Requirements:**
 
-- At least one local folder must be open — the vault is appended to the workspace folder list to avoid triggering an extension host restart.
+- At least one local folder must be open — vault folders are appended to the workspace folder list to avoid triggering an extension host restart.
 
-**Limitations:**
+**Notes:**
 
-- Vault files do **not** appear in the Quick Open picker (`Cmd+P`) or in `@workspace` references used by other extensions. VSCode's file search for virtual file systems requires the `FileSearchProvider` API, which remains a proposed (unstable) API and cannot be used in published extensions.
-- The Explorer tree view and the workspace folder both appear in the sidebar. This duplication is an accepted trade-off — the tree view provides custom UI (welcome view, context menus), while the workspace folder enables cross-extension visibility.
+- The Explorer tree view and the workspace folders both appear in the sidebar. This duplication is an accepted trade-off — the tree view provides custom UI (welcome view, context menus), while the workspace folders enable Quick Open and cross-extension visibility.
 
 ## Prerequisites
 
@@ -77,6 +78,7 @@ git clone https://github.com/otaviof/obsidian-vfs.git
 cd obsidian-vfs
 pnpm install
 pnpm package:vscode
+
 code --install-extension packages/vscode/obsidian-vfs.vsix
 ```
 
