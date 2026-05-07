@@ -6,6 +6,7 @@ vi.mock("vscode", () => createVscodeMock({ workspace: true, uri: true }));
 
 import * as vscode from "vscode";
 
+import { SCHEME } from "./uri-adapter.js";
 import {
   FOLDER_NAME_PREFIX,
   addVaultWorkspaceFolder,
@@ -46,7 +47,7 @@ describe("hasVaultWorkspaceFolder", () => {
   it("returns true when an obs:// folder exists (backward compat)", () => {
     workspace.workspaceFolders = [
       { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
-      { uri: { scheme: "obs" }, name: `${FOLDER_NAME_PREFIX}Notes`, index: 1 },
+      { uri: { scheme: SCHEME }, name: `${FOLDER_NAME_PREFIX}Notes`, index: 1 },
     ];
     expect(hasVaultWorkspaceFolder("/vault")).toBe(true);
   });
@@ -113,7 +114,7 @@ describe("addVaultWorkspaceFolder", () => {
   it("returns already-present when obs:// folder exists (backward compat)", () => {
     workspace.workspaceFolders = [
       { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
-      { uri: { scheme: "obs" }, name: `${FOLDER_NAME_PREFIX}Notes`, index: 1 },
+      { uri: { scheme: SCHEME }, name: `${FOLDER_NAME_PREFIX}Notes`, index: 1 },
     ];
 
     const result = addVaultWorkspaceFolder("/vault", ["Notes"]);
@@ -212,7 +213,7 @@ describe("removeVaultWorkspaceFolders", () => {
   it("removes obs:// folders (backward compat)", () => {
     workspace.workspaceFolders = [
       { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
-      { uri: { scheme: "obs" }, name: `${FOLDER_NAME_PREFIX}Notes`, index: 1 },
+      { uri: { scheme: SCHEME }, name: `${FOLDER_NAME_PREFIX}Notes`, index: 1 },
     ];
 
     removeVaultWorkspaceFolders("/vault");
@@ -222,8 +223,8 @@ describe("removeVaultWorkspaceFolders", () => {
   it("removes multiple obs:// folders (backward compat)", () => {
     workspace.workspaceFolders = [
       { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
-      { uri: { scheme: "obs" }, name: `${FOLDER_NAME_PREFIX}Notes`, index: 1 },
-      { uri: { scheme: "obs" }, name: `${FOLDER_NAME_PREFIX}Projects`, index: 2 },
+      { uri: { scheme: SCHEME }, name: `${FOLDER_NAME_PREFIX}Notes`, index: 1 },
+      { uri: { scheme: SCHEME }, name: `${FOLDER_NAME_PREFIX}Projects`, index: 2 },
     ];
 
     removeVaultWorkspaceFolders("/vault");

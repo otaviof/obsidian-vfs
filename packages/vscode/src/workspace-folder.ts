@@ -2,6 +2,8 @@ import path from "node:path";
 
 import * as vscode from "vscode";
 
+import { toFileUri } from "./uri-adapter.js";
+
 /** Result of attempting to add the vault as a workspace folder. */
 export type AddWorkspaceFolderResult =
   | { readonly status: "added" }
@@ -59,7 +61,7 @@ export function addVaultWorkspaceFolder(
   }
 
   const newFolders = autoMount.map((folder) => ({
-    uri: vscode.Uri.file(path.join(physicalPath, folder)),
+    uri: toFileUri(folder, physicalPath),
     name: `${FOLDER_NAME_PREFIX}${folder}`,
   }));
   vscode.workspace.updateWorkspaceFolders(folders.length, 0, ...newFolders);

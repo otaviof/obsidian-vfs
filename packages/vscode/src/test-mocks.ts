@@ -4,6 +4,8 @@ import { vi } from "vitest";
 import type { LocalIndexTracker } from "@obsidian-vfs/core";
 import { makeLocalIndexTrackerWith } from "@obsidian-vfs/core/testing";
 
+import { SCHEME } from "./scheme.js";
+
 /** Reusable `EventEmitter` mock matching VSCode's `EventEmitter` contract. */
 export function createMockEventEmitter(): new () => {
   event: (listener: (e: unknown) => void) => { dispose: () => void };
@@ -197,12 +199,14 @@ export function createVscodeMock(
 export function fakeUri(
   uriPath: string,
   vaultName = "TestVault",
-): { scheme: string; authority: string; path: string; toString: () => string } {
+  scheme = SCHEME,
+): { scheme: string; authority: string; path: string; fsPath: string; toString: () => string } {
   return {
-    scheme: "obs",
-    authority: vaultName,
+    scheme,
+    authority: scheme === SCHEME ? vaultName : "",
     path: uriPath,
-    toString: () => `obs://${vaultName}${uriPath}`,
+    fsPath: uriPath,
+    toString: () => (scheme === SCHEME ? `${SCHEME}://${vaultName}${uriPath}` : `file://${uriPath}`),
   };
 }
 

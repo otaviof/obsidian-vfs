@@ -20,6 +20,7 @@ vi.mock("./vault-tree-provider.js", () => ({
 import * as vscode from "vscode";
 
 import { registerCommands } from "./commands.js";
+import { SCHEME } from "./uri-adapter.js";
 import { readAutoMount } from "./vault-tree-provider.js";
 
 const mockReadAutoMount = vi.mocked(readAutoMount);
@@ -353,7 +354,7 @@ describe("openInObsidian command", () => {
     (tracker as unknown as Record<string, unknown>).cli = { open: mockOpen };
 
     Object.defineProperty(vscode.window, "activeTextEditor", {
-      value: { document: { uri: { scheme: "obs", path: "/note.md" } } },
+      value: { document: { uri: { scheme: SCHEME, path: "/note.md" } } },
       writable: true,
       configurable: true,
     });
@@ -398,14 +399,17 @@ describe("openInObsidian command", () => {
     expect(vscode.window.showInformationMessage).toHaveBeenCalledWith("No Obsidian VFS file active");
   });
 
-  it("shows message when active editor is not obs://", async () => {
+  it("calls cli.open when active editor has file:// URI under vault", async () => {
+    const mockOpen = vi.fn().mockResolvedValue({ ok: true, value: undefined });
+    const tracker = mockTracker();
+    (tracker as unknown as Record<string, unknown>).cli = { open: mockOpen };
+
     Object.defineProperty(vscode.window, "activeTextEditor", {
-      value: { document: { uri: { scheme: "file", path: "/local.md" } } },
+      value: { document: { uri: { scheme: "file", fsPath: "/vault/notes/todo.md" } } },
       writable: true,
       configurable: true,
     });
 
-    const tracker = mockTracker();
     const ctx = fakeContext();
     const tree = fakeTreeProvider();
     const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
@@ -416,7 +420,7 @@ describe("openInObsidian command", () => {
       .mock.calls.find((c) => c[0] === "obsidianVFS.openInObsidian")![1] as () => Promise<void>;
     await openHandler();
 
-    expect(vscode.window.showInformationMessage).toHaveBeenCalledWith("No Obsidian VFS file active");
+    expect(mockOpen).toHaveBeenCalledWith("notes/todo.md");
 
     Object.defineProperty(vscode.window, "activeTextEditor", {
       value: undefined,
@@ -433,7 +437,7 @@ describe("openInObsidian command", () => {
     (tracker as unknown as Record<string, unknown>).cli = { open: mockOpen };
 
     Object.defineProperty(vscode.window, "activeTextEditor", {
-      value: { document: { uri: { scheme: "obs", path: "/note.md" } } },
+      value: { document: { uri: { scheme: SCHEME, path: "/note.md" } } },
       writable: true,
       configurable: true,
     });
@@ -525,7 +529,7 @@ describe("searchNotes command", () => {
     );
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
       "vscode.open",
-      expect.objectContaining({ scheme: "obs", path: "/docs/overview.md" }),
+      expect.objectContaining({ scheme: "file", fsPath: "/vault/docs/overview.md" }),
     );
   });
 

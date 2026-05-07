@@ -12,7 +12,7 @@ import { VaultTreeDataProvider, VaultTreeItem, readAutoMount } from "./vault-tre
 
 describe("VaultTreeItem", () => {
   it("creates a collapsed folder item", () => {
-    const item = new VaultTreeItem("notes", "notes", "directory", "MyVault");
+    const item = new VaultTreeItem("notes", "notes", "directory", "/vault");
 
     expect(item.label).toBe("notes");
     expect(item.vaultPath).toBe("notes");
@@ -22,7 +22,7 @@ describe("VaultTreeItem", () => {
   });
 
   it("creates a file item with open command", () => {
-    const item = new VaultTreeItem("readme.md", "docs/readme.md", "file", "MyVault");
+    const item = new VaultTreeItem("readme.md", "docs/readme.md", "file", "/vault");
 
     expect(item.label).toBe("readme.md");
     expect(item.vaultPath).toBe("docs/readme.md");
@@ -90,7 +90,7 @@ describe("VaultTreeDataProvider", () => {
     });
 
     const provider = new VaultTreeDataProvider(tracker);
-    const parent = new VaultTreeItem("projects", "projects", "directory", "TestVault");
+    const parent = new VaultTreeItem("projects", "projects", "directory", "/vault");
     const children = await provider.getChildren(parent);
 
     expect(children).toHaveLength(2);
@@ -114,7 +114,7 @@ describe("VaultTreeDataProvider", () => {
     });
 
     const provider = new VaultTreeDataProvider(tracker);
-    const parent = new VaultTreeItem("root", "root", "directory", "TestVault");
+    const parent = new VaultTreeItem("root", "root", "directory", "/vault");
     const children = await provider.getChildren(parent);
     const labels = children.map((c) => c.label);
 
@@ -132,7 +132,7 @@ describe("VaultTreeDataProvider", () => {
     });
 
     const provider = new VaultTreeDataProvider(tracker);
-    const parent = new VaultTreeItem("root", "root", "directory", "TestVault");
+    const parent = new VaultTreeItem("root", "root", "directory", "/vault");
     const children = await provider.getChildren(parent);
 
     expect(children).toEqual([]);
@@ -156,7 +156,7 @@ describe("VaultTreeDataProvider", () => {
   it("getTreeItem returns the element itself", () => {
     const tracker = mockTracker();
     const provider = new VaultTreeDataProvider(tracker);
-    const item = new VaultTreeItem("test.md", "test.md", "file", "V");
+    const item = new VaultTreeItem("test.md", "test.md", "file", "/vault");
 
     expect(provider.getTreeItem(item)).toBe(item);
 

@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import { parseMarkdownLinks } from "@obsidian-vfs/core";
 import type { LocalIndexTracker } from "@obsidian-vfs/core";
 
-import { toVscodeUri } from "./uri-adapter.js";
+import { toFileUri } from "./uri-adapter.js";
 
 /** Provides clickable links for `[[wikilink]]` syntax in Markdown files. */
 export class WikilinkDocumentLinkProvider implements vscode.DocumentLinkProvider {
@@ -24,7 +24,7 @@ export class WikilinkDocumentLinkProvider implements vscode.DocumentLinkProvider
       const startPos = document.positionAt(link.startIndex);
       const endPos = document.positionAt(link.endIndex);
       const range = new vscode.Range(startPos, endPos);
-      const targetUri = toVscodeUri(result.value.resolvedPath, this.#tracker.context.name);
+      const targetUri = toFileUri(result.value.resolvedPath, this.#tracker.context.physicalPath);
 
       links.push(new vscode.DocumentLink(range, targetUri));
     }

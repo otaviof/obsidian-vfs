@@ -73,6 +73,7 @@ import type { LocalIndexTracker } from "@obsidian-vfs/core";
 import { bootstrapFromConfig, readConfig } from "./bootstrap.js";
 import { registerCommands } from "./commands.js";
 import { activate, deactivate } from "./extension.js";
+import { SCHEME } from "./uri-adapter.js";
 import { FOLDER_NAME_PREFIX } from "./workspace-folder.js";
 import { ObsidianFileSystemProvider } from "./file-system-provider.js";
 import { StatusBarManager } from "./status-bar.js";
@@ -138,7 +139,7 @@ describe("activate", () => {
 
     expect(ObsidianFileSystemProvider).toHaveBeenCalledWith(fakeTracker);
     expect(vscode.workspace.registerFileSystemProvider).toHaveBeenCalledWith(
-      "obs",
+      SCHEME,
       expect.anything(),
       { isCaseSensitive: true, isReadonly: false },
     );
@@ -162,7 +163,10 @@ describe("activate", () => {
     expect(StatusBarManager).toHaveBeenCalledWith(fakeTracker);
     expect(WikilinkDocumentLinkProvider).toHaveBeenCalledWith(fakeTracker);
     expect(vscode.languages.registerDocumentLinkProvider).toHaveBeenCalledWith(
-      { scheme: "obs", language: "markdown" },
+      [
+        { scheme: SCHEME, language: "markdown" },
+        { scheme: "file", language: "markdown" },
+      ],
       expect.anything(),
     );
   });

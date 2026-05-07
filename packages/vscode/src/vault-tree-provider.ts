@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { LocalIndexTracker, VFSFileType } from "@obsidian-vfs/core";
 
-import { toVscodeUri } from "./uri-adapter.js";
+import { toFileUri } from "./uri-adapter.js";
 
 /** Context value for tree items, used in `when` clauses for context menus. */
 type VaultItemContext = "obsFile" | "obsFolder";
@@ -11,7 +11,7 @@ export class VaultTreeItem extends vscode.TreeItem {
   /** Vault-relative path of this item. */
   readonly vaultPath: string;
 
-  constructor(label: string, vaultPath: string, type: VFSFileType, vaultName: string) {
+  constructor(label: string, vaultPath: string, type: VFSFileType, physicalPath: string) {
     const isDir = type === "directory";
     super(
       label,
@@ -20,7 +20,7 @@ export class VaultTreeItem extends vscode.TreeItem {
 
     this.vaultPath = vaultPath;
     this.contextValue = (isDir ? "obsFolder" : "obsFile") satisfies VaultItemContext;
-    this.resourceUri = toVscodeUri(vaultPath, vaultName);
+    this.resourceUri = toFileUri(vaultPath, physicalPath);
 
     if (!isDir) {
       this.command = {
@@ -67,9 +67,9 @@ export class VaultTreeDataProvider
     const mounted = readAutoMount();
     if (mounted.length === 0) return [];
 
-    const vaultName = this.#tracker.context.name;
+    const { name, physicalPath } = this.#tracker.context;
     return mounted.map(
-      (folder) => new VaultTreeItem(folder || vaultName, folder, "directory", vaultName),
+      (folder) => new VaultTreeItem(folder || name, folder, "directory", physicalPath),
     );
   }
 
@@ -78,13 +78,13 @@ export class VaultTreeDataProvider
     const result = await this.#tracker.readDirectory(vaultPath);
     if (!result.ok) return [];
 
-    const vaultName = this.#tracker.context.name;
+    const { physicalPath } = this.#tracker.context;
     return result.value
       .slice()
       .sort(sortEntries)
       .map(
         ([name, type]) =>
-          new VaultTreeItem(name, vaultPath ? `${vaultPath}/${name}` : name, type, vaultName),
+          new VaultTreeItem(name, vaultPath ? `${vaultPath}/${name}` : name, type, physicalPath),
       );
   }
 

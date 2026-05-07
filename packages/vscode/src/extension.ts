@@ -61,7 +61,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const wikilinkProvider = new WikilinkDocumentLinkProvider(tracker);
   context.subscriptions.push(
     vscode.languages.registerDocumentLinkProvider(
-      { scheme: SCHEME, language: "markdown" },
+      [
+        { scheme: SCHEME, language: "markdown" },
+        { scheme: "file", language: "markdown" },
+      ],
       wikilinkProvider,
     ),
   );

@@ -61,7 +61,7 @@ describe("WikilinkDocumentLinkProvider", () => {
     const links = await provider.provideDocumentLinks(doc);
 
     expect(links).toHaveLength(1);
-    expect(links[0].target).toMatchObject({ scheme: "obs", path: "/folder/Note.md" });
+    expect(links[0].target).toMatchObject({ scheme: "file", fsPath: "/vault/folder/Note.md" });
   });
 
   it("skips failed wikilink resolutions", async () => {
@@ -197,8 +197,8 @@ describe("WikilinkDocumentLinkProvider", () => {
     const links = await provider.provideDocumentLinks(fakeDocument("[[A]][[B]][[C]]"));
 
     expect(links).toHaveLength(2);
-    expect(links[0].target).toMatchObject({ path: "/A.md" });
-    expect(links[1].target).toMatchObject({ path: "/C.md" });
+    expect(links[0].target).toMatchObject({ scheme: "file", fsPath: "/vault/A.md" });
+    expect(links[1].target).toMatchObject({ scheme: "file", fsPath: "/vault/C.md" });
   });
 
   it("correctly maps character positions to VSCode ranges", async () => {

@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { LocalIndexTracker } from "@obsidian-vfs/core";
 
-import { SCHEME, toVaultPath, toVscodeUri } from "./uri-adapter.js";
+import { SCHEME, toFileUri, toVaultPath, toVaultPathFromFile } from "./uri-adapter.js";
 import type { VaultTreeDataProvider } from "./vault-tree-provider.js";
 import { readAutoMount } from "./vault-tree-provider.js";
 
@@ -54,18 +54,21 @@ async function unmountCommand(treeProvider: VaultTreeDataProvider): Promise<void
   treeProvider.refresh();
 }
 
-/** Open the active `obs://` file in the Obsidian desktop app. */
+/** Open the active Obsidian VFS file in the Obsidian desktop app. */
 async function openInObsidianCommand(
   tracker: LocalIndexTracker,
   outputChannel: vscode.OutputChannel,
 ): Promise<void> {
   const editor = vscode.window.activeTextEditor;
-  if (editor?.document.uri.scheme !== SCHEME) {
+  if (editor?.document.uri.scheme !== SCHEME && editor?.document.uri.scheme !== "file") {
     await vscode.window.showInformationMessage("No Obsidian VFS file active");
     return;
   }
 
-  const vaultPath = toVaultPath(editor.document.uri);
+  const vaultPath =
+    editor.document.uri.scheme === SCHEME
+      ? toVaultPath(editor.document.uri)
+      : toVaultPathFromFile(editor.document.uri, tracker.context.physicalPath);
   const result = await tracker.cli.open(vaultPath);
   if (!result.ok) {
     outputChannel.appendLine(`Open in Obsidian failed: ${result.error.message}`);
@@ -90,7 +93,7 @@ async function searchNotesCommand(tracker: LocalIndexTracker): Promise<void> {
   });
   if (!picked) return;
 
-  const uri = toVscodeUri(picked.description, tracker.context.name);
+  const uri = toFileUri(picked.description, tracker.context.physicalPath);
   await vscode.commands.executeCommand("vscode.open", uri);
 }
 

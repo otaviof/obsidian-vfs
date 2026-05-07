@@ -7,7 +7,7 @@ Browse, search, and edit your [Obsidian](https://obsidian.md) vault directly in 
 - **Mount vault folders** into the Explorer tree view
 - **Browse and read** Markdown files through the `obs://` virtual file system
 - **Edit existing files** with writes going directly to the vault on disk
-- **Wikilink navigation**, click `[[links]]` in Markdown to jump between notes
+- **Wikilink navigation**, click `[[links]]` in Markdown to jump between notes (resolves to `file://` paths for seamless navigation in workspace folders)
 - **Search notes** via Quick Pick across all vault Markdown files
 - **Open in Obsidian**, jump to the current file in the Obsidian app
 - **Auto-mount** configured folders on startup
@@ -23,7 +23,7 @@ Available via the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`):
 |---------|-------------|
 | `Obsidian VFS: Mount Folder` | Pick a top-level vault folder and add it to the Explorer tree view |
 | `Obsidian VFS: Unmount Folder` | Remove a mounted vault folder from the tree view |
-| `Obsidian VFS: Open in Obsidian` | Open the active `obs://` file in the Obsidian app |
+| `Obsidian VFS: Open in Obsidian` | Open the active vault file in the Obsidian app (works from both `obs://` and `file://` documents) |
 | `Obsidian VFS: Search Notes` | Quick Pick search across all vault Markdown files |
 
 ## Settings
@@ -46,7 +46,7 @@ All three toggle settings (`explorer`, `statusBar`, `workspace`) take effect imm
 
 When `obsidianVFS.workspace` is enabled, the extension adds each `autoMount` folder as a `file://` workspace folder pointing to the actual directory on disk, named **obs://\<folder\>**. Because these are native file-system paths, VS Code's built-in file indexer (`ripgrep`) can index them — so vault files appear in **Quick Open** (`Cmd+P`) and **Search** (`Ctrl+Shift+F`).
 
-The `obs://` FileSystemProvider remains registered for the tree view, wikilink navigation, and document links.
+The `obs://` FileSystemProvider remains registered for internal operations (stat, read, write, file watching). All user-facing navigation — wikilinks, search results, tree view items — resolves to `file://` URIs so they work seamlessly with workspace folders.
 
 **Requirements:**
 
