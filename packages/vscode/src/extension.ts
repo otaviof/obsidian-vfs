@@ -10,6 +10,8 @@ import { WikilinkDocumentLinkProvider } from "./wikilink-provider.js";
 import {
   FOLDER_NAME_PREFIX,
   addVaultWorkspaceFolder,
+  excludeVaultFromGitDetection,
+  includeVaultInGitDetection,
   removeVaultWorkspaceFolders,
 } from "./workspace-folder.js";
 
@@ -79,6 +81,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     const wfResult = addVaultWorkspaceFolder(tracker.context.physicalPath, config.autoMount);
     const detail = "reason" in wfResult ? ` — ${wfResult.reason}` : "";
     outputChannel.appendLine(`Workspace folder: ${wfResult.status}${detail}`);
+    await excludeVaultFromGitDetection(tracker.context.physicalPath);
   }
 
   context.subscriptions.push(
@@ -105,6 +108,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         removeVaultWorkspaceFolders(tracker.context.physicalPath);
         if (updated.workspace) {
           addVaultWorkspaceFolder(tracker.context.physicalPath, updated.autoMount);
+          void excludeVaultFromGitDetection(tracker.context.physicalPath);
+        } else {
+          void includeVaultInGitDetection(tracker.context.physicalPath);
         }
       }
     }),

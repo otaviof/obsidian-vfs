@@ -64,6 +64,8 @@ vi.mock("./workspace-folder.js", async (importOriginal) => {
     addVaultWorkspaceFolder: vi.fn().mockReturnValue({ status: "added" }),
     removeVaultWorkspaceFolders: vi.fn(),
     hasVaultWorkspaceFolder: vi.fn(),
+    excludeVaultFromGitDetection: vi.fn().mockResolvedValue(undefined),
+    includeVaultInGitDetection: vi.fn().mockResolvedValue(undefined),
   };
 });
 
@@ -79,12 +81,19 @@ import { ObsidianFileSystemProvider } from "./file-system-provider.js";
 import { StatusBarManager } from "./status-bar.js";
 import { VaultTreeDataProvider } from "./vault-tree-provider.js";
 import { WikilinkDocumentLinkProvider } from "./wikilink-provider.js";
-import { addVaultWorkspaceFolder, removeVaultWorkspaceFolders } from "./workspace-folder.js";
+import {
+  addVaultWorkspaceFolder,
+  excludeVaultFromGitDetection,
+  includeVaultInGitDetection,
+  removeVaultWorkspaceFolders,
+} from "./workspace-folder.js";
 
 const mockBootstrap = vi.mocked(bootstrapFromConfig);
 const mockReadConfig = vi.mocked(readConfig);
 const mockAddWF = vi.mocked(addVaultWorkspaceFolder);
 const mockRemoveWF = vi.mocked(removeVaultWorkspaceFolders);
+const mockExcludeGit = vi.mocked(excludeVaultFromGitDetection);
+const mockIncludeGit = vi.mocked(includeVaultInGitDetection);
 
 describe("activate", () => {
   beforeEach(() => {
@@ -192,6 +201,7 @@ describe("activate", () => {
     await activate(fakeContext() as never);
 
     expect(mockAddWF).toHaveBeenCalledWith("/vault", ["Notes"]);
+    expect(mockExcludeGit).toHaveBeenCalledWith("/vault");
   });
 
   it("skips workspace folder when workspace is false", async () => {
@@ -581,6 +591,7 @@ describe("configuration change listener", () => {
 
     expect(mockRemoveWF).toHaveBeenCalledWith("/vault");
     expect(mockAddWF).toHaveBeenCalledWith("/vault", ["Notes"]);
+    expect(mockExcludeGit).toHaveBeenCalledWith("/vault");
   });
 
   it("removes workspace folders when workspace config changes to false", async () => {
@@ -618,6 +629,7 @@ describe("configuration change listener", () => {
 
     expect(mockRemoveWF).toHaveBeenCalledWith("/vault");
     expect(mockAddWF).not.toHaveBeenCalled();
+    expect(mockIncludeGit).toHaveBeenCalledWith("/vault");
   });
 
   it("refreshes workspace folders when autoMount config changes", async () => {

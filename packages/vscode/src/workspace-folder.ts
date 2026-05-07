@@ -39,6 +39,31 @@ export function removeVaultWorkspaceFolders(physicalPath: string): void {
   }
 }
 
+/** Add the vault path to `git.ignoredRepositories` so VSCode's Git extension skips it. */
+export function excludeVaultFromGitDetection(physicalPath: string): Thenable<void> {
+  const gitConfig = vscode.workspace.getConfiguration("git");
+  const ignored = gitConfig.get<string[]>("ignoredRepositories", []);
+  if (ignored.includes(physicalPath)) return Promise.resolve();
+  return gitConfig.update(
+    "ignoredRepositories",
+    [...ignored, physicalPath],
+    vscode.ConfigurationTarget.Global,
+  );
+}
+
+/** Remove the vault path from `git.ignoredRepositories`. */
+export function includeVaultInGitDetection(physicalPath: string): Thenable<void> {
+  const gitConfig = vscode.workspace.getConfiguration("git");
+  const ignored = gitConfig.get<string[]>("ignoredRepositories", []);
+  const filtered = ignored.filter((p) => p !== physicalPath);
+  if (filtered.length === ignored.length) return Promise.resolve();
+  return gitConfig.update(
+    "ignoredRepositories",
+    filtered.length > 0 ? filtered : undefined,
+    vscode.ConfigurationTarget.Global,
+  );
+}
+
 /**
  * Add autoMount folders as individual workspace folders for Explorer browsing.
  * Appends at the end to avoid extension host restart.
