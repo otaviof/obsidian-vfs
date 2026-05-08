@@ -11,7 +11,7 @@ import type {
 } from "@obsidian-vfs/core";
 
 import { throwFileExists, throwVFSError } from "./error-mapper.js";
-import { toVaultPath, toVscodeUri } from "./uri-adapter.js";
+import { SCHEME, toVaultPath, toVscodeUri } from "./uri-adapter.js";
 
 /** Map core `VFSFileType` to `vscode.FileType`. */
 function mapFileType(type: VFSFileType): vscode.FileType {
@@ -102,12 +102,12 @@ export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
 
   /** Required interface method. Workspace folders use `file://` URIs so the native FS handles these. */
   delete(): Promise<void> {
-    throw vscode.FileSystemError.NoPermissions("Not supported on obs:// scheme");
+    throw vscode.FileSystemError.NoPermissions(`Not supported on ${SCHEME}:// scheme`);
   }
 
   /** Required interface method. Workspace folders use `file://` URIs so the native FS handles these. */
   rename(): Promise<void> {
-    throw vscode.FileSystemError.NoPermissions("Not supported on obs:// scheme");
+    throw vscode.FileSystemError.NoPermissions(`Not supported on ${SCHEME}:// scheme`);
   }
 
   /** Subscribe to file change events, filtering by watched prefix. */

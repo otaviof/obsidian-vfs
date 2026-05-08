@@ -6,12 +6,13 @@ import type { MentionResult, VFSResult } from "./types.js";
 import { processContent } from "./content-slice.js";
 import { resolveResource, resolveSkillResource } from "./resolve-resource.js";
 import { resolveWikilink } from "./resolve-wikilink.js";
+import { URI_SCHEME } from "./uri.js";
 
 /** Prefix for context mentions (`@obs:name`). */
-export const MENTION_PREFIX = "@obs:";
+export const MENTION_PREFIX = `@${URI_SCHEME}:`;
 
 /** Prefix for skill-only mentions (`/obs:name`). */
-export const SKILL_PREFIX = "/obs:";
+export const SKILL_PREFIX = `/${URI_SCHEME}:`;
 
 /** Add the `@obs:` prefix if the user omitted it; preserve existing prefixes. */
 export function normalizeMention(input: string): string {
@@ -112,7 +113,10 @@ export async function resolveMention(
   if (!mention.startsWith(MENTION_PREFIX)) {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: `Invalid @obs: mention: missing prefix` },
+      error: {
+        code: "INVALID_URI",
+        message: `Invalid ${MENTION_PREFIX} mention: missing prefix`,
+      },
     };
   }
 
@@ -120,7 +124,10 @@ export async function resolveMention(
   if (raw === "") {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: "Invalid @obs: mention: empty reference" },
+      error: {
+        code: "INVALID_URI",
+        message: `Invalid ${MENTION_PREFIX} mention: empty reference`,
+      },
     };
   }
 
@@ -128,7 +135,7 @@ export async function resolveMention(
   if (namePart === "") {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: "Invalid @obs: mention: empty path" },
+      error: { code: "INVALID_URI", message: `Invalid ${MENTION_PREFIX} mention: empty path` },
     };
   }
 
@@ -187,7 +194,10 @@ export async function resolveSkillMention(
   if (!mention.startsWith(SKILL_PREFIX)) {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: "Invalid /obs: mention: missing prefix" },
+      error: {
+        code: "INVALID_URI",
+        message: `Invalid ${SKILL_PREFIX} mention: missing prefix`,
+      },
     };
   }
 
@@ -195,7 +205,10 @@ export async function resolveSkillMention(
   if (raw === "") {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: "Invalid /obs: mention: empty reference" },
+      error: {
+        code: "INVALID_URI",
+        message: `Invalid ${SKILL_PREFIX} mention: empty reference`,
+      },
     };
   }
 
@@ -203,7 +216,7 @@ export async function resolveSkillMention(
   if (namePart === "") {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: "Invalid /obs: mention: empty path" },
+      error: { code: "INVALID_URI", message: `Invalid ${SKILL_PREFIX} mention: empty path` },
     };
   }
 

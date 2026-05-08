@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { DiscoveredResource } from "@obsidian-vfs/core";
+import { extractCuratedFrontmatter, formatCuratedLines, SKILL_PREFIX } from "@obsidian-vfs/core";
 
 import type { ProvisionArgs } from "./types.js";
 import type { ProvisionStrategy } from "./cmd-provision-resources.js";
@@ -12,30 +13,33 @@ const OBS_READ_BIN = "./bin/obs-read";
 
 /** Build the permission rule string for a single skill's !command. */
 function buildPermissionRule(skillName: string): string {
-  return `Bash(${OBS_READ_BIN} "/obs:${skillName}")`;
+  return `Bash(${OBS_READ_BIN} "${SKILL_PREFIX}${skillName}")`;
 }
 
-/** Build the proxy SKILL.md content string for a given skill. */
-function buildProxyContent(skill: DiscoveredResource): string {
-  return [
+/** Build the proxy SKILL.md content string for a given skill with curated frontmatter. */
+function buildProxyContent(skill: DiscoveredResource, curated: readonly string[]): string {
+  const lines = [
     "---",
     `name: ${skill.name}`,
     `description: ${skill.description}`,
+    ...curated,
     "---",
     "",
-    `!\`${OBS_READ_BIN} "/obs:${skill.name}"\``,
+    `!\`${OBS_READ_BIN} "${SKILL_PREFIX}${skill.name}"\``,
     "",
-  ].join("\n");
+  ];
+  return lines.join("\n");
 }
 
 /** Write a single proxy SKILL.md file, creating the directory if needed. */
 async function writeProxySkill(
   skill: DiscoveredResource,
+  curated: readonly string[],
   skillsDir: string,
 ): Promise<"written" | "unchanged"> {
   const dir = path.join(skillsDir, skill.name);
   const filePath = path.join(dir, "SKILL.md");
-  const content = buildProxyContent(skill);
+  const content = buildProxyContent(skill, curated);
 
   try {
     const existing = await readFile(filePath, "utf-8");
@@ -113,7 +117,11 @@ const skillStrategy: ProvisionStrategy = {
   resourceKind: "skills",
   outputDir: path.join(CLAUDE_DIR, "skills"),
   enumerate: (tracker) => tracker.listSkills(),
-  writeProxy: (resource, _tracker, outputDir) => writeProxySkill(resource, outputDir),
+  writeProxy: async (resource, tracker, outputDir) => {
+    const source = await tracker.readFile(resource.vaultRelativePath);
+    const curated = source.ok ? formatCuratedLines(extractCuratedFrontmatter(source.value)) : [];
+    return writeProxySkill(resource, curated, outputDir);
+  },
   syncPermissions: syncSettingsPermissions,
   countPermissions: countPermissionChanges,
 };

@@ -1,5 +1,11 @@
 import type { VFSResult } from "./types.js";
 
+/** The URI scheme identifier (`obs`). */
+export const URI_SCHEME = "obs";
+
+/** Full URI prefix including the `://` separator (`obs://`). */
+export const URI_PREFIX = `${URI_SCHEME}://`;
+
 /**
  * Decomposed form of an `obs://[vault-name]/path/to/note.md[#section]` URI.
  */
@@ -14,20 +20,23 @@ export interface ObsUriComponents {
  * input. Components are URL-decoded.
  */
 export function parseObsUri(uri: string): VFSResult<ObsUriComponents> {
-  if (!uri.toLowerCase().startsWith("obs://")) {
+  if (!uri.toLowerCase().startsWith(URI_PREFIX)) {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: "Invalid obs:// URI: missing or wrong scheme" },
+      error: {
+        code: "INVALID_URI",
+        message: `Invalid ${URI_PREFIX} URI: missing or wrong scheme`,
+      },
     };
   }
 
-  const rest = uri.slice(6);
+  const rest = uri.slice(URI_PREFIX.length);
   const slashIndex = rest.indexOf("/");
 
   if (slashIndex < 0) {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: "Invalid obs:// URI: missing path" },
+      error: { code: "INVALID_URI", message: `Invalid ${URI_PREFIX} URI: missing path` },
     };
   }
 
@@ -35,7 +44,7 @@ export function parseObsUri(uri: string): VFSResult<ObsUriComponents> {
   if (rawVault === "") {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: "Invalid obs:// URI: empty vault name" },
+      error: { code: "INVALID_URI", message: `Invalid ${URI_PREFIX} URI: empty vault name` },
     };
   }
 
@@ -57,7 +66,7 @@ export function parseObsUri(uri: string): VFSResult<ObsUriComponents> {
   if (rawPath === "") {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: "Invalid obs:// URI: empty path" },
+      error: { code: "INVALID_URI", message: `Invalid ${URI_PREFIX} URI: empty path` },
     };
   }
 
@@ -73,7 +82,10 @@ export function parseObsUri(uri: string): VFSResult<ObsUriComponents> {
   } catch {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: "Invalid obs:// URI: malformed percent-encoding" },
+      error: {
+        code: "INVALID_URI",
+        message: `Invalid ${URI_PREFIX} URI: malformed percent-encoding`,
+      },
     };
   }
 }
@@ -84,8 +96,8 @@ export function parseObsUri(uri: string): VFSResult<ObsUriComponents> {
  */
 export function buildObsUri(components: ObsUriComponents): string {
   const vault = encodeURIComponent(components.vaultName);
-  const path = components.path.split("/").map(encodeURIComponent).join("/");
-  let uri = `obs://${vault}/${path}`;
+  const p = components.path.split("/").map(encodeURIComponent).join("/");
+  let uri = `${URI_PREFIX}${vault}/${p}`;
   if (components.section !== undefined) {
     uri += `#${encodeURIComponent(components.section)}`;
   }

@@ -93,7 +93,7 @@ export { AsyncQueue } from "./queue.js";
  * LRU cache, URI parsing, config validation, secure file reads, and tracker.
  */
 export { LRUCache } from "./lru-cache.js";
-export { parseObsUri, buildObsUri } from "./uri.js";
+export { URI_SCHEME, URI_PREFIX, parseObsUri, buildObsUri } from "./uri.js";
 export { validateVFSConfig } from "./vfs-config.js";
 export { readVirtualFile } from "./read-file.js";
 export { LocalIndexTracker } from "./local-index-tracker.js";
@@ -121,3 +121,32 @@ export {
   resolveMention,
   resolveSkillMention,
 } from "./resolve-mention.js";
+
+/**
+ * Claude model mapping for non-Claude model names.
+ */
+export type { ClaudeModel } from "./model-mapping.js";
+export {
+  CLAUDE_HAIKU,
+  CLAUDE_SONNET,
+  CLAUDE_OPUS,
+  DEFAULT_MODEL,
+  mapModelToClaude,
+} from "./model-mapping.js";
+
+/**
+ * Frontmatter extraction and model remapping utilities.
+ */
+export type { CuratedFrontmatter } from "./frontmatter.js";
+export {
+  DESCRIPTION_RE,
+  MODEL_LINE_RE,
+  ALLOWED_TOOLS_RE,
+  ARGUMENT_HINT_RE,
+  extractFrontmatter,
+  extractFrontmatterField,
+  extractFrontmatterDescription,
+  extractCuratedFrontmatter,
+  formatCuratedLines,
+  remapModelLine,
+} from "./frontmatter.js";

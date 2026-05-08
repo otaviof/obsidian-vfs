@@ -6,7 +6,7 @@ Obsidian VFS, a virtual file-system to share Obsidian notes into VSCode and Clau
 
 ## Architecture
 
-- **`packages/core`**: `obs://` URI resolution, LRU cache, `ObsidianCLI` wrapper, `node:fs` reads, `parseMarkdownLinks` parser for `[[wikilinks]]`/`![[embeds]]`, `resolveEmbeds` transclusion, `resolveCliPath` platform-aware binary resolution. CLI calls serialized via async queue.
+- **`packages/core`**: `obs://` URI resolution (`URI_SCHEME`, `URI_PREFIX`), LRU cache, `ObsidianCLI` wrapper, `node:fs` reads, `parseMarkdownLinks` parser for `[[wikilinks]]`/`![[embeds]]`, `resolveEmbeds` transclusion, `resolveCliPath` platform-aware binary resolution, `mapModelToClaude` model mapping, `CuratedFrontmatter` extraction and formatting. CLI calls serialized via async queue.
 - **`packages/vscode`**: `FileSystemProvider` for `obs://`. Reads via disk, writes via native `node:fs`. Commands: mount/unmount folders, open in Obsidian, search notes. Auto-mount from settings, status bar, wikilink navigation via `DocumentLinkProvider`. CJS output, ESM source.
 - **`packages/claude-plugin`**: Agent SDK plugin. `UserPromptSubmit` hook resolves `@obs:` (context) and `/obs:` (skill-only) mentions into `additionalContext`. Exports `obs-read-main.ts` for `bin/obs-read`.
 - **`packages/cli`**: `npx obsidian-vfs`: `inspect`, `resolve`, `list-skills`, `provision-skills`, `list-agents`, `provision-agents`.

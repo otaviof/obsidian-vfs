@@ -28,6 +28,7 @@ import {
   statVirtualFile,
 } from "./fs-enumeration.js";
 import { VaultFileWatcher } from "./file-watcher.js";
+import { extractFrontmatterDescription } from "./frontmatter.js";
 
 /**
  * Optional configuration for the `LocalIndexTracker.create` factory.
@@ -43,31 +44,6 @@ const SKILL_FILENAME = "SKILL.md";
 
 /** Allowed characters in resource names (alphanumeric, hyphens, underscores, dots). */
 const SAFE_RESOURCE_NAME_RE = /^[a-zA-Z0-9._-]+$/;
-
-/** Pattern to extract `description:` from YAML frontmatter. */
-const DESCRIPTION_RE = /^description:\s*(.+)$/m;
-
-/** Extract the raw YAML frontmatter block from markdown content, or `undefined`. */
-function extractFrontmatter(content: string): string | undefined {
-  if (!content.startsWith("---\n")) return undefined;
-  const end = content.indexOf("\n---\n", 4);
-  if (end === -1) return undefined;
-  return content.slice(4, end);
-}
-
-/** Extract a field value from YAML frontmatter by regex pattern, or `undefined`. */
-function extractFrontmatterField(content: string, pattern: RegExp): string | undefined {
-  const frontmatter = extractFrontmatter(content);
-  if (!frontmatter) return undefined;
-  const match = pattern.exec(frontmatter);
-  const value = match?.[1]?.trim();
-  return value !== "" ? value : undefined;
-}
-
-/** Extract the `description` value from YAML frontmatter, or `undefined`. */
-function extractFrontmatterDescription(content: string): string | undefined {
-  return extractFrontmatterField(content, DESCRIPTION_RE);
-}
 
 /**
  * Central orchestrator atop `ObsidianCLI`. Provides vault discovery, config

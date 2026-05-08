@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { scrubWikilinks } from "@obsidian-vfs/core";
+import { remapModelLine, scrubWikilinks } from "@obsidian-vfs/core";
 
 import type { ProvisionArgs } from "./types.js";
 import type { ProvisionStrategy } from "./cmd-provision-resources.js";
@@ -43,7 +43,8 @@ function buildProxyContent(
   const scrubbedBody = scrubWikilinks(body, vaultName);
 
   if (frontmatter) {
-    const fm = ensureNameInFrontmatter(frontmatter, name);
+    const remapped = remapModelLine(frontmatter);
+    const fm = ensureNameInFrontmatter(remapped, name);
     return `---\n${fm}\n---\n${scrubbedBody}`;
   }
 

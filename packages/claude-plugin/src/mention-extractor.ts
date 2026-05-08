@@ -1,3 +1,5 @@
+import { URI_SCHEME } from "@obsidian-vfs/core";
+
 import type { ExtractedMention } from "./types.js";
 
 /** Pattern matching fenced code blocks (``` delimited, with optional language tag). */
@@ -7,7 +9,7 @@ const FENCED_CODE_BLOCK = /```[\s\S]*?```/g;
 const INLINE_CODE = /`[^`]+`/g;
 
 /** Pattern matching `@obs:` and `/obs:` mentions — captures prefix and reference. */
-const MENTION_PATTERN = /([@/])obs:([^\s]+)/g;
+const MENTION_PATTERN = new RegExp(`([@/])${URI_SCHEME}:([^\\s]+)`, "g");
 
 /** Trailing punctuation to strip from mention references. */
 const TRAILING_PUNCT = /[,.)!?;:]+$/;

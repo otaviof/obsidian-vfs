@@ -1,5 +1,6 @@
 import type { DiscoveredResource, LocalIndexTracker, VFSResult } from "@obsidian-vfs/core";
 import type { Mock } from "vitest";
+import { vi } from "vitest";
 import { makeLocalIndexTrackerWith } from "@obsidian-vfs/core/testing";
 
 export { makeLocalIndexTrackerWith, makeDiscoveredResource } from "@obsidian-vfs/core/testing";
@@ -19,17 +20,42 @@ export const FORMAT_ERROR_STUB = (err: { message: string }) => `ERROR: ${err.mes
 export const FORMAT_VERBOSE_TIMING_STUB = (label: string, ms: number) =>
   `[verbose] ${label}: ${ms.toFixed(1)}ms`;
 
-/** Build a mock tracker whose `listSkills` resolves to the given result. */
-export function makeListSkillsTracker(listSkillsResult: VFSResult<DiscoveredResource[]>) {
-  const { tracker } = makeLocalIndexTrackerWith("listSkills", listSkillsResult);
+/** Options for building a provision tracker mock. */
+export interface ProvisionTrackerOptions {
+  readonly readFileResult?: VFSResult<string>;
+  readonly extraMethods?: Partial<Record<keyof LocalIndexTracker, Mock>>;
+}
+
+/** Build a provision tracker whose list method and `readFile` are both mocked. */
+function makeProvisionTracker<K extends keyof LocalIndexTracker>(
+  methodName: K,
+  listResult: VFSResult<DiscoveredResource[]>,
+  options: ProvisionTrackerOptions = {},
+) {
+  const readFileResult = options.readFileResult ?? {
+    ok: false as const,
+    error: { code: "FILE_NOT_FOUND", message: "no source" },
+  };
+  const readFileMock = vi.fn().mockResolvedValue(readFileResult);
+  const { tracker } = makeLocalIndexTrackerWith(methodName, listResult, {
+    readFile: readFileMock,
+    ...options.extraMethods,
+  });
   return tracker;
 }
 
-/** Build a mock tracker whose `listAgents` resolves to the given result. */
+/** Build a mock tracker whose `listSkills` and `readFile` resolve to the given results. */
+export function makeListSkillsTracker(
+  listSkillsResult: VFSResult<DiscoveredResource[]>,
+  options?: ProvisionTrackerOptions,
+) {
+  return makeProvisionTracker("listSkills", listSkillsResult, options);
+}
+
+/** Build a mock tracker whose `listAgents` and `readFile` resolve to the given results. */
 export function makeListAgentsTracker(
   listAgentsResult: VFSResult<DiscoveredResource[]>,
-  extraMethods: Partial<Record<keyof LocalIndexTracker, Mock>> = {},
+  options?: ProvisionTrackerOptions,
 ) {
-  const { tracker } = makeLocalIndexTrackerWith("listAgents", listAgentsResult, extraMethods);
-  return tracker;
+  return makeProvisionTracker("listAgents", listAgentsResult, options);
 }

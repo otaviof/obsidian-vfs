@@ -466,6 +466,76 @@ describe("cmd-provision-skills", () => {
     );
   });
 
+  it("proxy maps non-Claude model to Claude equivalent", async () => {
+    const vaultSource =
+      "---\ndescription: Deploy helper\nmodel: gemini-2.0-flash-lite\n---\n\nDeploy content.\n";
+    const tracker = makeListSkillsTracker(
+      { ok: true, value: [makeDiscoveredResource()] },
+      { readFileResult: { ok: true, value: vaultSource } },
+    );
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs());
+
+    const writeCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("SKILL.md"));
+    expect(writeCall).toBeDefined();
+    const content = String(writeCall![1]);
+    expect(content).toContain("model: haiku");
+    expect(content).not.toContain("gemini");
+  });
+
+  it("proxy preserves allowed-tools from vault source", async () => {
+    const vaultSource =
+      "---\ndescription: Deploy helper\nallowed-tools: Bash, Read\n---\n\nDeploy content.\n";
+    const tracker = makeListSkillsTracker(
+      { ok: true, value: [makeDiscoveredResource()] },
+      { readFileResult: { ok: true, value: vaultSource } },
+    );
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs());
+
+    const writeCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("SKILL.md"));
+    expect(writeCall).toBeDefined();
+    const content = String(writeCall![1]);
+    expect(content).toContain("allowed-tools: Bash, Read");
+  });
+
+  it("proxy preserves argument-hint from vault source", async () => {
+    const vaultSource =
+      '---\ndescription: Deploy helper\nargument-hint: "pass the target"\n---\n\nDeploy content.\n';
+    const tracker = makeListSkillsTracker(
+      { ok: true, value: [makeDiscoveredResource()] },
+      { readFileResult: { ok: true, value: vaultSource } },
+    );
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs());
+
+    const writeCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("SKILL.md"));
+    expect(writeCall).toBeDefined();
+    const content = String(writeCall![1]);
+    expect(content).toContain('argument-hint: "pass the target"');
+  });
+
+  it("proxy omits absent curated fields", async () => {
+    const vaultSource = "---\ndescription: Deploy helper\n---\n\nDeploy content.\n";
+    const tracker = makeListSkillsTracker(
+      { ok: true, value: [makeDiscoveredResource()] },
+      { readFileResult: { ok: true, value: vaultSource } },
+    );
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs());
+
+    const writeCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("SKILL.md"));
+    expect(writeCall).toBeDefined();
+    const content = String(writeCall![1]);
+    expect(content).not.toContain("model:");
+    expect(content).not.toContain("allowed-tools:");
+    expect(content).not.toContain("argument-hint:");
+  });
+
   it("include that matches nothing results in empty written", async () => {
     const skills = [makeDiscoveredResource()];
     const tracker = makeListSkillsTracker({ ok: true, value: skills });
