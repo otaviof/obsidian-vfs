@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  OBSIDIAN_CLI_PATH,
-  PLATFORM_OBSIDIAN_CLI_PATHS,
+  OBSIDIAN_VFS_CLI_PATH,
+  PLATFORM_OBSIDIAN_VFS_CLI_PATHS,
   resolveCliPath,
 } from "./resolve-cli-path.js";
 
@@ -13,14 +13,14 @@ describe("resolveCliPath", () => {
   });
 
   it("returns env var when set", () => {
-    const result = resolveCliPath({ env: { OBSIDIAN_CLI_PATH: "/env/obs" } });
+    const result = resolveCliPath({ env: { OBSIDIAN_VFS_CLI_PATH: "/env/obs" } });
     expect(result).toBe("/env/obs");
   });
 
   it("user path takes priority over env var", () => {
     const result = resolveCliPath({
       userPath: "/custom/obs",
-      env: { OBSIDIAN_CLI_PATH: "/env/obs" },
+      env: { OBSIDIAN_VFS_CLI_PATH: "/env/obs" },
     });
     expect(result).toBe("/custom/obs");
   });
@@ -46,13 +46,13 @@ describe("resolveCliPath", () => {
   });
 
   it("ignores empty env var", () => {
-    const result = resolveCliPath({ env: { OBSIDIAN_CLI_PATH: "" }, platform: "linux" });
+    const result = resolveCliPath({ env: { OBSIDIAN_VFS_CLI_PATH: "" }, platform: "linux" });
     expect(result).toBe("/usr/local/bin/obsidian");
   });
 
   it("env var takes priority over platform default", () => {
     const result = resolveCliPath({
-      env: { OBSIDIAN_CLI_PATH: "/snap/bin/obsidian" },
+      env: { OBSIDIAN_VFS_CLI_PATH: "/snap/bin/obsidian" },
       platform: "linux",
     });
     expect(result).toBe("/snap/bin/obsidian");
@@ -60,19 +60,19 @@ describe("resolveCliPath", () => {
 
   it("falls back to process.env when env option is omitted", () => {
     const result = resolveCliPath({ platform: "darwin" });
-    const expected = process.env[OBSIDIAN_CLI_PATH] ?? PLATFORM_OBSIDIAN_CLI_PATHS.darwin;
+    const expected = process.env[OBSIDIAN_VFS_CLI_PATH] ?? PLATFORM_OBSIDIAN_VFS_CLI_PATHS.darwin;
     expect(result).toBe(expected);
   });
 });
 
 describe("constants", () => {
-  it("OBSIDIAN_CLI_PATH is the expected env var name", () => {
-    expect(OBSIDIAN_CLI_PATH).toBe("OBSIDIAN_CLI_PATH");
+  it("OBSIDIAN_VFS_CLI_PATH is the expected env var name", () => {
+    expect(OBSIDIAN_VFS_CLI_PATH).toBe("OBSIDIAN_VFS_CLI_PATH");
   });
 
-  it("PLATFORM_OBSIDIAN_CLI_PATHS has darwin and linux entries", () => {
-    expect(PLATFORM_OBSIDIAN_CLI_PATHS).toHaveProperty("darwin");
-    expect(PLATFORM_OBSIDIAN_CLI_PATHS).toHaveProperty("linux");
-    expect(Object.keys(PLATFORM_OBSIDIAN_CLI_PATHS)).toHaveLength(2);
+  it("PLATFORM_OBSIDIAN_VFS_CLI_PATHS has darwin and linux entries", () => {
+    expect(PLATFORM_OBSIDIAN_VFS_CLI_PATHS).toHaveProperty("darwin");
+    expect(PLATFORM_OBSIDIAN_VFS_CLI_PATHS).toHaveProperty("linux");
+    expect(Object.keys(PLATFORM_OBSIDIAN_VFS_CLI_PATHS)).toHaveLength(2);
   });
 });

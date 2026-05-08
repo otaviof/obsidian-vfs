@@ -91,7 +91,7 @@ export function formatError(error: VFSError): string {
 
   if (error.code === "CLI_UNAVAILABLE") {
     msg +=
-      "\nHint: Is the Obsidian CLI installed? Set the OBSIDIAN_CLI_PATH environment variable to override.";
+      "\nHint: Is the Obsidian CLI installed? Set the OBSIDIAN_VFS_CLI_PATH environment variable to override.";
   } else if (error.code === "VAULT_NOT_FOUND") {
     msg +=
       "\nHint: Run this command from within an Obsidian vault directory, or set the OBSIDIAN_VAULT environment variable.";
@@ -271,7 +271,6 @@ Options:
   --dry-run               Show what would change without writing (provision-*)
   --include <glob>        Only provision resources matching glob (repeatable, provision-*)
   --exclude <glob>        Skip resources matching glob (repeatable, provision-*)
-  --timeout <ms>          CLI timeout in milliseconds (default: 10000)
   -h, --help              Show this help message
 
 Examples:

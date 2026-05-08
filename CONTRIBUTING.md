@@ -5,7 +5,7 @@
 - Node.js 22+
 - pnpm 11
 - [Obsidian](https://obsidian.md) installed with a vault open
-- The `obsidian` CLI on your PATH (or configured via `OBSIDIAN_CLI_PATH`)
+- The `obsidian` CLI on your PATH (or configured via `OBSIDIAN_VFS_CLI_PATH`)
 
 ## Setup
 

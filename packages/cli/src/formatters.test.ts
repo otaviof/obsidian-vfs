@@ -469,7 +469,6 @@ describe("formatHelp", () => {
     expect(help).toContain("--dry-run");
     expect(help).toContain("--include");
     expect(help).toContain("--exclude");
-    expect(help).toContain("--timeout");
     expect(help).toContain("--help");
   });
 });

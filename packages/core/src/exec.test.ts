@@ -131,7 +131,7 @@ describe("resolveExecConfig", () => {
   });
 
   it("uses custom CLI path from environment", () => {
-    const config = resolveExecConfig({ OBSIDIAN_CLI_PATH: "/usr/bin/obs" });
+    const config = resolveExecConfig({ OBSIDIAN_VFS_CLI_PATH: "/usr/bin/obs" });
     expect(config.cliPath).toBe("/usr/bin/obs");
   });
 

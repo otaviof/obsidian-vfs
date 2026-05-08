@@ -24,7 +24,6 @@ npx obsidian-vfs --help
 | `--json` | Machine-readable JSON output |
 | `--verbose`, `-v` | Timing diagnostics |
 | `--description` | Show descriptions (list-skills, list-agents) |
-| `--timeout <ms>` | CLI operation timeout (default: 10 000 ms) |
 | `--help`, `-h` | Show usage information |
 
 ## Commands
@@ -189,9 +188,7 @@ Same add-only behavior as skills. Delete `.claude/agents/<name>.md` manually to 
 
 | Variable | Purpose | Default |
 |----------|---------|---------|
-| `OBSIDIAN_CLI_PATH` | Path to the Obsidian CLI binary | `"obsidian"` |
+| `OBSIDIAN_VFS_CLI_PATH` | Path to the Obsidian CLI binary | `"obsidian"` |
 | `OBSIDIAN_VFS_TIMEOUT_MS` | CLI operation timeout in milliseconds | `10000` |
-
-The `--timeout` flag overrides `OBSIDIAN_VFS_TIMEOUT_MS`. To use a custom CLI binary path, set `OBSIDIAN_CLI_PATH`.
 
 For upstream Claude Code documentation on skills, agents, hooks, and plugins, see the [Claude plugin README](../claude-plugin/README.md#claude-code-documentation).

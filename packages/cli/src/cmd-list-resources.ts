@@ -1,4 +1,3 @@
-import { resolveCliPath } from "@obsidian-vfs/core";
 import type { DiscoveredResource, LocalIndexTracker, VFSResult } from "@obsidian-vfs/core";
 
 import type { ListResourcesArgs, ListResourcesOutput } from "./types.js";
@@ -19,7 +18,7 @@ export async function run(
   resourceKind: string,
   enumerate: (tracker: LocalIndexTracker) => Promise<VFSResult<DiscoveredResource[]>>,
 ): Promise<number> {
-  const boot = await bootstrapTracker({ cliPath: resolveCliPath(), timeoutMs: args.timeoutMs });
+  const boot = await bootstrapTracker();
   if (!boot.ok) {
     if (args.json) {
       writeStdout(JSON.stringify({ ok: false, error: boot.error }, null, 2));

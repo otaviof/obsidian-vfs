@@ -10,8 +10,6 @@ export const CLI_DEFAULTS = {
   json: false,
   verbose: false,
   description: false,
-  cliPath: "obsidian",
-  timeoutMs: 10_000,
 } as const;
 
 /** Stub implementation for the `formatError` mock shared by all command tests. */

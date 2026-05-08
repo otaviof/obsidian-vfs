@@ -79,7 +79,7 @@
         "obsidianVFS.cliPath": {
           "type": "string",
           "default": "",
-          "description": "Path to the Obsidian CLI binary (empty = auto-detect per platform, or set OBSIDIAN_CLI_PATH env var)"
+          "description": "Path to the Obsidian CLI binary (empty = auto-detect per platform, or set OBSIDIAN_VFS_CLI_PATH env var)"
         },
         "obsidianVFS.timeoutMs": {
           "type": "number",

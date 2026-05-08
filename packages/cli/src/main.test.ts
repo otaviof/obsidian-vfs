@@ -55,21 +55,6 @@ describe("parseGlobalArgs", () => {
     }
   });
 
-  it("parses --timeout", () => {
-    const result = parseGlobalArgs(["inspect", "mention", "--timeout", "5000"]);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.options.timeoutMs).toBe(5000);
-    }
-  });
-
-  it("defaults --timeout to 10000", () => {
-    const result = parseGlobalArgs(["inspect", "mention"]);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.options.timeoutMs).toBe(10000);
-    }
-  });
 
   it("shows help when no command given", () => {
     const result = parseGlobalArgs([]);
@@ -106,30 +91,6 @@ describe("parseGlobalArgs", () => {
 
   it("returns usage error for unknown flag", () => {
     const result = parseGlobalArgs(["--bogus"]);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.exitCode).toBe(2);
-    }
-  });
-
-  it("returns usage error for invalid timeout", () => {
-    const result = parseGlobalArgs(["inspect", "m", "--timeout", "abc"]);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.exitCode).toBe(2);
-    }
-  });
-
-  it("returns usage error for zero timeout", () => {
-    const result = parseGlobalArgs(["inspect", "m", "--timeout", "0"]);
-    expect(result.ok).toBe(false);
-    if (!result.ok) {
-      expect(result.exitCode).toBe(2);
-    }
-  });
-
-  it("returns usage error for negative timeout", () => {
-    const result = parseGlobalArgs(["inspect", "m", "--timeout", "-1"]);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.exitCode).toBe(2);

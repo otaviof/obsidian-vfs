@@ -62,8 +62,8 @@ export type { CLIExecOptions } from "./exec.js";
  */
 export {
   resolveCliPath,
-  OBSIDIAN_CLI_PATH,
-  PLATFORM_OBSIDIAN_CLI_PATHS,
+  OBSIDIAN_VFS_CLI_PATH,
+  PLATFORM_OBSIDIAN_VFS_CLI_PATHS,
 } from "./resolve-cli-path.js";
 export type { ResolveCliPathOptions } from "./resolve-cli-path.js";
 

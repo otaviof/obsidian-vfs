@@ -20,7 +20,6 @@ export interface CLIOptions {
   readonly dryRun: boolean;
   readonly include: readonly string[];
   readonly exclude: readonly string[];
-  readonly timeoutMs: number;
 }
 
 /** Arguments for the inspect command. */
@@ -30,7 +29,6 @@ export interface InspectArgs {
   readonly verbose: boolean;
   readonly full: boolean;
   readonly body: boolean;
-  readonly timeoutMs: number;
 }
 
 /** Arguments for listing resources (skills or agents). */
@@ -38,7 +36,6 @@ export interface ListResourcesArgs {
   readonly json: boolean;
   readonly verbose: boolean;
   readonly description: boolean;
-  readonly timeoutMs: number;
 }
 
 /** Structured output of a list-resources command (skills or agents). */
@@ -54,7 +51,6 @@ export interface ProvisionArgs {
   readonly verbose: boolean;
   readonly include: readonly string[];
   readonly exclude: readonly string[];
-  readonly timeoutMs: number;
 }
 
 /** Metadata about filtering applied during provisioning. */
@@ -80,7 +76,6 @@ export interface ResolveArgs {
   readonly wikilink: string;
   readonly json: boolean;
   readonly verbose: boolean;
-  readonly timeoutMs: number;
 }
 
 /** Structured output of the inspect command (used for --json). */

@@ -2,8 +2,6 @@
 
 import { parseArgs } from "node:util";
 
-import { DEFAULT_TIMEOUT_MS } from "@obsidian-vfs/core";
-
 import type {
   CLIOptions,
   InspectArgs,
@@ -50,7 +48,6 @@ export function parseGlobalArgs(
         "dry-run": { type: "boolean", default: false },
         include: { type: "string", multiple: true, default: [] as string[] },
         exclude: { type: "string", multiple: true, default: [] as string[] },
-        timeout: { type: "string", default: String(DEFAULT_TIMEOUT_MS) },
         help: { type: "boolean", short: "h", default: false },
       },
       allowPositionals: true,
@@ -76,7 +73,6 @@ export function parseGlobalArgs(
         dryRun: false,
         include: [],
         exclude: [],
-        timeoutMs: DEFAULT_TIMEOUT_MS,
       },
       positionals: [],
     };
@@ -85,13 +81,6 @@ export function parseGlobalArgs(
   const command = parsed.positionals[0];
   if (!VALID_COMMANDS.has(command)) {
     writeStderr(formatUsageError(`Unknown command: ${command}`));
-    return { ok: false, exitCode: EXIT_USAGE };
-  }
-
-  const timeoutStr = parsed.values.timeout as string;
-  const timeoutMs = Number.parseInt(timeoutStr, 10);
-  if (Number.isNaN(timeoutMs) || timeoutMs <= 0) {
-    writeStderr(formatUsageError(`Invalid timeout value: ${timeoutStr}`));
     return { ok: false, exitCode: EXIT_USAGE };
   }
 
@@ -114,7 +103,6 @@ export function parseGlobalArgs(
       dryRun: parsed.values["dry-run"] as boolean,
       include,
       exclude,
-      timeoutMs,
     },
     positionals: parsed.positionals.slice(1),
   };
@@ -132,7 +120,6 @@ function buildInspectArgs(options: CLIOptions, positionals: readonly string[]): 
     verbose: options.verbose,
     full: options.full,
     body: options.body,
-    timeoutMs: options.timeoutMs,
   };
 }
 
@@ -146,7 +133,6 @@ function buildResolveArgs(options: CLIOptions, positionals: readonly string[]): 
     wikilink: positionals[0],
     json: options.json,
     verbose: options.verbose,
-    timeoutMs: options.timeoutMs,
   };
 }
 
@@ -156,7 +142,6 @@ function buildListResourcesArgs(options: CLIOptions): ListResourcesArgs {
     json: options.json,
     verbose: options.verbose,
     description: options.description,
-    timeoutMs: options.timeoutMs,
   };
 }
 
@@ -168,7 +153,6 @@ function buildProvisionArgs(options: CLIOptions): ProvisionArgs {
     verbose: options.verbose,
     include: options.include,
     exclude: options.exclude,
-    timeoutMs: options.timeoutMs,
   };
 }
 
