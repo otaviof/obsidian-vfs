@@ -76,6 +76,7 @@ Or via the Extensions sidebar: **`···` menu > Install from VSIX...**
 
 ```sh
 git clone https://github.com/otaviof/obsidian-vfs.git
+
 cd obsidian-vfs
 pnpm install
 pnpm package:vscode
