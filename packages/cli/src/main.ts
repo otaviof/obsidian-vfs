@@ -2,7 +2,7 @@
 
 import { parseArgs } from "node:util";
 
-import { DEFAULT_CLI_PATH, DEFAULT_TIMEOUT_MS } from "@obsidian-vfs/core";
+import { DEFAULT_TIMEOUT_MS } from "@obsidian-vfs/core";
 
 import type {
   CLIOptions,
@@ -49,7 +49,6 @@ export function parseGlobalArgs(
         "dry-run": { type: "boolean", default: false },
         include: { type: "string", multiple: true, default: [] as string[] },
         exclude: { type: "string", multiple: true, default: [] as string[] },
-        "cli-path": { type: "string", default: DEFAULT_CLI_PATH },
         timeout: { type: "string", default: String(DEFAULT_TIMEOUT_MS) },
         help: { type: "boolean", short: "h", default: false },
       },
@@ -75,7 +74,6 @@ export function parseGlobalArgs(
         dryRun: false,
         include: [],
         exclude: [],
-        cliPath: DEFAULT_CLI_PATH,
         timeoutMs: DEFAULT_TIMEOUT_MS,
       },
       positionals: [],
@@ -113,7 +111,6 @@ export function parseGlobalArgs(
       dryRun: parsed.values["dry-run"] as boolean,
       include,
       exclude,
-      cliPath: parsed.values["cli-path"] as string,
       timeoutMs,
     },
     positionals: parsed.positionals.slice(1),
@@ -132,7 +129,6 @@ function buildInspectArgs(options: CLIOptions, positionals: readonly string[]): 
     verbose: options.verbose,
     full: options.full,
     body: options.body,
-    cliPath: options.cliPath,
     timeoutMs: options.timeoutMs,
   };
 }
@@ -147,8 +143,6 @@ function buildResolveArgs(options: CLIOptions, positionals: readonly string[]): 
     wikilink: positionals[0],
     json: options.json,
     verbose: options.verbose,
-    cliPath: options.cliPath,
-
     timeoutMs: options.timeoutMs,
   };
 }
@@ -158,7 +152,6 @@ function buildListResourcesArgs(options: CLIOptions): ListResourcesArgs {
   return {
     json: options.json,
     verbose: options.verbose,
-    cliPath: options.cliPath,
     timeoutMs: options.timeoutMs,
   };
 }
@@ -171,7 +164,6 @@ function buildProvisionArgs(options: CLIOptions): ProvisionArgs {
     verbose: options.verbose,
     include: options.include,
     exclude: options.exclude,
-    cliPath: options.cliPath,
     timeoutMs: options.timeoutMs,
   };
 }

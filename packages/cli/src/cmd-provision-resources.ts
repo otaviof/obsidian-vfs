@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { resolveCliPath } from "@obsidian-vfs/core";
 import type { DiscoveredResource, LocalIndexTracker, VFSResult } from "@obsidian-vfs/core";
 
 import type { ProvisionArgs, ProvisionFilter, ProvisionOutput } from "./types.js";
@@ -43,7 +44,7 @@ const SETTINGS_PATH = path.join(CLAUDE_DIR, "settings.local.json");
 
 /** Execute a provision command using the given strategy. */
 export async function run(args: ProvisionArgs, strategy: ProvisionStrategy): Promise<number> {
-  const boot = await bootstrapTracker({ cliPath: args.cliPath, timeoutMs: args.timeoutMs });
+  const boot = await bootstrapTracker({ cliPath: resolveCliPath(), timeoutMs: args.timeoutMs });
   if (!boot.ok) {
     if (args.json) {
       writeStdout(JSON.stringify({ ok: false, error: boot.error }, null, 2));

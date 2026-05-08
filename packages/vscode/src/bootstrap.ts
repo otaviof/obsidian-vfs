@@ -1,5 +1,5 @@
 import * as vscode from "vscode";
-import { DEFAULT_CLI_PATH, DEFAULT_TIMEOUT_MS, bootstrapTracker } from "@obsidian-vfs/core";
+import { DEFAULT_TIMEOUT_MS, bootstrapTracker, resolveCliPath } from "@obsidian-vfs/core";
 import type { BootstrapResult, VFSResult } from "@obsidian-vfs/core";
 
 import type { ExtensionConfig } from "./types.js";
@@ -8,7 +8,7 @@ import type { ExtensionConfig } from "./types.js";
 export function readConfig(): ExtensionConfig {
   const cfg = vscode.workspace.getConfiguration("obsidianVFS");
   return {
-    cliPath: cfg.get<string>("cliPath", DEFAULT_CLI_PATH),
+    cliPath: resolveCliPath({ userPath: cfg.get<string>("cliPath", "") }),
     timeoutMs: cfg.get<number>("timeoutMs", DEFAULT_TIMEOUT_MS),
     autoMount: cfg.get<string[]>("autoMount", []),
     explorer: cfg.get<boolean>("explorer", true),

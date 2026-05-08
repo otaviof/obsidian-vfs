@@ -18,21 +18,42 @@ import {
   formatVerboseTiming,
 } from "./formatters.js";
 
+/** Fixture vault root path. */
+const VAULT_ROOT = "/Users/me/vault";
+
+/** Fixture vault display name. */
+const VAULT_NAME = "My Vault";
+
+/** Fixture inspect mention. */
+const INSPECT_MENTION = "@obs:architect";
+
+/** Fixture inspect vault-relative path. */
+const INSPECT_RESOLVED_PATH = "30-resources/ai/staff/architect.md";
+
+/** Fixture inspect content. */
+const INSPECT_CONTENT = "Some agent content here.";
+
+/** Fixture resolve wikilink input. */
+const RESOLVE_WIKILINK = "Project Plan";
+
+/** Fixture resolve vault-relative path. */
+const RESOLVE_RESOLVED_PATH = "10-projects/Project Plan.md";
+
 const sampleInspect: InspectOutput = {
-  mention: "@obs:architect",
+  mention: INSPECT_MENTION,
   targetType: "agent",
-  resolvedPath: "30-resources/ai/staff/architect.md",
-  physicalPath: "/Users/me/vault/30-resources/ai/staff/architect.md",
-  vaultName: "My Vault",
+  resolvedPath: INSPECT_RESOLVED_PATH,
+  physicalPath: `${VAULT_ROOT}/${INSPECT_RESOLVED_PATH}`,
+  vaultName: VAULT_NAME,
   section: undefined,
-  contentLength: 42,
-  content: "Some agent content here.",
+  contentLength: INSPECT_CONTENT.length,
+  content: INSPECT_CONTENT,
 };
 
 const sampleResolve: ResolveOutput = {
-  wikilink: "Project Plan",
-  resolvedPath: "10-projects/Project Plan.md",
-  physicalPath: "/Users/me/vault/10-projects/Project Plan.md",
+  wikilink: RESOLVE_WIKILINK,
+  resolvedPath: RESOLVE_RESOLVED_PATH,
+  physicalPath: `${VAULT_ROOT}/${RESOLVE_RESOLVED_PATH}`,
   candidates: [],
 };
 
@@ -91,15 +112,15 @@ describe("formatInspectResult", () => {
   it("renders all header fields", () => {
     const result = formatInspectResult(sampleInspect, { full: false });
     expect(result).toContain("Mention:");
-    expect(result).toContain("@obs:architect");
+    expect(result).toContain(INSPECT_MENTION);
     expect(result).toContain("Target Type:");
     expect(result).toContain("agent");
     expect(result).toContain("Vault Path:");
-    expect(result).toContain("30-resources/ai/staff/architect.md");
+    expect(result).toContain(INSPECT_RESOLVED_PATH);
     expect(result).toContain("Physical Path:");
-    expect(result).toContain("/Users/me/vault/30-resources/ai/staff/architect.md");
+    expect(result).toContain(`${VAULT_ROOT}/${INSPECT_RESOLVED_PATH}`);
     expect(result).toContain("Vault:");
-    expect(result).toContain("My Vault");
+    expect(result).toContain(VAULT_NAME);
   });
 
   it("shows section when defined", () => {
@@ -144,7 +165,7 @@ describe("formatInspectJSON", () => {
     const json = formatInspectJSON({ ok: true, data: sampleInspect });
     const parsed = JSON.parse(json) as { ok: boolean; data: InspectOutput };
     expect(parsed.ok).toBe(true);
-    expect(parsed.data.mention).toBe("@obs:architect");
+    expect(parsed.data.mention).toBe(INSPECT_MENTION);
   });
 
   it("serializes error result", () => {
@@ -159,9 +180,9 @@ describe("formatInspectJSON", () => {
 describe("formatResolveResult", () => {
   it("renders wikilink and paths with quotes", () => {
     const result = formatResolveResult(sampleResolve);
-    expect(result).toContain('"Project Plan"');
-    expect(result).toContain('"10-projects/Project Plan.md"');
-    expect(result).toContain('"/Users/me/vault/10-projects/Project Plan.md"');
+    expect(result).toContain(`"${RESOLVE_WIKILINK}"`);
+    expect(result).toContain(`"${RESOLVE_RESOLVED_PATH}"`);
+    expect(result).toContain(`"${VAULT_ROOT}/${RESOLVE_RESOLVED_PATH}"`);
   });
 });
 
@@ -192,7 +213,7 @@ describe("formatResolveJSON", () => {
     const json = formatResolveJSON({ ok: true, data: sampleResolve });
     const parsed = JSON.parse(json) as { ok: boolean; data: ResolveOutput };
     expect(parsed.ok).toBe(true);
-    expect(parsed.data.wikilink).toBe("Project Plan");
+    expect(parsed.data.wikilink).toBe(RESOLVE_WIKILINK);
   });
 });
 
@@ -421,7 +442,6 @@ describe("formatHelp", () => {
     expect(help).toContain("--dry-run");
     expect(help).toContain("--include");
     expect(help).toContain("--exclude");
-    expect(help).toContain("--cli-path");
     expect(help).toContain("--timeout");
     expect(help).toContain("--help");
   });

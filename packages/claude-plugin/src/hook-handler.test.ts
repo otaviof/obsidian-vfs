@@ -1,19 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("@obsidian-vfs/core", () => {
+vi.mock("@obsidian-vfs/core", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  const cliPath = (actual.resolveCliPath as () => string)();
   return {
+    ...actual,
     ObsidianCLIImpl: vi.fn(),
     LocalIndexTracker: {
       create: vi.fn(),
     },
     bootstrapTracker: vi.fn(),
-    MENTION_PREFIX: "@obs:",
-    SKILL_PREFIX: "/obs:",
     resolveMention: vi.fn(),
     resolveSkillMention: vi.fn(),
-    resolveExecConfig: vi.fn().mockReturnValue({ cliPath: "obsidian", timeoutMs: 10_000 }),
-    DEFAULT_CLI_PATH: "obsidian",
-    DEFAULT_TIMEOUT_MS: 10_000,
+    resolveExecConfig: vi.fn().mockReturnValue({ cliPath, timeoutMs: 10_000 }),
   };
 });
 

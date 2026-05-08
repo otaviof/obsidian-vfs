@@ -2,7 +2,7 @@
   "name": "obsidian-vfs",
   "displayName": "Obsidian VFS",
   "description": "Browse, search, and edit your Obsidian vault directly in VSCode via a virtual file system (obs://)",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "private": true,
   "publisher": "obsidian-vfs",
   "engines": {
@@ -78,8 +78,8 @@
       "properties": {
         "obsidianVFS.cliPath": {
           "type": "string",
-          "default": "obsidian",
-          "description": "Path to the Obsidian CLI binary"
+          "default": "",
+          "description": "Path to the Obsidian CLI binary (empty = auto-detect per platform, or set OBSIDIAN_CLI_PATH env var)"
         },
         "obsidianVFS.timeoutMs": {
           "type": "number",

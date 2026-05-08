@@ -1,6 +1,11 @@
 import path from "node:path";
 
-import { SKILL_PREFIX, normalizeMention, resolveSkillMention } from "@obsidian-vfs/core";
+import {
+  SKILL_PREFIX,
+  normalizeMention,
+  resolveCliPath,
+  resolveSkillMention,
+} from "@obsidian-vfs/core";
 import type { VFSError } from "@obsidian-vfs/core";
 
 import type { InspectArgs, InspectOutput } from "./types.js";
@@ -29,7 +34,7 @@ function emitError(error: VFSError, json: boolean): number {
 export async function run(args: InspectArgs): Promise<number> {
   const mention = normalizeMention(args.mention);
 
-  const boot = await bootstrapTracker({ cliPath: args.cliPath, timeoutMs: args.timeoutMs });
+  const boot = await bootstrapTracker({ cliPath: resolveCliPath(), timeoutMs: args.timeoutMs });
   if (!boot.ok) return emitError(boot.error, args.json);
 
   const { tracker, initMs } = boot.value;

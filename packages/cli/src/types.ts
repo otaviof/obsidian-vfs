@@ -19,7 +19,6 @@ export interface CLIOptions {
   readonly dryRun: boolean;
   readonly include: readonly string[];
   readonly exclude: readonly string[];
-  readonly cliPath: string;
   readonly timeoutMs: number;
 }
 
@@ -30,7 +29,6 @@ export interface InspectArgs {
   readonly verbose: boolean;
   readonly full: boolean;
   readonly body: boolean;
-  readonly cliPath: string;
   readonly timeoutMs: number;
 }
 
@@ -38,7 +36,6 @@ export interface InspectArgs {
 export interface ListResourcesArgs {
   readonly json: boolean;
   readonly verbose: boolean;
-  readonly cliPath: string;
   readonly timeoutMs: number;
 }
 
@@ -55,7 +52,6 @@ export interface ProvisionArgs {
   readonly verbose: boolean;
   readonly include: readonly string[];
   readonly exclude: readonly string[];
-  readonly cliPath: string;
   readonly timeoutMs: number;
 }
 
@@ -82,8 +78,6 @@ export interface ResolveArgs {
   readonly wikilink: string;
   readonly json: boolean;
   readonly verbose: boolean;
-  readonly cliPath: string;
-
   readonly timeoutMs: number;
 }
 

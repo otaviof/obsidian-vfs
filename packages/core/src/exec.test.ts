@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { CLIExecOptions } from "./exec.js";
 import { execCLI, resolveExecConfig } from "./exec.js";
+import { resolveCliPath } from "./resolve-cli-path.js";
 
 vi.mock("node:child_process", () => ({
   execFile: vi.fn(),
@@ -124,13 +125,13 @@ describe("execCLI", () => {
 });
 
 describe("resolveExecConfig", () => {
-  it("uses default CLI path when not set", () => {
+  it("uses platform default CLI path when not set", () => {
     const config = resolveExecConfig({});
-    expect(config.cliPath).toBe("obsidian");
+    expect(config.cliPath).toBe(resolveCliPath({ env: {} }));
   });
 
   it("uses custom CLI path from environment", () => {
-    const config = resolveExecConfig({ OBSIDIAN_VFS_CLI_PATH: "/usr/bin/obs" });
+    const config = resolveExecConfig({ OBSIDIAN_CLI_PATH: "/usr/bin/obs" });
     expect(config.cliPath).toBe("/usr/bin/obs");
   });
 

@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { classifyInput, normalizeWikilink, SKILL_PREFIX } from "@obsidian-vfs/core";
+import { classifyInput, normalizeWikilink, resolveCliPath, SKILL_PREFIX } from "@obsidian-vfs/core";
 import type { VFSError } from "@obsidian-vfs/core";
 
 import type { ResolveArgs, ResolveOutput } from "./types.js";
@@ -57,7 +57,7 @@ export async function run(args: ResolveArgs): Promise<number> {
     return EXIT_USAGE;
   }
 
-  const boot = await bootstrapTracker({ cliPath: args.cliPath, timeoutMs: args.timeoutMs });
+  const boot = await bootstrapTracker({ cliPath: resolveCliPath(), timeoutMs: args.timeoutMs });
   if (!boot.ok) return emitError(boot.error, args.json);
 
   const { tracker, initMs } = boot.value;

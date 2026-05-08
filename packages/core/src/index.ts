@@ -54,8 +54,18 @@ export type { FileChangeEvent, FileChangeListener, FileChangeType } from "./file
 /**
  * CLI execution defaults and options.
  */
-export { DEFAULT_CLI_PATH, DEFAULT_TIMEOUT_MS, resolveExecConfig } from "./exec.js";
+export { DEFAULT_TIMEOUT_MS, resolveExecConfig } from "./exec.js";
 export type { CLIExecOptions } from "./exec.js";
+
+/**
+ * Platform-aware CLI binary path resolution.
+ */
+export {
+  resolveCliPath,
+  OBSIDIAN_CLI_PATH,
+  PLATFORM_OBSIDIAN_CLI_PATHS,
+} from "./resolve-cli-path.js";
+export type { ResolveCliPathOptions } from "./resolve-cli-path.js";
 
 /**
  * Shared bootstrap: create a `LocalIndexTracker` from CLI options.

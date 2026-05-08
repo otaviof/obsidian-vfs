@@ -4,13 +4,15 @@ import { createVscodeMock } from "./test-mocks.js";
 
 vi.mock("vscode", () => createVscodeMock({ workspace: true }));
 
-vi.mock("@obsidian-vfs/core", () => ({
-  DEFAULT_CLI_PATH: "obsidian",
-  DEFAULT_TIMEOUT_MS: 10_000,
-  bootstrapTracker: vi.fn(),
-}));
+vi.mock("@obsidian-vfs/core", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    bootstrapTracker: vi.fn(),
+  };
+});
 
-import { bootstrapTracker } from "@obsidian-vfs/core";
+import { bootstrapTracker, resolveCliPath } from "@obsidian-vfs/core";
 import * as vscode from "vscode";
 
 import { bootstrapFromConfig, readConfig } from "./bootstrap.js";
@@ -20,7 +22,7 @@ const mockBootstrap = vi.mocked(bootstrapTracker);
 describe("readConfig", () => {
   it("returns defaults when no settings configured", () => {
     const config = readConfig();
-    expect(config.cliPath).toBe("obsidian");
+    expect(config.cliPath).toBe(resolveCliPath());
     expect(config.timeoutMs).toBe(10_000);
     expect(config.autoMount).toEqual([]);
   });
@@ -52,7 +54,7 @@ describe("bootstrapFromConfig", () => {
     const result = await bootstrapFromConfig();
 
     expect(mockBootstrap).toHaveBeenCalledWith({
-      cliPath: "obsidian",
+      cliPath: resolveCliPath(),
       timeoutMs: 10_000,
     });
     expect(result.ok).toBe(true);

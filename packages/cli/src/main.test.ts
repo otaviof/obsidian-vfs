@@ -55,27 +55,11 @@ describe("parseGlobalArgs", () => {
     }
   });
 
-  it("parses --cli-path", () => {
-    const result = parseGlobalArgs(["inspect", "mention", "--cli-path", "/usr/bin/obsidian"]);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.options.cliPath).toBe("/usr/bin/obsidian");
-    }
-  });
-
   it("parses --timeout", () => {
     const result = parseGlobalArgs(["inspect", "mention", "--timeout", "5000"]);
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.options.timeoutMs).toBe(5000);
-    }
-  });
-
-  it("defaults --cli-path to 'obsidian'", () => {
-    const result = parseGlobalArgs(["inspect", "mention"]);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.options.cliPath).toBe("obsidian");
     }
   });
 
