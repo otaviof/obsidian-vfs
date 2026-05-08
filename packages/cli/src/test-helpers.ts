@@ -9,6 +9,7 @@ export { makeLocalIndexTrackerWith, makeDiscoveredResource } from "@obsidian-vfs
 export const CLI_DEFAULTS = {
   json: false,
   verbose: false,
+  description: false,
   cliPath: "obsidian",
   timeoutMs: 10_000,
 } as const;

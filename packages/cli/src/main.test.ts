@@ -304,4 +304,29 @@ describe("parseGlobalArgs", () => {
       expect(result.options.exclude).toEqual(["draft-*"]);
     }
   });
+
+  it("parses --description flag", () => {
+    const result = parseGlobalArgs(["list-skills", "--description"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.description).toBe(true);
+    }
+  });
+
+  it("--description defaults to false", () => {
+    const result = parseGlobalArgs(["list-skills"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.description).toBe(false);
+    }
+  });
+
+  it("--description works with list-agents", () => {
+    const result = parseGlobalArgs(["list-agents", "--description"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.command).toBe("list-agents");
+      expect(result.options.description).toBe(true);
+    }
+  });
 });

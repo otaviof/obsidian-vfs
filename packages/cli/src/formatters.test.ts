@@ -222,7 +222,7 @@ describe("formatVerboseTiming", () => {
 });
 
 describe("formatListResourcesResult", () => {
-  it("renders resource table", () => {
+  it("renders compact output without descriptions by default", () => {
     const output: ListResourcesOutput = {
       resources: [
         { name: "deploy", description: "Deploy helper", vaultRelativePath: "skills/deploy" },
@@ -230,7 +230,25 @@ describe("formatListResourcesResult", () => {
       ],
       count: 2,
     };
-    const result = formatListResourcesResult(output, "skills");
+    const result = formatListResourcesResult(output, "skills", { description: false });
+    expect(result).toContain("Found 2 skills:");
+    expect(result).toContain("deploy");
+    expect(result).toContain("skills/deploy");
+    expect(result).toContain("review");
+    expect(result).toContain("skills/review");
+    expect(result).not.toContain("Deploy helper");
+    expect(result).not.toContain("Code reviewer");
+  });
+
+  it("renders descriptions when description flag is true", () => {
+    const output: ListResourcesOutput = {
+      resources: [
+        { name: "deploy", description: "Deploy helper", vaultRelativePath: "skills/deploy" },
+        { name: "review", description: "Code reviewer", vaultRelativePath: "skills/review" },
+      ],
+      count: 2,
+    };
+    const result = formatListResourcesResult(output, "skills", { description: true });
     expect(result).toContain("Found 2 skills:");
     expect(result).toContain("deploy");
     expect(result).toContain("Deploy helper");
@@ -240,8 +258,21 @@ describe("formatListResourcesResult", () => {
     expect(result).toContain("skills/review");
   });
 
+  it("truncates long descriptions with ellipsis at 50 chars", () => {
+    const longDesc = "A".repeat(60);
+    const output: ListResourcesOutput = {
+      resources: [{ name: "test", description: longDesc, vaultRelativePath: "skills/test" }],
+      count: 1,
+    };
+    const result = formatListResourcesResult(output, "skills", { description: true });
+    expect(result).toContain("…");
+    expect(result).not.toContain("A".repeat(60));
+  });
+
   it("handles empty list", () => {
-    const result = formatListResourcesResult({ resources: [], count: 0 }, "skills");
+    const result = formatListResourcesResult({ resources: [], count: 0 }, "skills", {
+      description: false,
+    });
     expect(result).toBe("Found 0 skills.");
   });
 
@@ -256,7 +287,7 @@ describe("formatListResourcesResult", () => {
       ],
       count: 1,
     };
-    const result = formatListResourcesResult(output, "agents");
+    const result = formatListResourcesResult(output, "agents", { description: false });
     expect(result).toContain("Found 1 agents:");
     expect(result).toContain("architect");
   });
@@ -434,6 +465,7 @@ describe("formatHelp", () => {
     expect(help).toContain("--verbose");
     expect(help).toContain("--full");
     expect(help).toContain("--body");
+    expect(help).toContain("--description");
     expect(help).toContain("--dry-run");
     expect(help).toContain("--include");
     expect(help).toContain("--exclude");

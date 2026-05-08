@@ -16,6 +16,7 @@ export interface CLIOptions {
   readonly verbose: boolean;
   readonly full: boolean;
   readonly body: boolean;
+  readonly description: boolean;
   readonly dryRun: boolean;
   readonly include: readonly string[];
   readonly exclude: readonly string[];
@@ -36,6 +37,7 @@ export interface InspectArgs {
 export interface ListResourcesArgs {
   readonly json: boolean;
   readonly verbose: boolean;
+  readonly description: boolean;
   readonly timeoutMs: number;
 }
 

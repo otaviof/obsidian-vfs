@@ -23,6 +23,7 @@ npx obsidian-vfs --help
 |------|-------------|
 | `--json` | Machine-readable JSON output |
 | `--verbose`, `-v` | Timing diagnostics |
+| `--description` | Show descriptions (list-skills, list-agents) |
 | `--timeout <ms>` | CLI operation timeout (default: 10 000 ms) |
 | `--help`, `-h` | Show usage information |
 
@@ -62,8 +63,11 @@ Enumerate all skills discovered from the vault's `skillsDirs` (configured in `.o
 
 ```sh
 pnpm cli list-skills
+pnpm cli list-skills --description
 pnpm cli list-skills --json
 ```
+
+Output is compact by default (name and vault-relative path only). Pass `--description` to include the description column.
 
 ### `list-agents`
 
@@ -71,8 +75,11 @@ Enumerate all agents discovered from the vault's `agentsDirs`.
 
 ```sh
 pnpm cli list-agents
+pnpm cli list-agents --description
 pnpm cli list-agents --json
 ```
+
+Output is compact by default (name and vault-relative path only). Pass `--description` to include the description column.
 
 ### `provision-skills`
 

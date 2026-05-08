@@ -52,7 +52,7 @@ export async function run(
   if (args.json) {
     writeStdout(formatListResourcesJSON(output));
   } else {
-    writeStdout(formatListResourcesResult(output, resourceKind));
+    writeStdout(formatListResourcesResult(output, resourceKind, { description: args.description }));
   }
 
   if (args.verbose) {

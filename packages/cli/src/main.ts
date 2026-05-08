@@ -46,6 +46,7 @@ export function parseGlobalArgs(
         verbose: { type: "boolean", short: "v", default: false },
         full: { type: "boolean", default: false },
         body: { type: "boolean", default: false },
+        description: { type: "boolean", default: false },
         "dry-run": { type: "boolean", default: false },
         include: { type: "string", multiple: true, default: [] as string[] },
         exclude: { type: "string", multiple: true, default: [] as string[] },
@@ -71,6 +72,7 @@ export function parseGlobalArgs(
         verbose: false,
         full: false,
         body: false,
+        description: false,
         dryRun: false,
         include: [],
         exclude: [],
@@ -108,6 +110,7 @@ export function parseGlobalArgs(
       verbose: parsed.values.verbose as boolean,
       full: parsed.values.full as boolean,
       body: parsed.values.body as boolean,
+      description: parsed.values.description as boolean,
       dryRun: parsed.values["dry-run"] as boolean,
       include,
       exclude,
@@ -152,6 +155,7 @@ function buildListResourcesArgs(options: CLIOptions): ListResourcesArgs {
   return {
     json: options.json,
     verbose: options.verbose,
+    description: options.description,
     timeoutMs: options.timeoutMs,
   };
 }

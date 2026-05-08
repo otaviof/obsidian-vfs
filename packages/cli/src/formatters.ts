@@ -1,4 +1,4 @@
-import type { VFSError } from "@obsidian-vfs/core";
+import type { VFSError, DiscoveredResource } from "@obsidian-vfs/core";
 
 import type { InspectOutput, ListResourcesOutput, ProvisionOutput, ResolveOutput } from "./types.js";
 
@@ -7,6 +7,13 @@ const INSPECT_MAX_LINES = 80;
 
 /** Label width for aligned key-value output. */
 const LABEL_WIDTH = 16;
+
+/** Column definition for tabular CLI output. */
+interface TableColumn {
+  readonly label: string;
+  readonly value: (item: DiscoveredResource) => string;
+  readonly maxWidth?: number;
+}
 
 /** Map error codes to human-readable prefixes. */
 function errorPrefix(code: string): string {
@@ -38,6 +45,33 @@ function truncateContent(content: string, maxLines: number): { text: string; omi
     text: lines.slice(0, maxLines).join("\n"),
     omitted: lines.length - maxLines,
   };
+}
+
+/** Format rows into padded, aligned columns. */
+function formatTable(columns: readonly TableColumn[], rows: readonly DiscoveredResource[]): string {
+  if (rows.length === 0) {
+    return "";
+  }
+
+  const columnWidths = columns.map((col) => {
+    const maxValueLength = Math.max(...rows.map((row) => col.value(row).length));
+    return col.maxWidth !== undefined ? Math.min(maxValueLength, col.maxWidth) : maxValueLength;
+  });
+
+  const lines: string[] = [];
+  for (const row of rows) {
+    const cells = columns.map((col, i) => {
+      const value = col.value(row);
+      const width = columnWidths[i];
+      if (value.length > width) {
+        return value.slice(0, width - 1) + "…";
+      }
+      return value.padEnd(width);
+    });
+    lines.push("  " + cells.join("  "));
+  }
+
+  return lines.join("\n");
 }
 
 /** Write a string to stdout. */
@@ -146,27 +180,23 @@ export function formatVerboseTiming(label: string, ms: number): string {
 export function formatListResourcesResult(
   output: ListResourcesOutput,
   resourceKind: string,
+  options: { description: boolean },
 ): string {
   if (output.count === 0) {
     return `Found 0 ${resourceKind}.`;
   }
 
-  const maxName = Math.max(...output.resources.map((s) => s.name.length));
-  const nameWidth = maxName + 2;
-  const descWidth = 50;
-  const lines: string[] = [`Found ${output.count} ${resourceKind}:`, ""];
+  const columns: TableColumn[] = [
+    { label: "Name", value: (r) => r.name },
+    ...(options.description
+      ? [{ label: "Description", value: (r: DiscoveredResource) => r.description, maxWidth: 50 }]
+      : []),
+    { label: "Path", value: (r) => r.vaultRelativePath },
+  ];
 
-  for (const resource of output.resources) {
-    const desc =
-      resource.description.length > descWidth
-        ? resource.description.slice(0, descWidth - 1) + "…"
-        : resource.description;
-    lines.push(
-      `  ${resource.name.padEnd(nameWidth)}${desc.padEnd(descWidth)}${resource.vaultRelativePath}`,
-    );
-  }
-
-  return lines.join("\n");
+  const header = `Found ${output.count} ${resourceKind}:`;
+  const table = formatTable(columns, output.resources);
+  return [header, "", table].join("\n");
 }
 
 /** Format a list-resources result as JSON. */
@@ -237,6 +267,7 @@ Options:
   -v, --verbose           Show timing and diagnostics
   --full                  Show full content (inspect only, no truncation)
   --body                  Output only the content body (inspect only)
+  --description           Show descriptions (list-skills, list-agents)
   --dry-run               Show what would change without writing (provision-*)
   --include <glob>        Only provision resources matching glob (repeatable, provision-*)
   --exclude <glob>        Skip resources matching glob (repeatable, provision-*)

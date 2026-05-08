@@ -65,6 +65,7 @@ describe("cmd-list-skills", () => {
     expect(mockFormatResult).toHaveBeenCalledWith(
       expect.objectContaining({ resources: [makeDiscoveredResource()], count: 1 }),
       "skills",
+      { description: false },
     );
     expect(mockWriteStdout).toHaveBeenCalled();
   });
@@ -138,6 +139,21 @@ describe("cmd-list-skills", () => {
     expect(mockFormatResult).toHaveBeenCalledWith(
       expect.objectContaining({ resources: [], count: 0 }),
       "skills",
+      { description: false },
+    );
+  });
+
+  it("passes description flag when true", async () => {
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    const code = await run(makeArgs({ description: true }));
+
+    expect(code).toBe(EXIT_SUCCESS);
+    expect(mockFormatResult).toHaveBeenCalledWith(
+      expect.objectContaining({ resources: [makeDiscoveredResource()], count: 1 }),
+      "skills",
+      { description: true },
     );
   });
 });
