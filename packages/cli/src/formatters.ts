@@ -19,7 +19,6 @@ function errorPrefix(code: string): string {
     TIMEOUT: "Timeout",
     PERMISSION_DENIED: "Permission denied",
     INVALID_URI: "Invalid reference",
-    NOT_IMPLEMENTED: "Not implemented",
   };
   return map[code] ?? "Error";
 }

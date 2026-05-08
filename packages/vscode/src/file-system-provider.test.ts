@@ -206,24 +206,6 @@ describe("ObsidianFileSystemProvider", () => {
       ).rejects.toThrow("FileExists");
     });
 
-    it("throws NoPermissions when creating new file (deferred)", async () => {
-      const tracker = mockTracker({
-        stat: vi.fn().mockResolvedValue({
-          ok: false,
-          error: { code: "FILE_NOT_FOUND", message: "new" },
-        }),
-      });
-      const provider = new ObsidianFileSystemProvider(tracker);
-      mockValidatePath.mockResolvedValueOnce({ ok: true, value: "/vault/new.md" });
-
-      await expect(
-        provider.writeFile(fakeUri("/new.md") as never, new Uint8Array(), {
-          create: true,
-          overwrite: false,
-        }),
-      ).rejects.toThrow("NoPermissions");
-    });
-
     it("throws on path validation failure", async () => {
       const tracker = mockTracker();
       const provider = new ObsidianFileSystemProvider(tracker);
@@ -268,20 +250,18 @@ describe("ObsidianFileSystemProvider", () => {
   });
 
   describe("delete", () => {
-    it("throws NoPermissions (deferred)", () => {
+    it("throws NoPermissions", () => {
       const tracker = mockTracker();
       const provider = new ObsidianFileSystemProvider(tracker);
-      expect(() => provider.delete(fakeUri("/note.md") as never)).toThrow("NoPermissions");
+      expect(() => provider.delete()).toThrow("NoPermissions");
     });
   });
 
   describe("rename", () => {
-    it("throws NoPermissions (deferred)", () => {
+    it("throws NoPermissions", () => {
       const tracker = mockTracker();
       const provider = new ObsidianFileSystemProvider(tracker);
-      expect(() =>
-        provider.rename(fakeUri("/old.md") as never, fakeUri("/new.md") as never),
-      ).toThrow("NoPermissions");
+      expect(() => provider.rename()).toThrow("NoPermissions");
     });
   });
 

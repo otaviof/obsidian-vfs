@@ -432,7 +432,7 @@ describe("openInObsidian command", () => {
   it("handles cli.open failure gracefully", async () => {
     const mockOpen = vi
       .fn()
-      .mockResolvedValue({ ok: false, error: { code: "NOT_IMPLEMENTED", message: "stub" } });
+      .mockResolvedValue({ ok: false, error: { code: "CLI_UNAVAILABLE", message: "stub" } });
     const tracker = mockTracker();
     (tracker as unknown as Record<string, unknown>).cli = { open: mockOpen };
 

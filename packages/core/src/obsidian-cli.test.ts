@@ -344,60 +344,62 @@ describe("ObsidianCLIImpl", () => {
     });
   });
 
-  describe("mutation stubs", () => {
-    it("create returns NOT_IMPLEMENTED", async () => {
-      const result = await cli.create("note.md");
+  describe("open", () => {
+    it("builds correct args and returns success", async () => {
+      execCLIMock.mockResolvedValue({
+        ok: true,
+        value: { stdout: "", stderr: "" },
+      });
+
+      const result = await cli.open("note.md");
+
+      expect(execCLIMock).toHaveBeenCalledWith(["open", "path=note.md"], expect.any(Object));
+      expect(result).toEqual({ ok: true, value: undefined });
+    });
+
+    it("passes newtab flag", async () => {
+      execCLIMock.mockResolvedValue({
+        ok: true,
+        value: { stdout: "", stderr: "" },
+      });
+
+      await cli.open("note.md", true);
+
+      expect(execCLIMock).toHaveBeenCalledWith(
+        ["open", "path=note.md", "newtab"],
+        expect.any(Object),
+      );
+    });
+
+    it("propagates CLI errors", async () => {
+      execCLIMock.mockResolvedValue({
+        ok: false,
+        error: { code: "CLI_UNAVAILABLE", message: "not found" },
+      });
+
+      const result = await cli.open("note.md");
+
       expect(result).toEqual({
         ok: false,
-        error: { code: "NOT_IMPLEMENTED", message: "Mutation not implemented" },
+        error: { code: "CLI_UNAVAILABLE", message: "not found" },
       });
     });
 
-    it("rename returns NOT_IMPLEMENTED", async () => {
-      const result = await cli.rename("old.md", "new.md");
-      expect(result).toEqual({
-        ok: false,
-        error: { code: "NOT_IMPLEMENTED", message: "Mutation not implemented" },
+    it("detects Error: stdout prefix", async () => {
+      execCLIMock.mockResolvedValue({
+        ok: true,
+        value: { stdout: "Error: file not found", stderr: "" },
       });
-    });
 
-    it("move returns NOT_IMPLEMENTED", async () => {
-      const result = await cli.move("file.md", "folder");
+      const result = await cli.open("missing.md");
+
       expect(result).toEqual({
         ok: false,
-        error: { code: "NOT_IMPLEMENTED", message: "Mutation not implemented" },
-      });
-    });
-
-    it("delete returns NOT_IMPLEMENTED", async () => {
-      const result = await cli.delete("file.md");
-      expect(result).toEqual({
-        ok: false,
-        error: { code: "NOT_IMPLEMENTED", message: "Mutation not implemented" },
-      });
-    });
-
-    it("append returns NOT_IMPLEMENTED", async () => {
-      const result = await cli.append("file.md", "content");
-      expect(result).toEqual({
-        ok: false,
-        error: { code: "NOT_IMPLEMENTED", message: "Mutation not implemented" },
-      });
-    });
-
-    it("prepend returns NOT_IMPLEMENTED", async () => {
-      const result = await cli.prepend("file.md", "content");
-      expect(result).toEqual({
-        ok: false,
-        error: { code: "NOT_IMPLEMENTED", message: "Mutation not implemented" },
-      });
-    });
-
-    it("open returns NOT_IMPLEMENTED", async () => {
-      const result = await cli.open("file.md");
-      expect(result).toEqual({
-        ok: false,
-        error: { code: "NOT_IMPLEMENTED", message: "Mutation not implemented" },
+        error: {
+          code: "CLI_ERROR",
+          message: "Error: file not found",
+          command: "open path=missing.md",
+        },
       });
     });
   });

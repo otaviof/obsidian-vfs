@@ -38,15 +38,6 @@ describe("throwVFSError", () => {
     expect(mockNoPermissions).toHaveBeenCalledWith(fakeErrorUri);
   });
 
-  it("throws NoPermissions for NOT_IMPLEMENTED", () => {
-    const result = {
-      ok: false as const,
-      error: { code: "NOT_IMPLEMENTED" as const, message: "not yet" },
-    };
-    expect(() => throwVFSError(result, fakeErrorUri)).toThrow("NoPermissions");
-    expect(mockNoPermissions).toHaveBeenCalledWith("not yet");
-  });
-
   it("throws Unavailable for CLI_UNAVAILABLE", () => {
     const result = {
       ok: false as const,

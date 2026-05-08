@@ -90,10 +90,6 @@ export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
     if (exists && !options.overwrite) {
       throwFileExists(uri);
     }
-    if (!exists && options.create) {
-      throw vscode.FileSystemError.NoPermissions("Creating new files requires CLI (deferred)");
-    }
-
     await fsWriteFile(pathResult.value, content);
   }
 
@@ -104,12 +100,14 @@ export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
     await mkdir(pathResult.value, { recursive: true });
   }
 
-  delete(_uri: vscode.Uri): Promise<void> {
-    throw vscode.FileSystemError.NoPermissions("Deletion requires CLI mutations (deferred)");
+  /** Required interface method. Workspace folders use `file://` URIs so the native FS handles these. */
+  delete(): Promise<void> {
+    throw vscode.FileSystemError.NoPermissions("Not supported on obs:// scheme");
   }
 
-  rename(_oldUri: vscode.Uri, _newUri: vscode.Uri): Promise<void> {
-    throw vscode.FileSystemError.NoPermissions("Rename requires CLI mutations (deferred)");
+  /** Required interface method. Workspace folders use `file://` URIs so the native FS handles these. */
+  rename(): Promise<void> {
+    throw vscode.FileSystemError.NoPermissions("Not supported on obs:// scheme");
   }
 
   /** Subscribe to file change events, filtering by watched prefix. */

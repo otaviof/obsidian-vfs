@@ -11,7 +11,7 @@ Read-only virtual filesystem exposing an [Obsidian](https://obsidian.md) vault v
 | Package | Description |
 |---------|-------------|
 | `packages/core` | `obs://` URI resolution, LRU cache, Obsidian CLI wrapper, direct file reads via `node:fs` |
-| `packages/vscode` | VS Code `FileSystemProvider` for `obs://` — reads from disk, mutations through CLI |
+| `packages/vscode` | VS Code `FileSystemProvider` for `obs://` — reads from disk, writes via native `node:fs` |
 | `packages/claude-plugin` | Agent SDK plugin resolving `@obs:` and `/obs:` mentions into context via `UserPromptSubmit` hook |
 | `packages/cli` | `npx obsidian-vfs` diagnostics and provisioning — `inspect`, `resolve`, `list-skills`, `provision-skills`, `list-agents`, `provision-agents` |
 

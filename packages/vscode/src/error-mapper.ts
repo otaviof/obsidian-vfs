@@ -3,7 +3,6 @@ import type { VFSResult } from "@obsidian-vfs/core";
 
 /** Map a failed `VFSResult` to the appropriate `vscode.FileSystemError` and throw. */
 export function throwVFSError(result: VFSResult<unknown>, uri: vscode.Uri): never {
-  const message = result.ok ? "Unexpected ok result" : result.error.message;
   const code = result.ok ? undefined : result.error.code;
 
   switch (code) {
@@ -11,8 +10,6 @@ export function throwVFSError(result: VFSResult<unknown>, uri: vscode.Uri): neve
       throw vscode.FileSystemError.FileNotFound(uri);
     case "PERMISSION_DENIED":
       throw vscode.FileSystemError.NoPermissions(uri);
-    case "NOT_IMPLEMENTED":
-      throw vscode.FileSystemError.NoPermissions(message);
     case "CLI_UNAVAILABLE":
       throw vscode.FileSystemError.Unavailable(uri);
     default:

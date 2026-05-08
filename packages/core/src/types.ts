@@ -9,8 +9,7 @@ export type ErrorCode =
   | "CLI_UNAVAILABLE"
   | "TIMEOUT"
   | "PERMISSION_DENIED"
-  | "INVALID_URI"
-  | "NOT_IMPLEMENTED";
+  | "INVALID_URI";
 
 /**
  * Structured error with a typed code and optional originating CLI command.

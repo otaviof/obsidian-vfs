@@ -44,7 +44,6 @@ describe("core type definitions", () => {
       | "TIMEOUT"
       | "PERMISSION_DENIED"
       | "INVALID_URI"
-      | "NOT_IMPLEMENTED"
     >();
   });
 });

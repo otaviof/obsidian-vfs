@@ -7,7 +7,7 @@ Obsidian VFS, a virtual file-system to share Obsidian notes into VSCode and Clau
 ## Architecture
 
 - **`packages/core`**: `obs://` URI resolution, LRU cache, `ObsidianCLI` wrapper, `node:fs` reads, `parseMarkdownLinks` parser for `[[wikilinks]]`/`![[embeds]]`, `resolveEmbeds` transclusion, `resolveCliPath` platform-aware binary resolution. CLI calls serialized via async queue.
-- **`packages/vscode`**: `FileSystemProvider` for `obs://`. Reads via disk, mutations via CLI. Commands: mount/unmount folders, open in Obsidian, search notes. Auto-mount from settings, status bar, wikilink navigation via `DocumentLinkProvider`. CJS output, ESM source.
+- **`packages/vscode`**: `FileSystemProvider` for `obs://`. Reads via disk, writes via native `node:fs`. Commands: mount/unmount folders, open in Obsidian, search notes. Auto-mount from settings, status bar, wikilink navigation via `DocumentLinkProvider`. CJS output, ESM source.
 - **`packages/claude-plugin`**: Agent SDK plugin. `UserPromptSubmit` hook resolves `@obs:` (context) and `/obs:` (skill-only) mentions into `additionalContext`. Exports `obs-read-main.ts` for `bin/obs-read`.
 - **`packages/cli`**: `npx obsidian-vfs`: `inspect`, `resolve`, `list-skills`, `provision-skills`, `list-agents`, `provision-agents`.
 - **`bin/`**: Shebanged scripts on Claude Code PATH. `obs-read` resolves vault mentions; `obs-hook-handler` wraps the hook handler.
@@ -51,8 +51,7 @@ Shared ignores across `.gitignore`, `.prettierignore`, `eslint.config.ts`: `node
 - **Result types**: return `VFSResult<T>` (ok/error union), never nulls.
 - **CLI parsing**: `search`/`backlinks` return JSON; `vault`/`files`/`folders`/`read` return plain text. Exit code always 0. Detect errors via `Error:` stdout prefix.
 - **Reads bypass CLI**: `readVirtualFile` uses `node:fs` directly.
-- **Mutations through CLI**: `create`, `rename`, `move`, `delete` via CLI to preserve wikilinks.
-- **Degraded mode** (Obsidian not running): reads/enumeration via `node:fs`; search, wikilinks, mutations unavailable.
+- **Degraded mode** (Obsidian not running): reads/enumeration via `node:fs`; search, wikilinks unavailable.
 - **Security**: `path.resolve` + vault-root prefix check on all I/O. Reject symlinks outside vault. `allowedFolders` enforced on all operations.
 - **VSCode plugin versioning**: bump `version` in `packages/vscode/package.json` following semver when changing plugin code. Patch for fixes, minor for new features, major for breaking changes.
 

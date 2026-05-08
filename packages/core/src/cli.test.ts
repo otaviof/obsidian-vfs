@@ -35,12 +35,8 @@ describe("CLI type definitions", () => {
     expectTypeOf<ObsidianCLI["isAvailable"]>().returns.toEqualTypeOf<Promise<boolean>>();
   });
 
-  it("ObsidianCLI.create returns Promise<VFSResult<string>>", () => {
-    expectTypeOf<ObsidianCLI["create"]>().returns.toEqualTypeOf<Promise<VFSResult<string>>>();
-  });
-
-  it("ObsidianCLI.delete returns Promise<VFSResult<void>>", () => {
-    expectTypeOf<ObsidianCLI["delete"]>().returns.toEqualTypeOf<Promise<VFSResult<void>>>();
+  it("ObsidianCLI.open returns Promise<VFSResult<void>>", () => {
+    expectTypeOf<ObsidianCLI["open"]>().returns.toEqualTypeOf<Promise<VFSResult<void>>>();
   });
 
   it("ErrorCode includes CLI_UNAVAILABLE and TIMEOUT", () => {

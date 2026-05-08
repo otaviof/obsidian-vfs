@@ -101,11 +101,6 @@ describe("formatError", () => {
     const err: VFSError = { code: "INVALID_URI", message: "bad uri" };
     expect(formatError(err)).toContain("Invalid reference");
   });
-
-  it("formats NOT_IMPLEMENTED", () => {
-    const err: VFSError = { code: "NOT_IMPLEMENTED", message: "nope" };
-    expect(formatError(err)).toContain("Not implemented");
-  });
 });
 
 describe("formatInspectResult", () => {

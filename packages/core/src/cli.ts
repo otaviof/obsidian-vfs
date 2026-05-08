@@ -16,8 +16,8 @@ export interface BacklinkEntry {
 }
 
 /**
- * CLI abstraction layer contract — wraps the Obsidian CLI binary with typed
- * methods for vault discovery, querying, enumeration, and mutation. All methods
+ * CLI abstraction layer contract. Wraps the Obsidian CLI binary with typed
+ * methods for vault discovery, querying, and enumeration. All methods
  * return `Promise<VFSResult<T>>` except `isAvailable` which is a plain boolean
  * health-check probe.
  */
@@ -52,24 +52,6 @@ export interface ObsidianCLI {
   /** Outgoing wikilink references from the given file. */
   links(file: string): Promise<VFSResult<string[]>>;
 
-  /** Create a new note, returning its path. */
-  create(name: string, opts?: { content?: string; overwrite?: boolean }): Promise<VFSResult<string>>;
-
-  /** Rename a note in-place, updating wikilinks. */
-  rename(file: string, name: string): Promise<VFSResult<string>>;
-
-  /** Move a note to a different folder, updating wikilinks. */
-  move(file: string, to: string): Promise<VFSResult<string>>;
-
-  /** Delete a note (trash by default, permanent if requested). */
-  delete(file: string, permanent?: boolean): Promise<VFSResult<void>>;
-
-  /** Append content to the end of a note. */
-  append(file: string, content: string, inline?: boolean): Promise<VFSResult<void>>;
-
-  /** Prepend content to the beginning of a note. */
-  prepend(file: string, content: string, inline?: boolean): Promise<VFSResult<void>>;
-
   /** Open a note in Obsidian's UI. */
   open(file: string, newtab?: boolean): Promise<VFSResult<void>>;
 
@@ -82,6 +64,6 @@ export interface ObsidianCLI {
   /** Read a frontmatter property value from a note. */
   propertyRead(file: string, name: string): Promise<VFSResult<string>>;
 
-  /** Health-check — returns true when the Obsidian app is reachable. */
+  /** Health-check, returns true when the Obsidian app is reachable. */
   isAvailable(): Promise<boolean>;
 }

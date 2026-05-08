@@ -2,6 +2,7 @@ import type { BacklinkEntry, ObsidianCLI, SearchMatch } from "./cli.js";
 import type { CLIExecOptions } from "./exec.js";
 import { execCLI } from "./exec.js";
 import {
+  detectCLIError,
   parseBacklinksJSON,
   parseLineList,
   parseSearchFiles,
@@ -13,8 +14,7 @@ import type { VFSResult } from "./types.js";
 
 /**
  * Concrete implementation of the ObsidianCLI interface, serializing all CLI calls
- * through an AsyncQueue. Read-only methods are fully implemented; mutation methods
- * return NOT_IMPLEMENTED.
+ * through an AsyncQueue.
  */
 export class ObsidianCLIImpl implements ObsidianCLI {
   readonly #options: CLIExecOptions;
@@ -138,68 +138,21 @@ export class ObsidianCLIImpl implements ObsidianCLI {
     });
   }
 
-  /** Health-check probe — bypasses queue, returns true if CLI is reachable. */
+  /** Health-check probe. Bypasses queue, returns true if CLI is reachable. */
   async isAvailable(): Promise<boolean> {
     const result = await execCLI(["vault", "info=path"], this.#options);
     return result.ok;
   }
 
-  /** Mutation stub — not implemented in read-only phase. */
-  create(
-    _name: string,
-    _opts?: { content?: string; overwrite?: boolean },
-  ): Promise<VFSResult<string>> {
-    return Promise.resolve({
-      ok: false,
-      error: { code: "NOT_IMPLEMENTED", message: "Mutation not implemented" },
-    });
-  }
-
-  /** Mutation stub — not implemented in read-only phase. */
-  rename(_file: string, _name: string): Promise<VFSResult<string>> {
-    return Promise.resolve({
-      ok: false,
-      error: { code: "NOT_IMPLEMENTED", message: "Mutation not implemented" },
-    });
-  }
-
-  /** Mutation stub — not implemented in read-only phase. */
-  move(_file: string, _to: string): Promise<VFSResult<string>> {
-    return Promise.resolve({
-      ok: false,
-      error: { code: "NOT_IMPLEMENTED", message: "Mutation not implemented" },
-    });
-  }
-
-  /** Mutation stub — not implemented in read-only phase. */
-  delete(_file: string, _permanent?: boolean): Promise<VFSResult<void>> {
-    return Promise.resolve({
-      ok: false,
-      error: { code: "NOT_IMPLEMENTED", message: "Mutation not implemented" },
-    });
-  }
-
-  /** Mutation stub — not implemented in read-only phase. */
-  append(_file: string, _content: string, _inline?: boolean): Promise<VFSResult<void>> {
-    return Promise.resolve({
-      ok: false,
-      error: { code: "NOT_IMPLEMENTED", message: "Mutation not implemented" },
-    });
-  }
-
-  /** Mutation stub — not implemented in read-only phase. */
-  prepend(_file: string, _content: string, _inline?: boolean): Promise<VFSResult<void>> {
-    return Promise.resolve({
-      ok: false,
-      error: { code: "NOT_IMPLEMENTED", message: "Mutation not implemented" },
-    });
-  }
-
-  /** Mutation stub — not implemented in read-only phase. */
-  open(_file: string, _newtab?: boolean): Promise<VFSResult<void>> {
-    return Promise.resolve({
-      ok: false,
-      error: { code: "NOT_IMPLEMENTED", message: "Mutation not implemented" },
+  /** Opens a note in Obsidian's UI via CLI. */
+  async open(file: string, newtab?: boolean): Promise<VFSResult<void>> {
+    return this.#queue.enqueue(async () => {
+      const args = ["open", `path=${file}`, ...(newtab ? ["newtab"] : [])];
+      const result = await execCLI(args, this.#options);
+      if (!result.ok) return result;
+      const err = detectCLIError<void>(result.value.stdout, args.join(" "));
+      if (err) return err;
+      return { ok: true, value: undefined };
     });
   }
 
