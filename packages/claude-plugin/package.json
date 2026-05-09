@@ -13,8 +13,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "pnpm exec tsc -b",
-    "clean": "pnpm exec tsc -b --clean"
+    "build": "pnpm exec tsc -b tsconfig.build.json",
+    "clean": "pnpm exec tsc -b --clean tsconfig.build.json"
   },
   "dependencies": {
     "@obsidian-vfs/core": "workspace:*"
