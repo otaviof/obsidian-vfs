@@ -33,8 +33,8 @@ Toolchain, scripts, and development workflows: [CONTRIBUTING.md#toolchain](CONTR
 - **Reads bypass CLI**: `readVirtualFile` uses `node:fs` directly.
 - **Degraded mode** (Obsidian not running): reads/enumeration via `node:fs`; search, wikilinks unavailable.
 - **Security**: `path.resolve` + vault-root prefix check on all I/O. Reject symlinks outside vault. Use `allowedFolders` enforced on all operations.
-- **VSCode plugin versioning**: bump `version` in `packages/vscode/package.json` following semver when changing plugin code. Patch for fixes, minor for new features, major for breaking changes.
-- **npm package versioning**: bump `version` in `packages/core/package.json` and `packages/cli/package.json` following semver when changing published code. npm rejects republishing the same version.
+- **Claude and VSCode plugin versioning**: bump `version` in `packages/claude-plugin/package.json` and `packages/vscode/package.json` following semver when changing plugin code. 
+- **NPM package versioning**: bump `version` in `packages/core/package.json` and `packages/cli/package.json` following semver when changing published code.
 
 ## Documentation
 
