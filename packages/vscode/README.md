@@ -1,3 +1,8 @@
+<p align="center">
+  <img src="obsidian-vfs.png" alt="Obsidian VFS" width="200" />
+  <br>
+</p>
+
 # Obsidian VFS
 
 Browse, search, and edit your [Obsidian](https://obsidian.md) vault directly in VS Code via a virtual file system (`obs://`). Mount vault folders into the Explorer sidebar, navigate `[[wikilinks]]`, and open notes in Obsidian — all without leaving your editor.

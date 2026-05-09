@@ -1,0 +1,31 @@
+{
+  "name": "obsidian-vfs",
+  "owner": {
+    "name": "Otávio Fernandes"
+  },
+  "metadata": {
+    "description": "Obsidian Virtual File System (VFS) for Claude"
+  },
+  "plugins": [
+    {
+      "name": "obsidian-vfs",
+      "source": "./",
+      "description": "Resolve @obs: mentions and /obs: skills from your Obsidian vault into Claude",
+      "version": "0.0.1",
+      "author": {
+        "name": "Otávio Fernandes"
+      },
+      "homepage": "https://github.com/otaviof/obsidian-vfs",
+      "repository": "https://github.com/otaviof/obsidian-vfs",
+      "license": "MIT",
+      "keywords": [
+        "obsidian",
+        "vault",
+        "vfs",
+        "knowledge-base"
+      ],
+      "category": "development",
+      "strict": false
+    }
+  ]
+}

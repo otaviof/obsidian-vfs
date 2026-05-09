@@ -34,11 +34,35 @@ Always resolve as a skill. No fallback to agents, files, or wikilinks.
 
 ## Installation
 
+### From GitHub
+
+Add the repository as a marketplace, then install the plugin:
+
+```sh
+# Add the marketplace (one-time setup)
+/plugin marketplace add otaviof/obsidian-vfs
+
+# Install the plugin
+/plugin install obsidian-vfs
+
+# Reload to activate
+/reload-plugins
+```
+
+Or from the CLI outside a session:
+
+```sh
+claude plugin marketplace add otaviof/obsidian-vfs
+claude plugin install obsidian-vfs
+```
+
+### Local development
+
 The plugin manifest lives at the repo root (`.claude-plugin/plugin.json`), so point `--plugin-dir` at the repo itself:
 
 ```sh
 # Build the plugin (required before first use)
-pnpm build
+pnpm install && pnpm build
 
 # Launch Claude Code with the plugin loaded
 claude --plugin-dir /path/to/obsidian-vfs
