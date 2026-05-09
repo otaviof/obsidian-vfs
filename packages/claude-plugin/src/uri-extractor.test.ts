@@ -88,4 +88,19 @@ describe("extractObsUris", () => {
     const result = extractObsUris("```markdown\nobs://drafts/fake\n```");
     expect(result).toHaveLength(0);
   });
+
+  it("extracts URI with literal parens from markdown link", () => {
+    const result = extractObsUris(
+      "[bases#Core Views (Built-in)](obs://drafts/bases#Core%20Views%20(Built-in))",
+    );
+    expect(result).toHaveLength(1);
+    expect(result[0].path).toBe("bases");
+    expect(result[0].section).toBe("Core Views (Built-in)");
+  });
+
+  it("trims unbalanced trailing paren from markdown link closer", () => {
+    const result = extractObsUris("[note](obs://drafts/simple-note)");
+    expect(result).toHaveLength(1);
+    expect(result[0].path).toBe("simple-note");
+  });
 });

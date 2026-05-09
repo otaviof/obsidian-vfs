@@ -586,7 +586,10 @@ function sliceContent(markdown, heading) {
 }
 function scrubWikilinks(markdown, vaultName) {
   return markdown.replace(WIKILINK_REGEX, (_match, target, display) => {
-    const uri = buildObsUri({ vaultName, path: target, section: void 0 });
+    const hashIndex = target.indexOf("#");
+    const path8 = hashIndex >= 0 ? target.slice(0, hashIndex) : target;
+    const section = hashIndex >= 0 ? target.slice(hashIndex + 1) : void 0;
+    const uri = buildObsUri({ vaultName, path: path8, section });
     return `[${display ?? target}](${uri})`;
   });
 }
@@ -1388,14 +1391,21 @@ function formatContext(mentions) {
 }
 
 // src/uri-extractor.ts
-var OBS_URI_PATTERN = new RegExp(`${URI_PREFIX.replace("//", "\\/{2}")}[^\\s)\\]>]+`, "g");
+var OBS_URI_PATTERN = new RegExp(`${URI_PREFIX.replace("//", "\\/{2}")}[^\\s\\]>]+`, "g");
+function trimTrailingParens(raw) {
+  let uri = raw;
+  while (uri.endsWith(")") && (uri.match(/\(/g) ?? []).length < (uri.match(/\)/g) ?? []).length) {
+    uri = uri.slice(0, -1);
+  }
+  return uri;
+}
 function extractObsUris(text) {
   const masked = maskCodeRegions(text);
   const seen = /* @__PURE__ */ new Map();
   const regex = new RegExp(OBS_URI_PATTERN.source, OBS_URI_PATTERN.flags);
   let match;
   while ((match = regex.exec(masked)) !== null) {
-    const uri = match[0];
+    const uri = trimTrailingParens(match[0]);
     const parsed = parseObsUri(uri);
     if (!parsed.ok) continue;
     const key = `${parsed.value.vaultName}/${parsed.value.path}${parsed.value.section !== void 0 ? `#${parsed.value.section}` : ""}`;

@@ -8,8 +8,17 @@ export interface ExtractedUri {
   readonly section: string | undefined;
 }
 
-/** Pattern matching obs:// URIs — both bare and inside markdown link parens. */
-const OBS_URI_PATTERN = new RegExp(`${URI_PREFIX.replace("//", "\\/{2}")}[^\\s)\\]>]+`, "g");
+/** Pattern matching obs:// URIs — allows parens since encodeURIComponent preserves them. */
+const OBS_URI_PATTERN = new RegExp(`${URI_PREFIX.replace("//", "\\/{2}")}[^\\s\\]>]+`, "g");
+
+/** Trim unbalanced trailing parens (markdown link closers like `[text](obs://...)`). */
+function trimTrailingParens(raw: string): string {
+  let uri = raw;
+  while (uri.endsWith(")") && (uri.match(/\(/g) ?? []).length < (uri.match(/\)/g) ?? []).length) {
+    uri = uri.slice(0, -1);
+  }
+  return uri;
+}
 
 /** Extract all unique obs:// URIs from text, ignoring code blocks. */
 export function extractObsUris(text: string): readonly ExtractedUri[] {
@@ -20,7 +29,7 @@ export function extractObsUris(text: string): readonly ExtractedUri[] {
   let match: RegExpExecArray | null;
 
   while ((match = regex.exec(masked)) !== null) {
-    const uri = match[0];
+    const uri = trimTrailingParens(match[0]);
     const parsed = parseObsUri(uri);
     if (!parsed.ok) continue;
 

@@ -522,7 +522,10 @@ function sliceContent(markdown, heading) {
 }
 function scrubWikilinks(markdown, vaultName) {
   return markdown.replace(WIKILINK_REGEX, (_match, target, display) => {
-    const uri = buildObsUri({ vaultName, path: target, section: void 0 });
+    const hashIndex = target.indexOf("#");
+    const path8 = hashIndex >= 0 ? target.slice(0, hashIndex) : target;
+    const section = hashIndex >= 0 ? target.slice(hashIndex + 1) : void 0;
+    const uri = buildObsUri({ vaultName, path: path8, section });
     return `[${display ?? target}](${uri})`;
   });
 }

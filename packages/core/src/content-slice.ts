@@ -55,7 +55,10 @@ export function sliceContent(markdown: string, heading: string): VFSResult<strin
  */
 export function scrubWikilinks(markdown: string, vaultName: string): string {
   return markdown.replace(WIKILINK_REGEX, (_match, target: string, display?: string) => {
-    const uri = buildObsUri({ vaultName, path: target, section: undefined });
+    const hashIndex = target.indexOf("#");
+    const path = hashIndex >= 0 ? target.slice(0, hashIndex) : target;
+    const section = hashIndex >= 0 ? target.slice(hashIndex + 1) : undefined;
+    const uri = buildObsUri({ vaultName, path, section });
     return `[${display ?? target}](${uri})`;
   });
 }

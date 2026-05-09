@@ -103,6 +103,28 @@ describe("scrubWikilinks", () => {
     const result = scrubWikilinks("[[Note]]", "My Vault");
     expect(result).toBe("[Note](obs://My%20Vault/Note)");
   });
+
+  it("separates section from path with fragment", () => {
+    const result = scrubWikilinks("[[bases#Simple]]", "vault");
+    expect(result).toBe("[bases#Simple](obs://vault/bases#Simple)");
+  });
+
+  it("encodes section with spaces and special characters", () => {
+    const result = scrubWikilinks("[[bases#Core Views (Built-in)]]", "drafts");
+    expect(result).toBe(
+      "[bases#Core Views (Built-in)](obs://drafts/bases#Core%20Views%20(Built-in))",
+    );
+  });
+
+  it("handles wikilink with section and alias", () => {
+    const result = scrubWikilinks("[[bases#Section|Display]]", "vault");
+    expect(result).toBe("[Display](obs://vault/bases#Section)");
+  });
+
+  it("handles wikilink without section", () => {
+    const result = scrubWikilinks("[[plain-note]]", "vault");
+    expect(result).toBe("[plain-note](obs://vault/plain-note)");
+  });
 });
 
 describe("processContent", () => {
