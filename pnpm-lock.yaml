@@ -41,6 +41,10 @@ importers:
       '@obsidian-vfs/core':
         specifier: workspace:*
         version: link:../core
+    devDependencies:
+      esbuild:
+        specifier: ^0.25.0
+        version: 0.25.12
 
   packages/cli:
     dependencies:

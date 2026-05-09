@@ -1,5 +1,5 @@
 #!/usr/bin/env node
 
-const handlerPath = new URL("../packages/claude-plugin/dist/hook-handler.js", import.meta.url).href;
+const handlerPath = new URL("../packages/claude-plugin/bundle/hook-handler.mjs", import.meta.url).href;
 
 await import(handlerPath);

@@ -1,6 +1,6 @@
 {
   "name": "@obsidian-vfs/claude-plugin",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "private": true,
   "type": "module",
   "exports": {
@@ -13,10 +13,13 @@
     "dist"
   ],
   "scripts": {
-    "build": "pnpm exec tsc -b tsconfig.build.json",
-    "clean": "pnpm exec tsc -b --clean tsconfig.build.json"
+    "build": "pnpm exec tsc -b tsconfig.build.json && node esbuild.mjs",
+    "clean": "pnpm exec tsc -b --clean tsconfig.build.json && rm -rf bundle"
   },
   "dependencies": {
     "@obsidian-vfs/core": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
   }
 }

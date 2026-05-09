@@ -28,6 +28,7 @@ export default defineConfig(
     ignores: [
       "**/node_modules/",
       "**/dist/",
+      "**/bundle/",
       "**/coverage/",
       "**/*.d.ts",
       ".claude/skills/",

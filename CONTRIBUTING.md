@@ -46,7 +46,7 @@ The consumer packages (`vscode`, `claude-plugin`, `cli`) depend on `core` but ha
 |---------|-------------|--------|
 | `packages/core` | `src/index.ts` | ESM (`dist/`) |
 | `packages/vscode` | `src/extension.ts` | CJS via esbuild (`dist/extension.js`) |
-| `packages/claude-plugin` | `src/hook-handler.ts` | ESM (`dist/`) |
+| `packages/claude-plugin` | `src/hook-handler.ts` | ESM (`dist/`) + self-contained bundle (`bundle/hook-handler.mjs`) |
 | `packages/cli` | `src/main.ts` | ESM (`dist/main.js`) |
 
 ## Conventions
@@ -74,7 +74,7 @@ The consumer packages (`vscode`, `claude-plugin`, `cli`) depend on `core` but ha
 
 ### Ignore Patterns
 
-Shared ignores across `.gitignore`, `.prettierignore`, `eslint.config.ts`: `node_modules/`, `dist/`, `coverage/`. When adding generated/vendored directories, add to all three files.
+Shared ignores across `.gitignore`, `.prettierignore`, `eslint.config.ts`: `node_modules/`, `dist/`, `coverage/`. When adding generated/vendored directories, add to all three files. Exception: `bundle/` is ignored by ESLint and Prettier but **not** `.gitignore` — it must be tracked in git for marketplace installs.
 
 ### Versioning
 
@@ -119,6 +119,14 @@ To load the plugin during development:
 ```sh
 claude --plugin-dir .
 ```
+
+### Hook handler bundle
+
+The `UserPromptSubmit` hook runs via `bin/obs-hook-handler`, which imports the **bundled** entry point at `packages/claude-plugin/bundle/hook-handler.mjs`. This self-contained ESM file (produced by esbuild) inlines all dependencies — including `@obsidian-vfs/core` — so marketplace installs (git clone) work without `node_modules` or a build step.
+
+- `bundle/` is tracked in git (not gitignored); `dist/` is not.
+- `pnpm build` produces both `dist/` (for tests and local dev) and `bundle/` (for distribution).
+- For local development, `settings.local.json` can override the hook path to point at the unbundled `dist/` output.
 
 ## Developing the VS Code Extension
 
