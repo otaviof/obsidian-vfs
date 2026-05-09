@@ -1,0 +1,6 @@
+#!/usr/bin/env node
+
+const handlerPath = new URL("../packages/claude-plugin/bundle/entry-subagent.mjs", import.meta.url)
+  .href;
+
+await import(handlerPath);

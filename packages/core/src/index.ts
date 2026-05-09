@@ -105,6 +105,7 @@ export { resolveWikilink } from "./resolve-wikilink.js";
 export { resolveResource, resolveSkillResource } from "./resolve-resource.js";
 export { sliceContent, scrubWikilinks, processContent } from "./content-slice.js";
 export {
+  maskCodeRegions,
   parseMarkdownLinks,
   normalizeWikilink,
   classifyInput,

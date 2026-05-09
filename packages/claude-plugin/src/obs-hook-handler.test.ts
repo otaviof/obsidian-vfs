@@ -21,6 +21,40 @@ describe("obs-hook-handler", () => {
     expect(() => accessSync(binPath, constants.X_OK)).not.toThrow();
   });
 
+  it("hooks.json references the expansion handler command", () => {
+    const hooksPath = resolve(import.meta.dirname, "../../../hooks/hooks.json");
+    const hooks = JSON.parse(readFileSync(hooksPath, "utf8")) as {
+      hooks: { UserPromptExpansion: { hooks: { command: string }[] }[] };
+    };
+    const command = hooks.hooks.UserPromptExpansion[0].hooks[0].command;
+    expect(command).toBe("${CLAUDE_PLUGIN_ROOT}/bin/obs-expansion-handler");
+  });
+
+  it("hooks.json references the subagent handler command", () => {
+    const hooksPath = resolve(import.meta.dirname, "../../../hooks/hooks.json");
+    const hooks = JSON.parse(readFileSync(hooksPath, "utf8")) as {
+      hooks: { SubagentStart: { hooks: { command: string }[] }[] };
+    };
+    const command = hooks.hooks.SubagentStart[0].hooks[0].command;
+    expect(command).toBe("${CLAUDE_PLUGIN_ROOT}/bin/obs-subagent-handler");
+  });
+
+  it("bin/obs-expansion-handler script exists and is executable", () => {
+    const binPath = resolve(import.meta.dirname, "../../../bin/obs-expansion-handler");
+    const content = readFileSync(binPath, "utf8");
+    expect(content).toContain("#!/usr/bin/env node");
+    expect(content).toContain("entry-expansion.mjs");
+    expect(() => accessSync(binPath, constants.X_OK)).not.toThrow();
+  });
+
+  it("bin/obs-subagent-handler script exists and is executable", () => {
+    const binPath = resolve(import.meta.dirname, "../../../bin/obs-subagent-handler");
+    const content = readFileSync(binPath, "utf8");
+    expect(content).toContain("#!/usr/bin/env node");
+    expect(content).toContain("entry-subagent.mjs");
+    expect(() => accessSync(binPath, constants.X_OK)).not.toThrow();
+  });
+
   it("bin/obs-read script exists and is executable", () => {
     const binPath = resolve(import.meta.dirname, "../../../bin/obs-read");
     const content = readFileSync(binPath, "utf8");

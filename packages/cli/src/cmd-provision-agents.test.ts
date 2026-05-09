@@ -201,9 +201,7 @@ describe("cmd-provision-agents", () => {
     const written = JSON.parse(String(settingsCall![1])) as {
       permissions: { allow: string[] };
     };
-    expect(written.permissions.allow).toContain(
-      buildPermissionRule(false),
-    );
+    expect(written.permissions.allow).toContain(buildPermissionRule(false));
   });
 
   it("does not duplicate obs-read permission", async () => {

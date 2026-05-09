@@ -1,4 +1,6 @@
-#!/usr/bin/env node
+// src/subagent-handler.ts
+import { readFile as readFile2 } from "node:fs/promises";
+import { join, resolve } from "node:path";
 
 // ../core/dist/exec.js
 import { execFile as execFileCb } from "node:child_process";
@@ -480,6 +482,68 @@ import path5 from "node:path";
 // ../core/dist/uri.js
 var URI_SCHEME = "obs";
 var URI_PREFIX = `${URI_SCHEME}://`;
+function parseObsUri(uri) {
+  if (!uri.toLowerCase().startsWith(URI_PREFIX)) {
+    return {
+      ok: false,
+      error: {
+        code: "INVALID_URI",
+        message: `Invalid ${URI_PREFIX} URI: missing or wrong scheme`
+      }
+    };
+  }
+  const rest = uri.slice(URI_PREFIX.length);
+  const slashIndex = rest.indexOf("/");
+  if (slashIndex < 0) {
+    return {
+      ok: false,
+      error: { code: "INVALID_URI", message: `Invalid ${URI_PREFIX} URI: missing path` }
+    };
+  }
+  const rawVault = rest.slice(0, slashIndex);
+  if (rawVault === "") {
+    return {
+      ok: false,
+      error: { code: "INVALID_URI", message: `Invalid ${URI_PREFIX} URI: empty vault name` }
+    };
+  }
+  const afterVault = rest.slice(slashIndex + 1);
+  const hashIndex = afterVault.indexOf("#");
+  let rawPath;
+  let rawSection;
+  if (hashIndex < 0) {
+    rawPath = afterVault;
+    rawSection = void 0;
+  } else {
+    rawPath = afterVault.slice(0, hashIndex);
+    const sectionPart = afterVault.slice(hashIndex + 1);
+    rawSection = sectionPart === "" ? void 0 : sectionPart;
+  }
+  if (rawPath === "") {
+    return {
+      ok: false,
+      error: { code: "INVALID_URI", message: `Invalid ${URI_PREFIX} URI: empty path` }
+    };
+  }
+  try {
+    return {
+      ok: true,
+      value: {
+        vaultName: decodeURIComponent(rawVault),
+        path: decodeURIComponent(rawPath),
+        section: rawSection !== void 0 ? decodeURIComponent(rawSection) : void 0
+      }
+    };
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code: "INVALID_URI",
+        message: `Invalid ${URI_PREFIX} URI: malformed percent-encoding`
+      }
+    };
+  }
+}
 function buildObsUri(components) {
   const vault = encodeURIComponent(components.vaultName);
   const p = components.path.split("/").map(encodeURIComponent).join("/");
@@ -670,50 +734,6 @@ async function resolveMention(mention, tracker) {
     value: {
       targetType,
       resolvedPath,
-      vaultName: tracker.context.name,
-      content: processed.value,
-      section
-    }
-  };
-}
-async function resolveSkillMention(mention, tracker) {
-  if (!mention.startsWith(SKILL_PREFIX)) {
-    return {
-      ok: false,
-      error: {
-        code: "INVALID_URI",
-        message: `Invalid ${SKILL_PREFIX} mention: missing prefix`
-      }
-    };
-  }
-  const raw = mention.slice(SKILL_PREFIX.length).trim();
-  if (raw === "") {
-    return {
-      ok: false,
-      error: {
-        code: "INVALID_URI",
-        message: `Invalid ${SKILL_PREFIX} mention: empty reference`
-      }
-    };
-  }
-  const { namePart, section } = parseSection(raw);
-  if (namePart === "") {
-    return {
-      ok: false,
-      error: { code: "INVALID_URI", message: `Invalid ${SKILL_PREFIX} mention: empty path` }
-    };
-  }
-  const skillResult = await tracker.resolveSkill(namePart);
-  if (!skillResult.ok)
-    return skillResult;
-  const processed = await readAndProcess(skillResult.value, section, tracker);
-  if (!processed.ok)
-    return processed;
-  return {
-    ok: true,
-    value: {
-      targetType: "skill",
-      resolvedPath: skillResult.value,
       vaultName: tracker.context.name,
       content: processed.value,
       section
@@ -1339,35 +1359,6 @@ function maskCodeRegions(text) {
   return masked;
 }
 
-// src/mention-extractor.ts
-var MENTION_PATTERN = new RegExp(`([@/])${URI_SCHEME}:([^\\s]+)`, "g");
-var TRAILING_PUNCT = /[,.)!?;:]+$/;
-function extractMentions(prompt) {
-  const masked = maskCodeRegions(prompt);
-  const seen = /* @__PURE__ */ new Map();
-  const regex = new RegExp(MENTION_PATTERN.source, MENTION_PATTERN.flags);
-  let match;
-  while ((match = regex.exec(masked)) !== null) {
-    const prefix = match[1];
-    let raw = match[0];
-    let reference = match[2];
-    raw = raw.replace(TRAILING_PUNCT, "");
-    reference = reference.replace(TRAILING_PUNCT, "");
-    if (reference === "") continue;
-    const kind = prefix === "/" ? "skill" : "context";
-    if (!seen.has(raw)) {
-      seen.set(raw, {
-        kind,
-        raw,
-        reference,
-        startIndex: match.index,
-        endIndex: match.index + raw.length
-      });
-    }
-  }
-  return [...seen.values()].sort((a, b) => a.startIndex - b.startIndex);
-}
-
 // src/context-formatter.ts
 var BLOCK_SEPARATOR = "\n\n";
 function formatHeader(raw, targetType, resolvedPath, section) {
@@ -1394,6 +1385,117 @@ function formatContext(mentions) {
     return formatError(m);
   });
   return blocks.join(BLOCK_SEPARATOR);
+}
+
+// src/uri-extractor.ts
+var OBS_URI_PATTERN = new RegExp(`${URI_PREFIX.replace("//", "\\/{2}")}[^\\s)\\]>]+`, "g");
+function extractObsUris(text) {
+  const masked = maskCodeRegions(text);
+  const seen = /* @__PURE__ */ new Map();
+  const regex = new RegExp(OBS_URI_PATTERN.source, OBS_URI_PATTERN.flags);
+  let match;
+  while ((match = regex.exec(masked)) !== null) {
+    const uri = match[0];
+    const parsed = parseObsUri(uri);
+    if (!parsed.ok) continue;
+    const key = `${parsed.value.vaultName}/${parsed.value.path}${parsed.value.section !== void 0 ? `#${parsed.value.section}` : ""}`;
+    if (!seen.has(key)) {
+      seen.set(key, {
+        uri,
+        vaultName: parsed.value.vaultName,
+        path: parsed.value.path,
+        section: parsed.value.section
+      });
+    }
+  }
+  return [...seen.values()];
+}
+
+// src/ref-resolver.ts
+function buildMention(path8, section) {
+  const sectionPart = section !== void 0 ? `#${section}` : "";
+  return `${MENTION_PREFIX}${path8}${sectionPart}`;
+}
+async function resolveObsUriReferences(content, tracker) {
+  const uris = extractObsUris(content);
+  if (uris.length === 0) return [];
+  const results = await Promise.all(
+    uris.map(async (uri) => {
+      const mention = buildMention(uri.path, uri.section);
+      const fakeExtracted = {
+        kind: "context",
+        raw: uri.uri,
+        reference: uri.path + (uri.section !== void 0 ? `#${uri.section}` : ""),
+        startIndex: 0,
+        endIndex: 0
+      };
+      const result = await resolveMention(mention, tracker);
+      if (result.ok) {
+        return {
+          status: "resolved",
+          mention: fakeExtracted,
+          targetType: result.value.targetType,
+          resolvedPath: result.value.resolvedPath,
+          section: result.value.section,
+          content: result.value.content
+        };
+      }
+      return { status: "error", mention: fakeExtracted, errorMessage: result.error.message };
+    })
+  );
+  return results;
+}
+
+// src/subagent-handler.ts
+function parseSubagentInput(raw) {
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) return null;
+  const obj = parsed;
+  if (obj.hook_event_name !== "SubagentStart") return null;
+  if (typeof obj.session_id !== "string") return null;
+  if (typeof obj.transcript_path !== "string") return null;
+  if (typeof obj.cwd !== "string") return null;
+  if (typeof obj.agent_type !== "string") return null;
+  return obj;
+}
+async function handleSubagentStart(input) {
+  const agentsRoot = join(input.cwd, ".claude", "agents");
+  const agentPath = join(agentsRoot, `${input.agent_type}.md`);
+  if (!resolve(agentPath).startsWith(resolve(agentsRoot) + "/")) return {};
+  let content;
+  try {
+    content = await readFile2(agentPath, "utf8");
+  } catch {
+    return {};
+  }
+  const uris = extractObsUris(content);
+  if (uris.length === 0) return {};
+  const config = resolveExecConfig(process.env);
+  const boot = await bootstrapTracker(config);
+  if (!boot.ok) {
+    const errorBlocks = uris.map((u) => `[obs: ${u.uri} -- Error: ${boot.error.message}]`);
+    return {
+      hookSpecificOutput: {
+        hookEventName: "SubagentStart",
+        additionalContext: errorBlocks.join("\n\n")
+      }
+    };
+  }
+  const refs = await resolveObsUriReferences(content, boot.value.tracker);
+  if (refs.length === 0) return {};
+  const context = formatContext(refs);
+  if (context === "") return {};
+  return {
+    hookSpecificOutput: {
+      hookEventName: "SubagentStart",
+      additionalContext: context
+    }
+  };
 }
 
 // src/stdin-runner.ts
@@ -1423,87 +1525,5 @@ function runHookEntry(name, parse, handle) {
   });
 }
 
-// src/hook-handler.ts
-function parseInput(raw) {
-  let parsed;
-  try {
-    parsed = JSON.parse(raw);
-  } catch {
-    return null;
-  }
-  if (typeof parsed !== "object" || parsed === null) return null;
-  const obj = parsed;
-  if (obj.hook_event_name !== "UserPromptSubmit") return null;
-  if (typeof obj.prompt !== "string") return null;
-  if (typeof obj.session_id !== "string") return null;
-  if (typeof obj.transcript_path !== "string") return null;
-  if (typeof obj.cwd !== "string") return null;
-  return obj;
-}
-async function resolveSkillMention2(mention, tracker) {
-  const result = await resolveSkillMention(SKILL_PREFIX + mention.reference, tracker);
-  if (result.ok) {
-    return {
-      status: "resolved",
-      mention,
-      targetType: result.value.targetType,
-      resolvedPath: result.value.resolvedPath,
-      section: result.value.section,
-      content: result.value.content
-    };
-  }
-  return { status: "error", mention, errorMessage: result.error.message };
-}
-async function resolveSingleMention(mention, tracker) {
-  if (mention.kind === "skill") {
-    return resolveSkillMention2(mention, tracker);
-  }
-  const fullMention = MENTION_PREFIX + mention.reference;
-  const result = await resolveMention(fullMention, tracker);
-  if (result.ok) {
-    return {
-      status: "resolved",
-      mention,
-      targetType: result.value.targetType,
-      resolvedPath: result.value.resolvedPath,
-      section: result.value.section,
-      content: result.value.content
-    };
-  }
-  return {
-    status: "error",
-    mention,
-    errorMessage: result.error.message
-  };
-}
-async function handlePromptSubmit(input) {
-  const mentions = extractMentions(input.prompt);
-  if (mentions.length === 0) return {};
-  const config = resolveExecConfig(process.env);
-  const boot = await bootstrapTracker(config);
-  if (!boot.ok) {
-    const errorBlocks = mentions.map((m) => `[obs: ${m.raw} -- Error: ${boot.error.message}]`);
-    return {
-      hookSpecificOutput: {
-        hookEventName: "UserPromptSubmit",
-        additionalContext: errorBlocks.join("\n\n")
-      }
-    };
-  }
-  const resolved = await Promise.all(
-    mentions.map((m) => resolveSingleMention(m, boot.value.tracker))
-  );
-  const context = formatContext(resolved);
-  if (context === "") return {};
-  return {
-    hookSpecificOutput: {
-      hookEventName: "UserPromptSubmit",
-      additionalContext: context
-    }
-  };
-}
-runHookEntry("plugin", parseInput, handlePromptSubmit);
-export {
-  handlePromptSubmit,
-  parseInput
-};
+// src/entry-subagent.ts
+runHookEntry("subagent handler", parseSubagentInput, handleSubagentStart);

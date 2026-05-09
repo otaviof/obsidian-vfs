@@ -34,7 +34,7 @@ describe("bundle execution", () => {
       proc.stdin.write(input);
       proc.stdin.end();
     });
-  };
+  }
 
   it("bundle executes via bin script and returns empty output for no mentions", async () => {
     const input = JSON.stringify({

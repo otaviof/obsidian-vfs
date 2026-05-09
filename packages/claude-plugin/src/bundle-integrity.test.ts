@@ -15,7 +15,7 @@ describe("bundle integrity", () => {
     const content = readFileSync(bundlePath, "utf8");
     expect(content).toMatch(/^#!\/usr\/bin\/env node/);
     expect(content).not.toContain('require("');
-    expect(content).not.toContain('module.exports');
+    expect(content).not.toContain("module.exports");
   });
 
   it("bundle has no external package dependencies", () => {

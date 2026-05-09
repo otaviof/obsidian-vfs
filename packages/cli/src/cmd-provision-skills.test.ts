@@ -150,9 +150,7 @@ describe("cmd-provision-skills", () => {
     const written = JSON.parse(String(settingsCall![1])) as {
       permissions: { allow: string[] };
     };
-    expect(written.permissions.allow).toContainEqual(
-      buildPermissionRule(false),
-    );
+    expect(written.permissions.allow).toContainEqual(buildPermissionRule(false));
   });
 
   it("--dry-run does not write files", async () => {

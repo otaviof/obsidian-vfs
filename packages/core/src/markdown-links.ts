@@ -28,8 +28,8 @@ function maskRegion(text: string, start: number, end: number): string {
   return text.slice(0, start) + " ".repeat(end - start) + text.slice(end);
 }
 
-/** Mask fenced code blocks and inline code spans to prevent false link detection. */
-function maskCodeRegions(text: string): string {
+/** Mask fenced code blocks and inline code spans to prevent false matches. */
+export function maskCodeRegions(text: string): string {
   let masked = text;
   for (const m of text.matchAll(FENCED_CODE_REGEX)) {
     masked = maskRegion(masked, m.index, m.index + m[0].length);

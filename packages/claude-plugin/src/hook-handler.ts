@@ -13,15 +13,7 @@ import type { ExtractedMention, HookInput, HookOutput, ResolvedMention } from ".
 import { extractMentions } from "./mention-extractor.js";
 import { bootstrapTracker } from "./bootstrap.js";
 import { formatContext } from "./context-formatter.js";
-
-/** Read all data from process.stdin as a string. */
-async function readStdin(): Promise<string> {
-  const chunks: Buffer[] = [];
-  for await (const chunk of process.stdin) {
-    chunks.push(chunk as Buffer);
-  }
-  return Buffer.concat(chunks).toString("utf8");
-}
+import { runHookEntry } from "./stdin-runner.js";
 
 /** Parse stdin JSON into HookInput, returning null on invalid input. */
 export function parseInput(raw: string): HookInput | null {
@@ -42,11 +34,6 @@ export function parseInput(raw: string): HookInput | null {
   if (typeof obj.cwd !== "string") return null;
 
   return obj as unknown as HookInput;
-}
-
-/** Write HookOutput as JSON to stdout. */
-function writeOutput(output: HookOutput): void {
-  process.stdout.write(JSON.stringify(output) + "\n");
 }
 
 /** Resolve a `/obs:` mention as a skill via the core pipeline. */
@@ -98,33 +85,22 @@ async function resolveSingleMention(
   };
 }
 
-/** Hook entry point: read stdin, extract mentions, resolve, write stdout. */
-async function main(): Promise<void> {
-  const raw = await readStdin();
-  const input = parseInput(raw);
-  if (input === null) {
-    writeOutput({});
-    return;
-  }
-
+/** Handle a UserPromptSubmit event: extract mentions, resolve, return context. */
+export async function handlePromptSubmit(input: HookInput): Promise<HookOutput> {
   const mentions = extractMentions(input.prompt);
-  if (mentions.length === 0) {
-    writeOutput({});
-    return;
-  }
+  if (mentions.length === 0) return {};
 
   const config = resolveExecConfig(process.env);
 
   const boot = await bootstrapTracker(config);
   if (!boot.ok) {
     const errorBlocks = mentions.map((m) => `[obs: ${m.raw} -- Error: ${boot.error.message}]`);
-    writeOutput({
+    return {
       hookSpecificOutput: {
         hookEventName: "UserPromptSubmit",
         additionalContext: errorBlocks.join("\n\n"),
       },
-    });
-    return;
+    };
   }
 
   const resolved = await Promise.all(
@@ -132,21 +108,14 @@ async function main(): Promise<void> {
   );
 
   const context = formatContext(resolved);
-  if (context === "") {
-    writeOutput({});
-    return;
-  }
+  if (context === "") return {};
 
-  writeOutput({
+  return {
     hookSpecificOutput: {
       hookEventName: "UserPromptSubmit",
       additionalContext: context,
     },
-  });
+  };
 }
 
-main().catch((err: unknown) => {
-  const message = err instanceof Error ? err.message : String(err);
-  process.stderr.write(`obsidian-vfs plugin error: ${message}\n`);
-  process.stdout.write("{}\n");
-});
+runHookEntry("plugin", parseInput, handlePromptSubmit);

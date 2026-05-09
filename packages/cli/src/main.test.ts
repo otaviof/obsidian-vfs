@@ -55,7 +55,6 @@ describe("parseGlobalArgs", () => {
     }
   });
 
-
   it("shows help when no command given", () => {
     const result = parseGlobalArgs([]);
     expect(result.ok).toBe(true);

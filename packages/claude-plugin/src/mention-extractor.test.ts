@@ -93,7 +93,7 @@ describe("extractMentions", () => {
   });
 
   it("handles multiple code blocks with mention between", () => {
-    const result = extractMentions("```a``` @obs:x ```b```");
+    const result = extractMentions("```\na\n```\n@obs:x\n```\nb\n```");
     expect(result).toHaveLength(1);
     expect(result[0].reference).toBe("x");
   });

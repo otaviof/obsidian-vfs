@@ -11,19 +11,14 @@
       "name": "obsidian-vfs",
       "source": "./",
       "description": "Resolve @obs: mentions and /obs: skills from your Obsidian vault into Claude",
-      "version": "0.0.3",
+      "version": "0.0.4",
       "author": {
         "name": "Otávio Fernandes"
       },
       "homepage": "https://github.com/otaviof/obsidian-vfs",
       "repository": "https://github.com/otaviof/obsidian-vfs",
       "license": "MIT",
-      "keywords": [
-        "obsidian",
-        "vault",
-        "vfs",
-        "knowledge-base"
-      ],
+      "keywords": ["obsidian", "vault", "vfs", "knowledge-base"],
       "category": "development",
       "strict": false
     }
