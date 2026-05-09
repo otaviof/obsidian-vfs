@@ -18,7 +18,7 @@
     "package:vscode": "pnpm build && pnpm --filter obsidian-vfs run package && ls -lhtr packages/vscode/*.vsix",
     "cli": "node packages/cli/dist/main.js",
     "audit": "pnpm audit",
-    "publish:npm": "pnpm build && pnpm --filter @obsidian-vfs/core publish --no-git-checks && pnpm --filter @obsidian-vfs/cli publish --no-git-checks",
+    "publish:npm": "pnpm build && pnpm --filter @obsidian-vfs/core publish && pnpm --filter @obsidian-vfs/cli publish",
     "reset": "pnpm -r run clean && rm -rf node_modules packages/*/node_modules && pnpm install"
   },
   "devDependencies": {
