@@ -1,6 +1,6 @@
 {
   "name": "@obsidian-vfs/core",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "type": "module",
   "description": "Core library for Obsidian VFS — vault resolution, content processing, path security",
   "license": "MIT",
@@ -23,6 +23,9 @@
       "types": "./dist/test-helpers.d.ts",
       "import": "./dist/test-helpers.js"
     }
+  },
+  "publishConfig": {
+    "access": "public"
   },
   "files": [
     "dist"
