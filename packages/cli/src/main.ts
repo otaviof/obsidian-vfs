@@ -49,6 +49,7 @@ export function parseGlobalArgs(
         "dry-run": { type: "boolean", default: false },
         include: { type: "string", multiple: true, default: [] as string[] },
         exclude: { type: "string", multiple: true, default: [] as string[] },
+        pin: { type: "boolean", default: false },
         help: { type: "boolean", short: "h", default: false },
       },
       allowPositionals: true,
@@ -74,6 +75,7 @@ export function parseGlobalArgs(
         dryRun: false,
         include: [],
         exclude: [],
+        pin: false,
       },
       positionals: [],
     };
@@ -104,6 +106,7 @@ export function parseGlobalArgs(
       dryRun: parsed.values["dry-run"] as boolean,
       include,
       exclude,
+      pin: parsed.values.pin as boolean,
     },
     positionals: parsed.positionals.slice(1),
   };
@@ -154,6 +157,7 @@ function buildProvisionArgs(options: CLIOptions): ProvisionArgs {
     verbose: options.verbose,
     include: options.include,
     exclude: options.exclude,
+    pin: options.pin,
   };
 }
 

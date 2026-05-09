@@ -100,6 +100,7 @@ pnpm cli provision-skills
 pnpm cli provision-skills --dry-run
 pnpm cli provision-skills --include deploy --include review
 pnpm cli provision-skills --exclude "draft-*"
+pnpm cli provision-skills --pin
 pnpm cli provision-skills --json
 ```
 
@@ -108,6 +109,7 @@ pnpm cli provision-skills --json
 | `--dry-run` | Preview without writing |
 | `--include <glob>` | Only provision matching skills (repeatable) |
 | `--exclude <glob>` | Skip matching skills (repeatable) |
+| `--pin` | Pin generated commands to the current CLI version |
 
 #### Why proxy skills?
 
@@ -137,10 +139,12 @@ name: deploy
 description: Deploy helper
 ---
 
-!`npx @obsidian-vfs/cli@0.1.0 inspect --body "/obs:deploy"`
+!`npx --yes @obsidian-vfs/cli inspect --body "/obs:deploy"`
 ```
 
 The proxy lives at `.claude/skills/deploy/SKILL.md`. When invoked, the `!`command`` preprocessor runs the CLI's `inspect --body`, which bootstraps the core tracker, resolves the skill from the vault, and outputs content to stdout. Claude receives this as the skill body with full native lifecycle: frontmatter metadata, autocomplete, forked context, compaction survival.
+
+By default, generated commands reference the package name without a version (`@obsidian-vfs/cli`), so they always resolve to the latest published version. Pass `--pin` to pin commands to the currently running CLI version (`@obsidian-vfs/cli@0.1.0`).
 
 When `OBSIDIAN_VFS_PROJECT_DIR` is set, provisioning emits `./bin/obs-read` instead (see [Environment Variables](#environment-variables)).
 
@@ -149,7 +153,13 @@ When `OBSIDIAN_VFS_PROJECT_DIR` is set, provisioning emits `./bin/obs-read` inst
 Provisioning adds a single generic allow rule to `.claude/settings.local.json`:
 
 ```
-Bash(npx @obsidian-vfs/cli@0.1.0 inspect --body *)
+Bash(npx --yes @obsidian-vfs/cli inspect --body *)
+```
+
+When `--pin` is passed, the rule pins to the current CLI version:
+
+```
+Bash(npx --yes @obsidian-vfs/cli@0.1.0 inspect --body *)
 ```
 
 When `OBSIDIAN_VFS_PROJECT_DIR` is set, the rule uses the local path instead: `Bash(./bin/obs-read *)`.
@@ -179,6 +189,7 @@ pnpm cli provision-agents
 pnpm cli provision-agents --dry-run
 pnpm cli provision-agents --include architect --include reviewer
 pnpm cli provision-agents --exclude "draft-*"
+pnpm cli provision-agents --pin
 pnpm cli provision-agents --json
 ```
 
@@ -187,6 +198,7 @@ pnpm cli provision-agents --json
 | `--dry-run` | Preview without writing |
 | `--include <glob>` | Only provision matching agents (repeatable) |
 | `--exclude <glob>` | Skip matching agents (repeatable) |
+| `--pin` | Pin generated commands to the current CLI version |
 
 #### Agent vs. skill proxies
 
@@ -213,11 +225,11 @@ Same add-only behavior as skills. Delete `.claude/agents/<name>.md` manually to 
 
 Controls how provisioning emits `!`command`` directives and permission rules:
 
-| Value | `!command` output | Use case |
-|---|---|---|
-| Unset | `npx @obsidian-vfs/cli@0.1.0 inspect --body "/obs:skill"` | Production — end users |
-| `.` | `./bin/obs-read "/obs:skill"` | Developing inside the repo |
-| `/path/to/obsidian-vfs` | `/path/to/obsidian-vfs/bin/obs-read "/obs:skill"` | Local checkout from another project |
+| Value | `!command` output (unpinned) | `!command` output (--pin) | Use case |
+|---|---|---|---|
+| Unset | `npx --yes @obsidian-vfs/cli inspect --body "/obs:skill"` | `npx --yes @obsidian-vfs/cli@0.1.0 inspect --body "/obs:skill"` | Production — end users |
+| `.` | `./bin/obs-read "/obs:skill"` | `./bin/obs-read "/obs:skill"` | Developing inside the repo |
+| `/path/to/obsidian-vfs` | `/path/to/obsidian-vfs/bin/obs-read "/obs:skill"` | `/path/to/obsidian-vfs/bin/obs-read "/obs:skill"` | Local checkout from another project |
 
 Only affects provisioning output. Does not change runtime behavior of `obs-read`, `inspect`, or hook resolution.
 

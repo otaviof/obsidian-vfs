@@ -37,7 +37,7 @@ import {
   writeStderr,
   writeStdout,
 } from "./formatters.js";
-import { CLI_VERSION, buildPermissionRule, readCommand } from "./cmd-provision-resources.js";
+import { buildPermissionRule, readCommand } from "./cmd-provision-resources.js";
 import { run } from "./cmd-provision-skills.js";
 
 const mockBootstrap = vi.mocked(bootstrapTracker);
@@ -92,7 +92,7 @@ describe("cmd-provision-skills", () => {
     expect(mockMkdir).toHaveBeenCalled();
     expect(mockWriteFile).toHaveBeenCalledWith(
       expect.stringContaining("deploy/SKILL.md"),
-      expect.stringContaining(`!\`${readCommand(CLI_VERSION)} "/obs:deploy"\``),
+      expect.stringContaining(`!\`${readCommand(false)} "/obs:deploy"\``),
       "utf-8",
     );
   });
@@ -107,7 +107,7 @@ describe("cmd-provision-skills", () => {
       "description: Deploy helper",
       "---",
       "",
-      `!\`${readCommand(CLI_VERSION)} "/obs:deploy"\``,
+      `!\`${readCommand(false)} "/obs:deploy"\``,
       "",
     ].join("\n");
     mockReadFile.mockImplementation((...args: unknown[]) => {
@@ -151,7 +151,7 @@ describe("cmd-provision-skills", () => {
       permissions: { allow: string[] };
     };
     expect(written.permissions.allow).toContainEqual(
-      buildPermissionRule(CLI_VERSION),
+      buildPermissionRule(false),
     );
   });
 
@@ -351,7 +351,7 @@ describe("cmd-provision-skills", () => {
       "description: Deployer",
       "---",
       "",
-      `!\`${readCommand(CLI_VERSION)} "/obs:deploy"\``,
+      `!\`${readCommand(false)} "/obs:deploy"\``,
       "",
     ].join("\n");
 
@@ -583,5 +583,79 @@ describe("cmd-provision-skills", () => {
       expect.stringContaining('!`/abs/path/bin/obs-read "/obs:deploy"`'),
       "utf-8",
     );
+  });
+
+  it("pin: false generates unpinned command", async () => {
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ pin: false }));
+
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      expect.stringContaining("deploy/SKILL.md"),
+      expect.stringContaining(`!\`${readCommand(false)} "/obs:deploy"\``),
+      "utf-8",
+    );
+  });
+
+  it("pin: true generates pinned command", async () => {
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ pin: true }));
+
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      expect.stringContaining("deploy/SKILL.md"),
+      expect.stringContaining(`!\`${readCommand(true)} "/obs:deploy"\``),
+      "utf-8",
+    );
+  });
+
+  it("pin: false adds unpinned permission rule", async () => {
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    mockReadFile.mockImplementation((...args: unknown[]) => {
+      const pathArg = String(args[0]);
+      if (pathArg.endsWith("settings.local.json")) {
+        return Promise.resolve(JSON.stringify({ permissions: { allow: [] } }));
+      }
+      return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    });
+
+    await run(makeArgs({ pin: false }));
+
+    const settingsCall = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).endsWith("settings.local.json"),
+    );
+    expect(settingsCall).toBeDefined();
+    const written = JSON.parse(String(settingsCall![1])) as {
+      permissions: { allow: string[] };
+    };
+    expect(written.permissions.allow).toContainEqual(buildPermissionRule(false));
+  });
+
+  it("pin: true adds pinned permission rule", async () => {
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    mockReadFile.mockImplementation((...args: unknown[]) => {
+      const pathArg = String(args[0]);
+      if (pathArg.endsWith("settings.local.json")) {
+        return Promise.resolve(JSON.stringify({ permissions: { allow: [] } }));
+      }
+      return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    });
+
+    await run(makeArgs({ pin: true }));
+
+    const settingsCall = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).endsWith("settings.local.json"),
+    );
+    expect(settingsCall).toBeDefined();
+    const written = JSON.parse(String(settingsCall![1])) as {
+      permissions: { allow: string[] };
+    };
+    expect(written.permissions.allow).toContainEqual(buildPermissionRule(true));
   });
 });

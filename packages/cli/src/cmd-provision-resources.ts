@@ -19,24 +19,28 @@ import {
 
 const require = createRequire(import.meta.url);
 
-/** CLI package version, read from package.json at runtime. */
-export const CLI_VERSION: string = (require("../package.json") as { version: string }).version;
+/** npm package name — single source of truth for the CLI identity. */
+export const CLI_PKG = "@obsidian-vfs/cli";
+
+/** CLI package version, read from package.json at runtime. Not exported — only readCommand needs it. */
+const CLI_VERSION: string = (require("../package.json") as { version: string }).version;
 
 /** Env var pointing to a local obsidian-vfs project directory. */
 const PROJECT_DIR_ENV = "OBSIDIAN_VFS_PROJECT_DIR";
 
 /** Build the read command prefix for !command directives and permission rules. */
-export function readCommand(version: string): string {
+export function readCommand(pin: boolean): string {
   const projectDir = process.env[PROJECT_DIR_ENV];
   if (projectDir) {
     return `${projectDir}/bin/obs-read`;
   }
-  return `npx @obsidian-vfs/cli@${version} inspect --body`;
+  const pkg = pin ? `${CLI_PKG}@${CLI_VERSION}` : CLI_PKG;
+  return `npx --yes ${pkg} inspect --body`;
 }
 
 /** Build a single generic permission rule covering all obs-read invocations. */
-export function buildPermissionRule(version: string): string {
-  return `Bash(${readCommand(version)} *)`;
+export function buildPermissionRule(pin: boolean): string {
+  return `Bash(${readCommand(pin)} *)`;
 }
 
 /** Strategy callbacks that vary between resource kinds (skills vs agents). */
@@ -68,7 +72,7 @@ const SETTINGS_PATH = path.join(CLAUDE_DIR, "settings.local.json");
 /** Ensure the generic permission rule exists in settings. Returns how many were added (0 or 1). */
 export async function syncPermissionRule(
   settingsPath: string,
-  version: string,
+  pin: boolean,
 ): Promise<{ added: number }> {
   let data: { permissions?: { allow?: string[] } };
 
@@ -82,7 +86,7 @@ export async function syncPermissionRule(
   data.permissions ??= {};
   if (!Array.isArray(data.permissions.allow)) data.permissions.allow = [];
 
-  const rule = buildPermissionRule(version);
+  const rule = buildPermissionRule(pin);
   if (data.permissions.allow.includes(rule)) {
     return { added: 0 };
   }
@@ -96,13 +100,13 @@ export async function syncPermissionRule(
 /** Check whether the permission rule would be added (read-only, for dry-run). */
 export async function countPermissionRule(
   settingsPath: string,
-  version: string,
+  pin: boolean,
 ): Promise<{ added: number }> {
   try {
     const raw = await readFile(settingsPath, "utf-8");
     const data = JSON.parse(raw) as { permissions?: { allow?: string[] } };
     const allow = Array.isArray(data.permissions?.allow) ? data.permissions.allow : [];
-    return { added: allow.includes(buildPermissionRule(version)) ? 0 : 1 };
+    return { added: allow.includes(buildPermissionRule(pin)) ? 0 : 1 };
   } catch {
     return { added: 1 };
   }

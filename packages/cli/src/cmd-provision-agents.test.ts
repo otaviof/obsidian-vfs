@@ -38,7 +38,7 @@ import {
   writeStderr,
   writeStdout,
 } from "./formatters.js";
-import { CLI_VERSION, buildPermissionRule } from "./cmd-provision-resources.js";
+import { buildPermissionRule } from "./cmd-provision-resources.js";
 import { run } from "./cmd-provision-agents.js";
 
 const mockBootstrap = vi.mocked(bootstrapTracker);
@@ -202,7 +202,7 @@ describe("cmd-provision-agents", () => {
       permissions: { allow: string[] };
     };
     expect(written.permissions.allow).toContain(
-      buildPermissionRule(CLI_VERSION),
+      buildPermissionRule(false),
     );
   });
 
@@ -215,7 +215,7 @@ describe("cmd-provision-agents", () => {
       if (pathArg.endsWith("settings.local.json")) {
         return Promise.resolve(
           JSON.stringify({
-            permissions: { allow: [buildPermissionRule(CLI_VERSION)] },
+            permissions: { allow: [buildPermissionRule(false)] },
           }),
         );
       }
@@ -446,5 +446,53 @@ describe("cmd-provision-agents", () => {
       }),
       "agents",
     );
+  });
+
+  it("pin: false adds unpinned permission rule", async () => {
+    const tracker = makeAgentTracker();
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    mockReadFile.mockImplementation((...args: unknown[]) => {
+      const pathArg = String(args[0]);
+      if (pathArg.endsWith("settings.local.json")) {
+        return Promise.resolve(JSON.stringify({ permissions: { allow: [] } }));
+      }
+      return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    });
+
+    await run(makeArgs({ pin: false }));
+
+    const settingsCall = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).endsWith("settings.local.json"),
+    );
+    expect(settingsCall).toBeDefined();
+    const written = JSON.parse(String(settingsCall![1])) as {
+      permissions: { allow: string[] };
+    };
+    expect(written.permissions.allow).toContainEqual(buildPermissionRule(false));
+  });
+
+  it("pin: true adds pinned permission rule", async () => {
+    const tracker = makeAgentTracker();
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    mockReadFile.mockImplementation((...args: unknown[]) => {
+      const pathArg = String(args[0]);
+      if (pathArg.endsWith("settings.local.json")) {
+        return Promise.resolve(JSON.stringify({ permissions: { allow: [] } }));
+      }
+      return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    });
+
+    await run(makeArgs({ pin: true }));
+
+    const settingsCall = mockWriteFile.mock.calls.find((c) =>
+      String(c[0]).endsWith("settings.local.json"),
+    );
+    expect(settingsCall).toBeDefined();
+    const written = JSON.parse(String(settingsCall![1])) as {
+      permissions: { allow: string[] };
+    };
+    expect(written.permissions.allow).toContainEqual(buildPermissionRule(true));
   });
 });

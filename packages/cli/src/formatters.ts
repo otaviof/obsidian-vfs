@@ -1,12 +1,13 @@
 import type { VFSError, DiscoveredResource } from "@obsidian-vfs/core";
 
 import type { InspectOutput, ListResourcesOutput, ProvisionOutput, ResolveOutput } from "./types.js";
+import { CLI_PKG } from "./cmd-provision-resources.js";
 
 /** Maximum number of lines shown in inspect content preview. */
 const INSPECT_MAX_LINES = 80;
 
 /** CLI invocation prefix used in help text and error hints. */
-const CLI_CMD = "npx @obsidian-vfs/cli";
+const CLI_CMD = `npx ${CLI_PKG}`;
 
 /** Label width for aligned key-value output. */
 const LABEL_WIDTH = 16;
@@ -274,6 +275,7 @@ Options:
   --dry-run               Show what would change without writing (provision-*)
   --include <glob>        Only provision resources matching glob (repeatable, provision-*)
   --exclude <glob>        Skip resources matching glob (repeatable, provision-*)
+  --pin                   Pin generated commands to the current CLI version (provision-*)
   -h, --help              Show this help message
 
 Environment:

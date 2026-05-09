@@ -290,4 +290,29 @@ describe("parseGlobalArgs", () => {
       expect(result.options.description).toBe(true);
     }
   });
+
+  it("parses --pin flag", () => {
+    const result = parseGlobalArgs(["provision-skills", "--pin"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.pin).toBe(true);
+    }
+  });
+
+  it("--pin defaults to false", () => {
+    const result = parseGlobalArgs(["provision-skills"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.pin).toBe(false);
+    }
+  });
+
+  it("--pin works with provision-agents", () => {
+    const result = parseGlobalArgs(["provision-agents", "--pin"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.command).toBe("provision-agents");
+      expect(result.options.pin).toBe(true);
+    }
+  });
 });

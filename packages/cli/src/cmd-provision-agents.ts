@@ -7,7 +7,6 @@ import type { ProvisionArgs } from "./types.js";
 import type { ProvisionStrategy } from "./cmd-provision-resources.js";
 import {
   CLAUDE_DIR,
-  CLI_VERSION,
   countPermissionRule,
   run as runProvision,
   syncPermissionRule,
@@ -74,29 +73,27 @@ async function writeProxyAgent(
   return "written";
 }
 
-/** Agent provisioning strategy. */
-const agentStrategy: ProvisionStrategy = {
-  resourceKind: "agents",
-  outputDir: path.join(CLAUDE_DIR, "agents"),
-  enumerate: (tracker) => tracker.listAgents(),
-  writeProxy: async (resource, tracker, outputDir) => {
-    const content = await tracker.readFile(resource.vaultRelativePath);
-    if (!content.ok) {
-      throw new Error(`read vault agent ${resource.name}: ${content.error.message}`);
-    }
-    const proxyContent = buildProxyContent(
-      resource.name,
-      resource.description,
-      content.value,
-      tracker.context.name,
-    );
-    return writeProxyAgent(resource.name, proxyContent, outputDir);
-  },
-  syncPermissions: (settingsPath) => syncPermissionRule(settingsPath, CLI_VERSION),
-  countPermissions: (settingsPath) => countPermissionRule(settingsPath, CLI_VERSION),
-};
-
 /** Execute the provision-agents command. */
 export async function run(args: ProvisionArgs): Promise<number> {
+  const agentStrategy: ProvisionStrategy = {
+    resourceKind: "agents",
+    outputDir: path.join(CLAUDE_DIR, "agents"),
+    enumerate: (tracker) => tracker.listAgents(),
+    writeProxy: async (resource, tracker, outputDir) => {
+      const content = await tracker.readFile(resource.vaultRelativePath);
+      if (!content.ok) {
+        throw new Error(`read vault agent ${resource.name}: ${content.error.message}`);
+      }
+      const proxyContent = buildProxyContent(
+        resource.name,
+        resource.description,
+        content.value,
+        tracker.context.name,
+      );
+      return writeProxyAgent(resource.name, proxyContent, outputDir);
+    },
+    syncPermissions: (settingsPath) => syncPermissionRule(settingsPath, args.pin),
+    countPermissions: (settingsPath) => countPermissionRule(settingsPath, args.pin),
+  };
   return runProvision(args, agentStrategy);
 }

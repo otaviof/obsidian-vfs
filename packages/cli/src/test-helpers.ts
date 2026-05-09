@@ -10,6 +10,7 @@ export const CLI_DEFAULTS = {
   json: false,
   verbose: false,
   description: false,
+  pin: false,
 } as const;
 
 /** Stub implementation for the `formatError` mock shared by all command tests. */
