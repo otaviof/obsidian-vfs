@@ -5,6 +5,9 @@ import type { InspectOutput, ListResourcesOutput, ProvisionOutput, ResolveOutput
 /** Maximum number of lines shown in inspect content preview. */
 const INSPECT_MAX_LINES = 80;
 
+/** CLI invocation prefix used in help text and error hints. */
+const CLI_CMD = "npx @obsidian-vfs/cli";
+
 /** Label width for aligned key-value output. */
 const LABEL_WIDTH = 16;
 
@@ -252,7 +255,7 @@ export function formatProvisionJSON(output: ProvisionOutput): string {
 
 /** Format the help/usage text. */
 export function formatHelp(): string {
-  return `Usage: obsidian-vfs <command> [options]
+  return `Usage: ${CLI_CMD} <command> [options]
 
 Commands:
   inspect <mention>       Resolve an @obs: mention and show the result
@@ -276,30 +279,30 @@ Options:
 Environment:
   OBSIDIAN_VFS_CLI_PATH        Path to the Obsidian CLI binary (default: "obsidian")
   OBSIDIAN_VFS_TIMEOUT_MS      CLI operation timeout in ms (default: 10000)
-  OBSIDIAN_VFS_PROJECT_DIR     Local project dir — provisioning emits ./bin/obs-read instead of npx
+  OBSIDIAN_VFS_PROJECT_DIR     Local project dir, provisioning emits "\${OBSIDIAN_VFS_PROJECT_DIR}/bin/obs-read" instead of npx
 
 Examples:
-  obsidian-vfs inspect "@obs:architect"
-  obsidian-vfs inspect "/obs:deploy" --body
-  obsidian-vfs inspect "10-projects/plan.md#Architecture"
-  obsidian-vfs resolve "Project Plan"
-  obsidian-vfs resolve "[[Project Plan]]"
-  obsidian-vfs inspect "@obs:architect" --body
-  obsidian-vfs list-skills
-  obsidian-vfs list-skills --json
-  obsidian-vfs provision-skills
-  obsidian-vfs provision-skills --dry-run
-  obsidian-vfs provision-skills --include deploy --include review
-  obsidian-vfs provision-skills --exclude "draft-*"
-  obsidian-vfs list-agents
-  obsidian-vfs list-agents --json
-  obsidian-vfs provision-agents
-  obsidian-vfs provision-agents --dry-run
-  obsidian-vfs provision-agents --include architect --include reviewer
-  obsidian-vfs provision-agents --exclude "draft-*"`;
+  ${CLI_CMD} inspect "@obs:architect"
+  ${CLI_CMD} inspect "/obs:deploy" --body
+  ${CLI_CMD} inspect "10-projects/plan.md#Architecture"
+  ${CLI_CMD} resolve "Project Plan"
+  ${CLI_CMD} resolve "[[Project Plan]]"
+  ${CLI_CMD} inspect "@obs:architect" --body
+  ${CLI_CMD} list-skills
+  ${CLI_CMD} list-skills --json
+  ${CLI_CMD} provision-skills
+  ${CLI_CMD} provision-skills --dry-run
+  ${CLI_CMD} provision-skills --include deploy --include review
+  ${CLI_CMD} provision-skills --exclude "draft-*"
+  ${CLI_CMD} list-agents
+  ${CLI_CMD} list-agents --json
+  ${CLI_CMD} provision-agents
+  ${CLI_CMD} provision-agents --dry-run
+  ${CLI_CMD} provision-agents --include architect --include reviewer
+  ${CLI_CMD} provision-agents --exclude "draft-*"`;
 }
 
 /** Format a usage error with the correct usage hint. */
 export function formatUsageError(message: string): string {
-  return `Error: ${message}\n\nRun 'obsidian-vfs --help' for usage.`;
+  return `Error: ${message}\n\nRun '${CLI_CMD} --help' for usage.`;
 }
