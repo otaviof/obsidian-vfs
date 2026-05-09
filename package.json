@@ -21,6 +21,9 @@
     "publish:npm": "pnpm build && pnpm --filter @obsidian-vfs/core publish && pnpm --filter @obsidian-vfs/cli publish",
     "reset": "pnpm -r run clean && rm -rf node_modules packages/*/node_modules && pnpm install"
   },
+  "pnpm": {
+    "shamefullyHoist": false
+  },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
     "@types/node": "^22.19.0",
