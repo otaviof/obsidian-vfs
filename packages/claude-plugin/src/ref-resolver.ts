@@ -2,6 +2,7 @@ import { MENTION_PREFIX, resolveMention } from "@obsidian-vfs/core";
 import type { LocalIndexTracker } from "@obsidian-vfs/core";
 
 import type { ResolvedMention } from "./types.js";
+import { toAbsolutePath } from "./types.js";
 import { extractObsUris } from "./uri-extractor.js";
 
 /** Build an @obs: mention string from extracted URI components. */
@@ -36,6 +37,7 @@ export async function resolveObsUriReferences(
           mention: fakeExtracted,
           targetType: result.value.targetType,
           resolvedPath: result.value.resolvedPath,
+          absolutePath: toAbsolutePath(tracker, result.value.resolvedPath),
           section: result.value.section,
           content: result.value.content,
         };

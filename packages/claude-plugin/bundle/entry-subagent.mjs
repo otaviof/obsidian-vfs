@@ -1,6 +1,6 @@
 // src/subagent-handler.ts
 import { readFile as readFile2 } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join as join2, resolve } from "node:path";
 
 // ../core/dist/exec.js
 import { execFile as execFileCb } from "node:child_process";
@@ -1364,15 +1364,16 @@ function maskCodeRegions(text) {
 
 // src/context-formatter.ts
 var BLOCK_SEPARATOR = "\n\n";
-function formatHeader(raw, targetType, resolvedPath, section) {
+function formatHeader(raw, targetType, resolvedPath, absolutePath, section) {
   const sectionPart = section !== void 0 ? `, section: ${section}` : "";
-  return `--- ${raw} (${targetType}, ${resolvedPath}${sectionPart}) ---`;
+  return `--- ${raw} (${targetType}, ${resolvedPath}, path: "${absolutePath}"${sectionPart}) ---`;
 }
 function formatResolved(mention) {
   const header = formatHeader(
     mention.mention.raw,
     mention.targetType,
     mention.resolvedPath,
+    mention.absolutePath,
     mention.section
   );
   return `${header}
@@ -1388,6 +1389,12 @@ function formatContext(mentions) {
     return formatError(m);
   });
   return blocks.join(BLOCK_SEPARATOR);
+}
+
+// src/types.ts
+import { join } from "node:path";
+function toAbsolutePath(tracker, relativePath) {
+  return join(tracker.context.physicalPath, relativePath);
 }
 
 // src/uri-extractor.ts
@@ -1446,6 +1453,7 @@ async function resolveObsUriReferences(content, tracker) {
           mention: fakeExtracted,
           targetType: result.value.targetType,
           resolvedPath: result.value.resolvedPath,
+          absolutePath: toAbsolutePath(tracker, result.value.resolvedPath),
           section: result.value.section,
           content: result.value.content
         };
@@ -1474,8 +1482,8 @@ function parseSubagentInput(raw) {
   return obj;
 }
 async function handleSubagentStart(input) {
-  const agentsRoot = join(input.cwd, ".claude", "agents");
-  const agentPath = join(agentsRoot, `${input.agent_type}.md`);
+  const agentsRoot = join2(input.cwd, ".claude", "agents");
+  const agentPath = join2(agentsRoot, `${input.agent_type}.md`);
   if (!resolve(agentPath).startsWith(resolve(agentsRoot) + "/")) return {};
   let content;
   try {

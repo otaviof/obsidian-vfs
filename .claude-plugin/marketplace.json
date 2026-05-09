@@ -11,7 +11,7 @@
       "name": "obsidian-vfs",
       "source": "./",
       "description": "Resolve @obs: mentions and /obs: skills from your Obsidian vault into Claude",
-      "version": "0.0.4",
+      "version": "0.1.0",
       "author": {
         "name": "Otávio Fernandes"
       },

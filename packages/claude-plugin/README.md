@@ -85,7 +85,7 @@ The plugin uses three hooks configured in `hooks/hooks.json`:
 2. The handler (`bin/obs-hook-handler`) reads the prompt from stdin as JSON.
 3. `extractMentions()` parses `@obs:` and `/obs:` references (masking code blocks to avoid false matches).
 4. Each mention is resolved in parallel through the core engine — context mentions via `resolveMention()`, skill mentions via `resolveSkillMention()`.
-5. Resolved content is formatted into blocks and returned as `additionalContext` in the JSON output.
+5. Resolved content is formatted into blocks and returned as `additionalContext` in the JSON output. Each block includes the vault-relative path and absolute filesystem path, enabling Claude to read/edit the source file directly.
 
 ### `UserPromptExpansion` — skill reference resolution
 

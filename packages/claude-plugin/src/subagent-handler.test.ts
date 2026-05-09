@@ -24,7 +24,9 @@ const mockResolveMention = vi.mocked(resolveMention);
 
 describe("subagent-handler", () => {
   let cwd: string;
-  const fakeTracker = { context: { name: "Vault" } } as unknown as LocalIndexTracker;
+  const fakeTracker = {
+    context: { name: "Vault", physicalPath: "/vault" },
+  } as unknown as LocalIndexTracker;
 
   beforeEach(() => {
     vi.clearAllMocks();

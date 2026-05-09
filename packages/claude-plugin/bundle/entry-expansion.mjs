@@ -1404,15 +1404,16 @@ function maskCodeRegions(text) {
 
 // src/context-formatter.ts
 var BLOCK_SEPARATOR = "\n\n";
-function formatHeader(raw, targetType, resolvedPath, section) {
+function formatHeader(raw, targetType, resolvedPath, absolutePath, section) {
   const sectionPart = section !== void 0 ? `, section: ${section}` : "";
-  return `--- ${raw} (${targetType}, ${resolvedPath}${sectionPart}) ---`;
+  return `--- ${raw} (${targetType}, ${resolvedPath}, path: "${absolutePath}"${sectionPart}) ---`;
 }
 function formatResolved(mention) {
   const header = formatHeader(
     mention.mention.raw,
     mention.targetType,
     mention.resolvedPath,
+    mention.absolutePath,
     mention.section
   );
   return `${header}
@@ -1449,6 +1450,12 @@ async function detectProxy(commandName, cwd) {
   const obsMention = match[1];
   const skillName = obsMention.slice("/obs:".length);
   return { isProxy: true, skillName, obsMention };
+}
+
+// src/types.ts
+import { join as join2 } from "node:path";
+function toAbsolutePath(tracker, relativePath) {
+  return join2(tracker.context.physicalPath, relativePath);
 }
 
 // src/uri-extractor.ts
@@ -1507,6 +1514,7 @@ async function resolveObsUriReferences(content, tracker) {
           mention: fakeExtracted,
           targetType: result.value.targetType,
           resolvedPath: result.value.resolvedPath,
+          absolutePath: toAbsolutePath(tracker, result.value.resolvedPath),
           section: result.value.section,
           content: result.value.content
         };

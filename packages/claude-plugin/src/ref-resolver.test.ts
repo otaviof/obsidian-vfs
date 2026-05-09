@@ -16,7 +16,9 @@ import { resolveObsUriReferences } from "./ref-resolver.js";
 const mockResolveMention = vi.mocked(resolveMention);
 
 describe("resolveObsUriReferences", () => {
-  const fakeTracker = { context: { name: "Vault" } } as unknown as LocalIndexTracker;
+  const fakeTracker = {
+    context: { name: "Vault", physicalPath: "/vault" },
+  } as unknown as LocalIndexTracker;
 
   beforeEach(() => {
     vi.clearAllMocks();

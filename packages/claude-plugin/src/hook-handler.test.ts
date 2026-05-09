@@ -39,7 +39,7 @@ function hookInput(prompt: string): string {
 }
 
 describe("hook-handler", () => {
-  const fakeTracker = { context: { name: "Vault" } } as unknown as LocalIndexTracker;
+  const fakeTracker = { context: { name: "Vault", physicalPath: "/vault" } } as unknown as LocalIndexTracker;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -157,6 +157,7 @@ describe("hook-handler", () => {
             mention: mentions[0],
             targetType: result.value.targetType,
             resolvedPath: result.value.resolvedPath,
+            absolutePath: "/vault/" + result.value.resolvedPath,
             section: result.value.section,
             content: result.value.content,
           },
@@ -196,6 +197,7 @@ describe("hook-handler", () => {
               mention: m,
               targetType: result.value.targetType,
               resolvedPath: result.value.resolvedPath,
+              absolutePath: "/vault/" + result.value.resolvedPath,
               section: result.value.section,
               content: result.value.content,
             };
@@ -264,6 +266,7 @@ describe("hook-handler", () => {
             mention: mentions[0],
             targetType: result.value.targetType,
             resolvedPath: result.value.resolvedPath,
+            absolutePath: "/vault/" + result.value.resolvedPath,
             section: result.value.section,
             content: result.value.content,
           },
@@ -294,6 +297,7 @@ describe("hook-handler", () => {
             mention: mentions[0],
             targetType: result.value.targetType,
             resolvedPath: result.value.resolvedPath,
+            absolutePath: "/vault/" + result.value.resolvedPath,
             section: result.value.section,
             content: result.value.content,
           },
@@ -326,6 +330,7 @@ describe("hook-handler", () => {
           mention: mentions[0],
           targetType: "skill",
           resolvedPath: "skills/obsidian/SKILL.md",
+          absolutePath: "/vault/skills/obsidian/SKILL.md",
           section: undefined,
           content: "Skill content here",
         },

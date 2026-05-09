@@ -22,11 +22,14 @@ describe("formatContext", () => {
       mention: mention("@obs:architect", "architect"),
       targetType: "agent",
       resolvedPath: "30-resources/ai/staff/architect.md",
+      absolutePath: "/vault/30-resources/ai/staff/architect.md",
       section: undefined,
       content: "You are an architect.",
     };
     const result = formatContext([resolved]);
-    expect(result).toContain("--- @obs:architect (agent, 30-resources/ai/staff/architect.md) ---");
+    expect(result).toContain(
+      '--- @obs:architect (agent, 30-resources/ai/staff/architect.md, path: "/vault/30-resources/ai/staff/architect.md") ---',
+    );
     expect(result).toContain("You are an architect.");
   });
 
@@ -36,11 +39,12 @@ describe("formatContext", () => {
       mention: mention("@obs:plan.md#Architecture", "plan.md#Architecture"),
       targetType: "file",
       resolvedPath: "10-projects/plan.md",
+      absolutePath: "/vault/10-projects/plan.md",
       section: "Architecture",
       content: "Design overview.",
     };
     const result = formatContext([resolved]);
-    expect(result).toContain("section: Architecture");
+    expect(result).toContain('path: "/vault/10-projects/plan.md", section: Architecture');
   });
 
   it("formats an error mention", () => {
@@ -60,6 +64,7 @@ describe("formatContext", () => {
         mention: mention("@obs:a", "a"),
         targetType: "file",
         resolvedPath: "a.md",
+        absolutePath: "/vault/a.md",
         section: undefined,
         content: "Content A",
       },
@@ -68,6 +73,7 @@ describe("formatContext", () => {
         mention: mention("@obs:b", "b"),
         targetType: "agent",
         resolvedPath: "b.md",
+        absolutePath: "/vault/b.md",
         section: undefined,
         content: "Content B",
       },
@@ -88,6 +94,7 @@ describe("formatContext", () => {
       mention: mention("@obs:agent", "agent"),
       targetType: "agent",
       resolvedPath: "agents/agent.md",
+      absolutePath: "/vault/agents/agent.md",
       section: undefined,
       content: "Agent content",
     };
@@ -100,6 +107,7 @@ describe("formatContext", () => {
       mention: mention("@obs:file", "file"),
       targetType: "file",
       resolvedPath: "file.md",
+      absolutePath: "/vault/file.md",
       section: undefined,
       content: "File content",
     };
@@ -112,6 +120,7 @@ describe("formatContext", () => {
       mention: mention("/obs:skill", "skill", "skill"),
       targetType: "skill",
       resolvedPath: "skills/skill/SKILL.md",
+      absolutePath: "/vault/skills/skill/SKILL.md",
       section: undefined,
       content: "Skill content",
     };
@@ -127,6 +136,7 @@ describe("formatContext", () => {
         mention: mention("@obs:good", "good"),
         targetType: "file",
         resolvedPath: "good.md",
+        absolutePath: "/vault/good.md",
         section: undefined,
         content: "Good content",
       },
@@ -147,11 +157,28 @@ describe("formatContext", () => {
       mention: mention("/obs:obsidian", "obsidian", "skill"),
       targetType: "skill",
       resolvedPath: "skills/obsidian/SKILL.md",
+      absolutePath: "/vault/skills/obsidian/SKILL.md",
       section: undefined,
       content: "Obsidian skill content",
     };
     const result = formatContext([resolved]);
-    expect(result).toContain("--- /obs:obsidian (skill, skills/obsidian/SKILL.md) ---");
+    expect(result).toContain(
+      '--- /obs:obsidian (skill, skills/obsidian/SKILL.md, path: "/vault/skills/obsidian/SKILL.md") ---',
+    );
     expect(result).toContain("Obsidian skill content");
+  });
+
+  it("handles paths with spaces correctly", () => {
+    const resolved: ResolvedMention = {
+      status: "resolved",
+      mention: mention("@obs:my note", "my note"),
+      targetType: "file",
+      resolvedPath: "10-projects/my note.md",
+      absolutePath: "/Users/x/My Vault/10-projects/my note.md",
+      section: undefined,
+      content: "Note with spaces in path",
+    };
+    const result = formatContext([resolved]);
+    expect(result).toContain('path: "/Users/x/My Vault/10-projects/my note.md"');
   });
 });

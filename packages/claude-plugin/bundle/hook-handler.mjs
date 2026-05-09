@@ -1342,6 +1342,12 @@ function maskCodeRegions(text) {
   return masked;
 }
 
+// src/types.ts
+import { join } from "node:path";
+function toAbsolutePath(tracker, relativePath) {
+  return join(tracker.context.physicalPath, relativePath);
+}
+
 // src/mention-extractor.ts
 var MENTION_PATTERN = new RegExp(`([@/])${URI_SCHEME}:([^\\s]+)`, "g");
 var TRAILING_PUNCT = /[,.)!?;:]+$/;
@@ -1373,15 +1379,16 @@ function extractMentions(prompt) {
 
 // src/context-formatter.ts
 var BLOCK_SEPARATOR = "\n\n";
-function formatHeader(raw, targetType, resolvedPath, section) {
+function formatHeader(raw, targetType, resolvedPath, absolutePath, section) {
   const sectionPart = section !== void 0 ? `, section: ${section}` : "";
-  return `--- ${raw} (${targetType}, ${resolvedPath}${sectionPart}) ---`;
+  return `--- ${raw} (${targetType}, ${resolvedPath}, path: "${absolutePath}"${sectionPart}) ---`;
 }
 function formatResolved(mention) {
   const header = formatHeader(
     mention.mention.raw,
     mention.targetType,
     mention.resolvedPath,
+    mention.absolutePath,
     mention.section
   );
   return `${header}
@@ -1451,6 +1458,7 @@ async function resolveSkillMention2(mention, tracker) {
       mention,
       targetType: result.value.targetType,
       resolvedPath: result.value.resolvedPath,
+      absolutePath: toAbsolutePath(tracker, result.value.resolvedPath),
       section: result.value.section,
       content: result.value.content
     };
@@ -1469,6 +1477,7 @@ async function resolveSingleMention(mention, tracker) {
       mention,
       targetType: result.value.targetType,
       resolvedPath: result.value.resolvedPath,
+      absolutePath: toAbsolutePath(tracker, result.value.resolvedPath),
       section: result.value.section,
       content: result.value.content
     };

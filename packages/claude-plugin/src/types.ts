@@ -1,3 +1,6 @@
+import { join } from "node:path";
+import type { LocalIndexTracker } from "@obsidian-vfs/core";
+
 /** JSON input received from Claude Code on stdin for the UserPromptSubmit hook. */
 export interface HookInput {
   readonly hook_event_name: "UserPromptSubmit";
@@ -34,6 +37,7 @@ export type ResolvedMention =
       readonly mention: ExtractedMention;
       readonly targetType: "file" | "agent" | "skill";
       readonly resolvedPath: string;
+      readonly absolutePath: string;
       readonly section: string | undefined;
       readonly content: string;
     }
@@ -42,3 +46,8 @@ export type ResolvedMention =
       readonly mention: ExtractedMention;
       readonly errorMessage: string;
     };
+
+/** Convert vault-relative path to absolute filesystem path. */
+export function toAbsolutePath(tracker: LocalIndexTracker, relativePath: string): string {
+  return join(tracker.context.physicalPath, relativePath);
+}

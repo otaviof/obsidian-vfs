@@ -10,6 +10,7 @@ import { resolveExecConfig } from "@obsidian-vfs/core";
 import type { LocalIndexTracker } from "@obsidian-vfs/core";
 
 import type { ExtractedMention, HookInput, HookOutput, ResolvedMention } from "./types.js";
+import { toAbsolutePath } from "./types.js";
 import { extractMentions } from "./mention-extractor.js";
 import { bootstrapTracker } from "./bootstrap.js";
 import { formatContext } from "./context-formatter.js";
@@ -48,6 +49,7 @@ async function resolveSkillMention(
       mention,
       targetType: result.value.targetType,
       resolvedPath: result.value.resolvedPath,
+      absolutePath: toAbsolutePath(tracker, result.value.resolvedPath),
       section: result.value.section,
       content: result.value.content,
     };
@@ -73,6 +75,7 @@ async function resolveSingleMention(
       mention,
       targetType: result.value.targetType,
       resolvedPath: result.value.resolvedPath,
+      absolutePath: toAbsolutePath(tracker, result.value.resolvedPath),
       section: result.value.section,
       content: result.value.content,
     };

@@ -8,10 +8,11 @@ function formatHeader(
   raw: string,
   targetType: string,
   resolvedPath: string,
+  absolutePath: string,
   section: string | undefined,
 ): string {
   const sectionPart = section !== undefined ? `, section: ${section}` : "";
-  return `--- ${raw} (${targetType}, ${resolvedPath}${sectionPart}) ---`;
+  return `--- ${raw} (${targetType}, ${resolvedPath}, path: "${absolutePath}"${sectionPart}) ---`;
 }
 
 /** Format a successfully resolved mention as a content block. */
@@ -20,6 +21,7 @@ function formatResolved(mention: ResolvedMention & { status: "resolved" }): stri
     mention.mention.raw,
     mention.targetType,
     mention.resolvedPath,
+    mention.absolutePath,
     mention.section,
   );
   return `${header}\n${mention.content}`;
