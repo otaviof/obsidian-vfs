@@ -1,6 +1,10 @@
 # @obsidian-vfs/claude-plugin
 
-Claude Code plugin that intercepts every `UserPromptSubmit` hook, scans for `@obs:` and `/obs:` mentions in your prompts, resolves each through the Obsidian vault, and injects the content as `additionalContext`.
+Claude Code plugin that intercepts `UserPromptSubmit`, `UserPromptExpansion`, and `SubagentStart` hooks to resolve vault references and inject content as `additionalContext`.
+
+- **`UserPromptSubmit`** — scans prompts for `@obs:` and `/obs:` mentions, resolves each through the vault.
+- **`UserPromptExpansion`** — detects vault-sourced proxy skills (provisioned via CLI), resolves `obs://` URIs in the skill's content to pre-load linked notes.
+- **`SubagentStart`** — scans provisioned agent definitions for `obs://` URIs and resolves linked notes into the agent's context.
 
 ## Mention Syntax
 
@@ -73,7 +77,9 @@ claude --plugin-dir .
 
 ## How It Works
 
-The plugin uses a `UserPromptSubmit` hook configured in `hooks/hooks.json`:
+The plugin uses three hooks configured in `hooks/hooks.json`:
+
+### `UserPromptSubmit` — mention resolution
 
 1. Claude Code fires the hook when a prompt is submitted.
 2. The handler (`bin/obs-hook-handler`) reads the prompt from stdin as JSON.
@@ -81,28 +87,28 @@ The plugin uses a `UserPromptSubmit` hook configured in `hooks/hooks.json`:
 4. Each mention is resolved in parallel through the core engine — context mentions via `resolveMention()`, skill mentions via `resolveSkillMention()`.
 5. Resolved content is formatted into blocks and returned as `additionalContext` in the JSON output.
 
+### `UserPromptExpansion` — skill reference resolution
+
+1. Fires when a user invokes any slash command (e.g., `/spike-skill`).
+2. The handler (`bin/obs-expansion-handler`) checks if the command maps to a vault-sourced proxy skill (reads `.claude/skills/<name>/SKILL.md` for the `inspect --body "/obs:..."` pattern).
+3. If it's a vault proxy, resolves the skill content, extracts `obs://` URIs (wikilinks scrubbed to links), and resolves each linked note.
+4. Returns resolved reference content as `additionalContext` so Claude sees both the skill and its linked notes.
+5. Non-vault commands exit in <1ms (one file read).
+
+### `SubagentStart` — agent reference resolution
+
+1. Fires when a subagent spawns.
+2. The handler (`bin/obs-subagent-handler`) reads `.claude/agents/<agent_type>.md` and scans for `obs://` URIs.
+3. If URIs are found, bootstraps the tracker and resolves each linked note.
+4. Returns resolved content as `additionalContext` for the agent's context.
+
 ### Hook Configuration
 
-The hook is defined in `hooks/hooks.json`:
-
-```json
-{
-  "hooks": [
-    {
-      "event": "UserPromptSubmit",
-      "type": "command",
-      "command": "${CLAUDE_PLUGIN_ROOT}/bin/obs-hook-handler",
-      "timeout": 30
-    }
-  ]
-}
-```
-
-`${CLAUDE_PLUGIN_ROOT}` is interpolated by Claude Code to the plugin's root directory at runtime.
+All hooks are defined in `hooks/hooks.json`. `${CLAUDE_PLUGIN_ROOT}` is interpolated by Claude Code to the plugin's root directory at runtime.
 
 ## `bin/` Executables
 
-Two standalone Node.js scripts in `bin/` at the repo root, auto-discovered by Claude Code and added to the Bash PATH at runtime:
+Four standalone Node.js scripts in `bin/` at the repo root, auto-discovered by Claude Code and added to the Bash PATH at runtime:
 
 ### `obs-read`
 
@@ -121,7 +127,15 @@ Used by Claude's Bash tool at runtime via bare `obs-read` (on PATH). Provisioned
 
 ### `obs-hook-handler`
 
-Thin wrapper that locates `packages/claude-plugin/dist/hook-handler.js` via `import.meta.url` and dynamically imports it. Replaces the inline `node ${CLAUDE_PLUGIN_ROOT}/...` command in the hook configuration with a self-resolving executable.
+Thin wrapper that imports `packages/claude-plugin/bundle/hook-handler.mjs` for `UserPromptSubmit` handling.
+
+### `obs-expansion-handler`
+
+Thin wrapper that imports `packages/claude-plugin/bundle/entry-expansion.mjs` for `UserPromptExpansion` handling.
+
+### `obs-subagent-handler`
+
+Thin wrapper that imports `packages/claude-plugin/bundle/entry-subagent.mjs` for `SubagentStart` handling.
 
 ## Why Provisioning Exists
 

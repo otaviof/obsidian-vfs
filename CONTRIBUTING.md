@@ -46,7 +46,7 @@ The consumer packages (`vscode`, `claude-plugin`, `cli`) depend on `core` but ha
 |---------|-------------|--------|
 | `packages/core` | `src/index.ts` | ESM (`dist/`) |
 | `packages/vscode` | `src/extension.ts` | CJS via esbuild (`dist/extension.js`) |
-| `packages/claude-plugin` | `src/hook-handler.ts` | ESM (`dist/`) + self-contained bundle (`bundle/hook-handler.mjs`) |
+| `packages/claude-plugin` | `src/hook-handler.ts`, `src/entry-expansion.ts`, `src/entry-subagent.ts` | ESM (`dist/`) + self-contained bundles (`bundle/*.mjs`) |
 | `packages/cli` | `src/main.ts` | ESM (`dist/main.js`) |
 
 ## Conventions
@@ -122,11 +122,17 @@ claude --plugin-dir .
 
 ### Hook handler bundle
 
-The `UserPromptSubmit` hook runs via `bin/obs-hook-handler`, which imports the **bundled** entry point at `packages/claude-plugin/bundle/hook-handler.mjs`. This self-contained ESM file (produced by esbuild) inlines all dependencies — including `@obsidian-vfs/core` — so marketplace installs (git clone) work without `node_modules` or a build step.
+Three hook handlers run via `bin/obs-*` scripts, each importing a **bundled** entry point from `packages/claude-plugin/bundle/`. These self-contained ESM files (produced by esbuild) inline all dependencies — including `@obsidian-vfs/core` — so marketplace installs (git clone) work without `node_modules` or a build step.
+
+| Hook event | Bin script | Bundle |
+|------------|-----------|--------|
+| `UserPromptSubmit` | `bin/obs-hook-handler` | `bundle/hook-handler.mjs` |
+| `UserPromptExpansion` | `bin/obs-expansion-handler` | `bundle/entry-expansion.mjs` |
+| `SubagentStart` | `bin/obs-subagent-handler` | `bundle/entry-subagent.mjs` |
 
 - `bundle/` is tracked in git (not gitignored); `dist/` is not.
 - `pnpm build` produces both `dist/` (for tests and local dev) and `bundle/` (for distribution).
-- For local development, `settings.local.json` can override the hook path to point at the unbundled `dist/` output.
+- For local development, `settings.local.json` can override the hook paths to point at the unbundled `dist/` output.
 
 ## Developing the VS Code Extension
 

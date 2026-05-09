@@ -29,7 +29,7 @@ The package exposes two entry points:
 | Resolution | `resolveMention`, `resolveSkillMention`, `resolveWikilink`, `normalizeMention`, `parseSection` |
 | File I/O | `readVirtualFile`, `listMarkdownFiles`, `readDirectory` |
 | CLI | `ObsidianCLI`, `resolveExecConfig`, `resolveCliPath` |
-| Content | `sliceContent`, `scrubWikilinks`, `processContent`, `resolveEmbeds` |
+| Content | `sliceContent`, `scrubWikilinks`, `processContent`, `resolveEmbeds`, `maskCodeRegions` |
 | Frontmatter | `extractFrontmatter`, `extractCuratedFrontmatter`, `remapModelLine`, `mapModelToClaude` |
 | Types | `VFSResult`, `VFSError`, `VFSConfig`, `ErrorCode`, `MentionKind` |
 | Utilities | `LRUCache`, `LocalIndexTracker`, `AsyncQueue` |
