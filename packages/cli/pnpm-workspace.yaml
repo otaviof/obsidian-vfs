@@ -1,0 +1,2 @@
+overrides:
+  '@obsidian-vfs/cli': 'link:'

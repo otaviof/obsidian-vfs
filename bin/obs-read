@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
-import { run } from "../packages/claude-plugin/dist/obs-read-main.js";
+import { run } from "../packages/cli/dist/cmd-inspect.js";
 
-process.exitCode = await run(process.argv.slice(2));
+const mention = process.argv[2];
+if (!mention) {
+  process.stderr.write("Usage: obs-read <reference>\n");
+  process.exitCode = 2;
+} else {
+  process.exitCode = await run({ mention, json: false, verbose: false, full: false, body: true });
+}

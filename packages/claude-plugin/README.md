@@ -82,7 +82,7 @@ Two standalone Node.js scripts in `bin/` at the repo root, auto-discovered by Cl
 
 ### `obs-read`
 
-Bootstraps a tracker, resolves a mention through the core pipeline (resolve, read, section slice, wikilink scrub), and writes the content to stdout. Accepts any mention format:
+Thin wrapper around the CLI's `inspect --body` command. Resolves a mention through the core pipeline (resolve, read, section slice, wikilink scrub) and writes the content to stdout. Accepts any mention format:
 
 ```sh
 obs-read "architect"             # Bare name → @obs:architect
@@ -93,7 +93,7 @@ obs-read "10-projects/plan.md"   # Vault-relative path
 
 Exit codes: `0` success, `1` resolution error, `2` usage error. Errors go to stderr; content to stdout.
 
-Used by skill proxies (`!`command`` in `SKILL.md`) via `./bin/obs-read` (relative path, since the `!`command`` preprocessor does not have the plugin PATH) and by Claude's Bash tool at runtime via bare `obs-read` (on PATH).
+Used by Claude's Bash tool at runtime via bare `obs-read` (on PATH). Provisioned skill proxies use `npx @obsidian-vfs/cli inspect --body` instead (or `./bin/obs-read` when `OBSIDIAN_VFS_PROJECT_DIR` is set for local development).
 
 ### `obs-hook-handler`
 
@@ -114,15 +114,15 @@ The [CLI provisioning commands](../cli/README.md) solve this by generating proxy
 
 ### Skills vs. Agents: Different Proxy Strategies
 
-**Skill proxies** use "!`command`" directives that call `./bin/obs-read` to fetch live vault content at invocation time. This keeps skill content always current — each session gets the latest vault version.
+**Skill proxies** use "!`command`" directives that call `npx @obsidian-vfs/cli inspect --body` (or `./bin/obs-read` for local development) to fetch live vault content at invocation time. This keeps skill content always current — each session gets the latest vault version.
 
-**Agent proxies** write the full vault content at provisioning time. This is a Claude Code platform constraint: the "!`command`" preprocessing is a `SKILL.md`-only feature — it does not work in agent files. An agent file containing `` !`command` `` produces the literal text, not the command output. `[[wikilinks]]` in agent content are converted to `obs://` URIs at provisioning time so Claude can follow them via `obs-read` at runtime.
+**Agent proxies** write the full vault content at provisioning time. This is a Claude Code platform constraint: the "!`command`" preprocessing is a `SKILL.md`-only feature — it does not work in agent files. An agent file containing "!`command`" produces the literal text, not the command output. `[[wikilinks]]` in agent content are converted to `obs://` URIs at provisioning time so Claude can follow them via `obs-read` at runtime.
 
 ### Runtime PATH
 
-After skill invocation, Claude follows wikilinks in skill content by calling bare `obs-read` via the Bash tool — this works because the plugin's `bin/` directory is on PATH in that context. The global `Bash(obs-read *)` permission covers these runtime calls.
+After skill invocation, Claude follows wikilinks in skill content by calling bare `obs-read` via the Bash tool — this works because the plugin's `bin/` directory is on PATH in that context.
 
-The "!`command`" preprocessor runs in a separate shell context without the plugin PATH, which is why skill proxies use the relative path `./bin/obs-read` instead of bare `obs-read`.
+The "!`command`" preprocessor runs in a separate shell context without the plugin PATH, which is why skill proxies use `npx @obsidian-vfs/cli inspect --body` (fetched from npm) or `./bin/obs-read` (local development via `OBSIDIAN_VFS_PROJECT_DIR`).
 
 See the [CLI documentation](../cli/README.md) for provisioning commands and options.
 
@@ -136,5 +136,5 @@ See the [CLI documentation](../cli/README.md) for provisioning commands and opti
 - [Plugins reference](https://code.claude.com/docs/en/plugins-reference) — `plugin.json` fields, `bin/`, environment variables
 - [Automate workflows with hooks](https://code.claude.com/docs/en/hooks-guide) — hook events, `additionalContext`, JSON format
 - [Hooks reference](https://code.claude.com/docs/en/hooks) — event types, lifecycle, timeout behavior
-- [Extend Claude with skills](https://code.claude.com/docs/en/skills) — `SKILL.md` format, `!`command``, frontmatter, discovery
+- [Extend Claude with skills](https://code.claude.com/docs/en/skills) — `SKILL.md` format, "!`command`", frontmatter, discovery
 - [Create custom subagents](https://code.claude.com/docs/en/sub-agents) — agent files, frontmatter, invocation modes

@@ -68,6 +68,7 @@ describe("cmd-provision-skills", () => {
 
   afterEach(() => {
     vi.restoreAllMocks();
+    delete process.env.OBSIDIAN_VFS_PROJECT_DIR;
   });
 
   it("returns EXIT_SUCCESS with discovered skills", async () => {
@@ -90,7 +91,7 @@ describe("cmd-provision-skills", () => {
     expect(mockMkdir).toHaveBeenCalled();
     expect(mockWriteFile).toHaveBeenCalledWith(
       expect.stringContaining("deploy/SKILL.md"),
-      expect.stringContaining('!`./bin/obs-read "/obs:deploy"`'),
+      expect.stringContaining('!`npx @obsidian-vfs/cli@0.1.0 inspect --body "/obs:deploy"`'),
       "utf-8",
     );
   });
@@ -105,7 +106,7 @@ describe("cmd-provision-skills", () => {
       "description: Deploy helper",
       "---",
       "",
-      '!`./bin/obs-read "/obs:deploy"`',
+      '!`npx @obsidian-vfs/cli@0.1.0 inspect --body "/obs:deploy"`',
       "",
     ].join("\n");
     mockReadFile.mockImplementation((...args: unknown[]) => {
@@ -148,7 +149,9 @@ describe("cmd-provision-skills", () => {
     const written = JSON.parse(String(settingsCall![1])) as {
       permissions: { allow: string[] };
     };
-    expect(written.permissions.allow).toContainEqual('Bash(./bin/obs-read "/obs:deploy")');
+    expect(written.permissions.allow).toContainEqual(
+      "Bash(npx @obsidian-vfs/cli@0.1.0 inspect --body *)",
+    );
   });
 
   it("--dry-run does not write files", async () => {
@@ -347,7 +350,7 @@ describe("cmd-provision-skills", () => {
       "description: Deployer",
       "---",
       "",
-      '!`./bin/obs-read "/obs:deploy"`',
+      '!`npx @obsidian-vfs/cli@0.1.0 inspect --body "/obs:deploy"`',
       "",
     ].join("\n");
 
@@ -550,6 +553,34 @@ describe("cmd-provision-skills", () => {
         filter: expect.objectContaining({ filteredCount: 0 }) as unknown,
       }),
       "skills",
+    );
+  });
+
+  it("OBSIDIAN_VFS_PROJECT_DIR=. emits ./bin/obs-read in proxy", async () => {
+    process.env.OBSIDIAN_VFS_PROJECT_DIR = ".";
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs());
+
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      expect.stringContaining("deploy/SKILL.md"),
+      expect.stringContaining('!`./bin/obs-read "/obs:deploy"`'),
+      "utf-8",
+    );
+  });
+
+  it("OBSIDIAN_VFS_PROJECT_DIR=/abs/path emits absolute path in proxy", async () => {
+    process.env.OBSIDIAN_VFS_PROJECT_DIR = "/abs/path";
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs());
+
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      expect.stringContaining("deploy/SKILL.md"),
+      expect.stringContaining('!`/abs/path/bin/obs-read "/obs:deploy"`'),
+      "utf-8",
     );
   });
 });

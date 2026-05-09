@@ -2,6 +2,23 @@
 
 Command-line interface for inspecting, resolving, and provisioning Obsidian vault resources. Provides diagnostics and automation for vault content, skills, and agents.
 
+## Installation
+
+Run directly via npx (no install required):
+
+```sh
+npx @obsidian-vfs/cli --help
+npx @obsidian-vfs/cli inspect "@obs:architect" --body
+npx @obsidian-vfs/cli provision-skills
+```
+
+Or install globally:
+
+```sh
+npm install -g @obsidian-vfs/cli
+obsidian-vfs --help
+```
+
 ## Usage
 
 From the workspace root (after building):
@@ -9,12 +26,6 @@ From the workspace root (after building):
 ```sh
 pnpm build
 pnpm cli --help
-```
-
-Or directly via the compiled binary:
-
-```sh
-npx obsidian-vfs --help
 ```
 
 ## Global Flags
@@ -118,7 +129,7 @@ Provisioning bridges this gap: it generates thin proxy files that Claude Code di
 
 #### How proxies work
 
-Each proxy contains a `!`command`` directive pointing to `./bin/obs-read`:
+Each proxy contains a `!`command`` directive that fetches live vault content:
 
 ```markdown
 ---
@@ -126,16 +137,22 @@ name: deploy
 description: Deploy helper
 ---
 
-!`./bin/obs-read "/obs:deploy"`
+!`npx @obsidian-vfs/cli@0.1.0 inspect --body "/obs:deploy"`
 ```
 
-The proxy lives at `.claude/skills/deploy/SKILL.md`. When invoked, the `!`command`` preprocessor runs `obs-read`, which bootstraps the core tracker, resolves the skill from the vault, and outputs content to stdout. Claude receives this as the skill body with full native lifecycle: frontmatter metadata, autocomplete, forked context, compaction survival.
+The proxy lives at `.claude/skills/deploy/SKILL.md`. When invoked, the `!`command`` preprocessor runs the CLI's `inspect --body`, which bootstraps the core tracker, resolves the skill from the vault, and outputs content to stdout. Claude receives this as the skill body with full native lifecycle: frontmatter metadata, autocomplete, forked context, compaction survival.
 
-#### Why `./bin/obs-read` (relative path)
+When `OBSIDIAN_VFS_PROJECT_DIR` is set, provisioning emits `./bin/obs-read` instead (see [Environment Variables](#environment-variables)).
 
-- **No `${}` expansions.** The `!`command`` preprocessor blocks shell variable expansions, so the command must use a relative path from the project root.
-- **No plugin PATH in preprocessor.** Plugin `bin/` directories are on PATH for Claude's Bash tool at runtime, but the `!`command`` preprocessor runs without plugin `${PATH}`.
-- **Explicit permissions required.** Each `!`command`` needs an allow rule in `.claude/settings.local.json`. The command generates per-skill rules like `Bash(./bin/obs-read "/obs:deploy")` automatically.
+#### Permissions
+
+Provisioning adds a single generic allow rule to `.claude/settings.local.json`:
+
+```
+Bash(npx @obsidian-vfs/cli@0.1.0 inspect --body *)
+```
+
+When `OBSIDIAN_VFS_PROJECT_DIR` is set, the rule uses the local path instead: `Bash(./bin/obs-read *)`.
 
 #### Behavior
 
@@ -179,7 +196,7 @@ pnpm cli provision-agents --json
 | Body mechanism | `!`command`` loads fresh content per session | Full content written at provisioning time |
 | Frontmatter | Minimal (name + description) | All fields forwarded from vault |
 | Wikilink scrubbing | At runtime by `obs-read` | At provisioning time by CLI |
-| Permissions | Per-skill `Bash(./bin/obs-read ...)` | Single global `Bash(obs-read *)` |
+| Permissions | Single generic `Bash(npx ... inspect --body *)` | Same generic rule |
 | Content freshness | Always current | Stale until re-provisioned |
 
 Same add-only behavior as skills. Delete `.claude/agents/<name>.md` manually to remove a deprovisioned agent.
@@ -190,5 +207,27 @@ Same add-only behavior as skills. Delete `.claude/agents/<name>.md` manually to 
 |----------|---------|---------|
 | `OBSIDIAN_VFS_CLI_PATH` | Path to the Obsidian CLI binary | `"obsidian"` |
 | `OBSIDIAN_VFS_TIMEOUT_MS` | CLI operation timeout in milliseconds | `10000` |
+| `OBSIDIAN_VFS_PROJECT_DIR` | Local project dir for provisioning (emits `./bin/obs-read` instead of `npx`) | unset |
+
+### `OBSIDIAN_VFS_PROJECT_DIR`
+
+Controls how provisioning emits `!`command`` directives and permission rules:
+
+| Value | `!command` output | Use case |
+|---|---|---|
+| Unset | `npx @obsidian-vfs/cli@0.1.0 inspect --body "/obs:skill"` | Production — end users |
+| `.` | `./bin/obs-read "/obs:skill"` | Developing inside the repo |
+| `/path/to/obsidian-vfs` | `/path/to/obsidian-vfs/bin/obs-read "/obs:skill"` | Local checkout from another project |
+
+Only affects provisioning output. Does not change runtime behavior of `obs-read`, `inspect`, or hook resolution.
+
+## Development
+
+### Developing with local provisioning
+
+```sh
+export OBSIDIAN_VFS_PROJECT_DIR=.
+pnpm cli provision-skills   # emits ./bin/obs-read in proxies
+```
 
 For upstream Claude Code documentation on skills, agents, hooks, and plugins, see the [Claude plugin README](../claude-plugin/README.md#claude-code-documentation).

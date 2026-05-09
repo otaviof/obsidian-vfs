@@ -1,8 +1,19 @@
 {
   "name": "@obsidian-vfs/core",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
+  "description": "Core library for Obsidian VFS — vault resolution, content processing, path security",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/otaviof/obsidian-vfs",
+    "directory": "packages/core"
+  },
+  "keywords": [
+    "obsidian",
+    "vault",
+    "vfs"
+  ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",

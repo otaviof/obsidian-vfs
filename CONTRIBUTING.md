@@ -78,7 +78,32 @@ Shared ignores across `.gitignore`, `.prettierignore`, `eslint.config.ts`: `node
 
 ### Versioning
 
-Bump `version` in `packages/vscode/package.json` following semver when changing extension code. Patch for fixes, minor for new features, major for breaking changes.
+**npm packages** (`@obsidian-vfs/core`, `@obsidian-vfs/cli`): share a single version, bumped in lockstep. Patch for fixes, minor for new features, major for breaking changes. The `cli` depends on `core` via `workspace:^` (pnpm converts to `^x.y.z` at publish time).
+
+**VSCode extension** (`packages/vscode/package.json`): independent version following semver.
+
+**Claude plugin** (`plugin.json`): independent version tracking marketplace releases. The plugin stays `private: true` — it is not published to npm.
+
+### Publishing to npm
+
+Manual workflow:
+
+1. Bump versions in `packages/core/package.json` and `packages/cli/package.json` (must match).
+2. Run `pnpm run ci` — lint, build, test must pass.
+3. `cd packages/core && npm publish --access public`
+4. `cd packages/cli && npm publish --access public`
+5. Verify: `npx @obsidian-vfs/cli@<version> --help`
+
+## Developing the CLI
+
+### Local provisioning
+
+Set `OBSIDIAN_VFS_PROJECT_DIR` so provisioned skill proxies use `./bin/obs-read` instead of `npx`:
+
+```sh
+export OBSIDIAN_VFS_PROJECT_DIR=.
+pnpm cli provision-skills
+```
 
 ## Developing the Claude Plugin
 

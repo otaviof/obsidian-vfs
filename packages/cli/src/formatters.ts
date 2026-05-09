@@ -273,12 +273,18 @@ Options:
   --exclude <glob>        Skip resources matching glob (repeatable, provision-*)
   -h, --help              Show this help message
 
+Environment:
+  OBSIDIAN_VFS_CLI_PATH        Path to the Obsidian CLI binary (default: "obsidian")
+  OBSIDIAN_VFS_TIMEOUT_MS      CLI operation timeout in ms (default: 10000)
+  OBSIDIAN_VFS_PROJECT_DIR     Local project dir — provisioning emits ./bin/obs-read instead of npx
+
 Examples:
   obsidian-vfs inspect "@obs:architect"
   obsidian-vfs inspect "/obs:deploy" --body
   obsidian-vfs inspect "10-projects/plan.md#Architecture"
   obsidian-vfs resolve "Project Plan"
   obsidian-vfs resolve "[[Project Plan]]"
+  obsidian-vfs inspect "@obs:architect" --body
   obsidian-vfs list-skills
   obsidian-vfs list-skills --json
   obsidian-vfs provision-skills

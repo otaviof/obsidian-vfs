@@ -200,7 +200,9 @@ describe("cmd-provision-agents", () => {
     const written = JSON.parse(String(settingsCall![1])) as {
       permissions: { allow: string[] };
     };
-    expect(written.permissions.allow).toContain("Bash(obs-read *)");
+    expect(written.permissions.allow).toContain(
+      "Bash(npx @obsidian-vfs/cli@0.1.0 inspect --body *)",
+    );
   });
 
   it("does not duplicate obs-read permission", async () => {
@@ -210,7 +212,11 @@ describe("cmd-provision-agents", () => {
     mockReadFile.mockImplementation((...args: unknown[]) => {
       const pathArg = String(args[0]);
       if (pathArg.endsWith("settings.local.json")) {
-        return Promise.resolve(JSON.stringify({ permissions: { allow: ["Bash(obs-read *)"] } }));
+        return Promise.resolve(
+          JSON.stringify({
+            permissions: { allow: ["Bash(npx @obsidian-vfs/cli@0.1.0 inspect --body *)"] },
+          }),
+        );
       }
       return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
     });

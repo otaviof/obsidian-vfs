@@ -5,10 +5,13 @@ import { remapModelLine, scrubWikilinks } from "@obsidian-vfs/core";
 
 import type { ProvisionArgs } from "./types.js";
 import type { ProvisionStrategy } from "./cmd-provision-resources.js";
-import { CLAUDE_DIR, run as runProvision } from "./cmd-provision-resources.js";
-
-/** Global permission rule for obs-read runtime usage. */
-const OBS_READ_GLOBAL_RULE = "Bash(obs-read *)";
+import {
+  CLAUDE_DIR,
+  CLI_VERSION,
+  countPermissionRule,
+  run as runProvision,
+  syncPermissionRule,
+} from "./cmd-provision-resources.js";
 
 /** Regex to match a `name:` line in YAML frontmatter. */
 const NAME_LINE_RE = /^name:\s*.+$/m;
@@ -71,42 +74,6 @@ async function writeProxyAgent(
   return "written";
 }
 
-/** Ensure the global obs-read permission rule exists. Returns how many were added (0 or 1). */
-async function ensureObsReadPermission(settingsPath: string): Promise<{ added: number }> {
-  let data: { permissions?: { allow?: string[] } };
-
-  try {
-    const raw = await readFile(settingsPath, "utf-8");
-    data = JSON.parse(raw) as typeof data;
-  } catch {
-    data = {};
-  }
-
-  data.permissions ??= {};
-  if (!Array.isArray(data.permissions.allow)) data.permissions.allow = [];
-
-  if (data.permissions.allow.includes(OBS_READ_GLOBAL_RULE)) {
-    return { added: 0 };
-  }
-
-  data.permissions.allow.push(OBS_READ_GLOBAL_RULE);
-  await mkdir(path.dirname(settingsPath), { recursive: true });
-  await writeFile(settingsPath, JSON.stringify(data, null, 2) + "\n", "utf-8");
-  return { added: 1 };
-}
-
-/** Check whether the global obs-read permission rule would be added (read-only, for dry-run). */
-async function countObsReadPermission(settingsPath: string): Promise<{ added: number }> {
-  try {
-    const raw = await readFile(settingsPath, "utf-8");
-    const data = JSON.parse(raw) as { permissions?: { allow?: string[] } };
-    const allow = Array.isArray(data.permissions?.allow) ? data.permissions.allow : [];
-    return { added: allow.includes(OBS_READ_GLOBAL_RULE) ? 0 : 1 };
-  } catch {
-    return { added: 1 };
-  }
-}
-
 /** Agent provisioning strategy. */
 const agentStrategy: ProvisionStrategy = {
   resourceKind: "agents",
@@ -125,8 +92,8 @@ const agentStrategy: ProvisionStrategy = {
     );
     return writeProxyAgent(resource.name, proxyContent, outputDir);
   },
-  syncPermissions: (settingsPath) => ensureObsReadPermission(settingsPath),
-  countPermissions: (settingsPath) => countObsReadPermission(settingsPath),
+  syncPermissions: (settingsPath) => syncPermissionRule(settingsPath, CLI_VERSION),
+  countPermissions: (settingsPath) => countPermissionRule(settingsPath, CLI_VERSION),
 };
 
 /** Execute the provision-agents command. */

@@ -45,7 +45,7 @@ importers:
   packages/cli:
     dependencies:
       '@obsidian-vfs/core':
-        specifier: workspace:*
+        specifier: workspace:^
         version: link:../core
 
   packages/core:

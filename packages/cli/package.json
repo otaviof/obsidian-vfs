@@ -1,8 +1,20 @@
 {
   "name": "@obsidian-vfs/cli",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "type": "module",
+  "description": "CLI for Obsidian VFS — provision skills/agents, inspect vault resources",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/otaviof/obsidian-vfs",
+    "directory": "packages/cli"
+  },
+  "keywords": [
+    "obsidian",
+    "vault",
+    "vfs",
+    "cli"
+  ],
   "bin": {
     "obsidian-vfs": "./dist/main.js"
   },
@@ -20,6 +32,6 @@
     "clean": "pnpm exec tsc -b --clean"
   },
   "dependencies": {
-    "@obsidian-vfs/core": "workspace:*"
+    "@obsidian-vfs/core": "workspace:^"
   }
 }

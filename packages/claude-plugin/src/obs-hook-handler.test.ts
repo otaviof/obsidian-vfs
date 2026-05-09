@@ -25,7 +25,7 @@ describe("obs-hook-handler", () => {
     const binPath = resolve(import.meta.dirname, "../../../bin/obs-read");
     const content = readFileSync(binPath, "utf8");
     expect(content).toContain("#!/usr/bin/env node");
-    expect(content).toContain("obs-read-main.js");
+    expect(content).toContain("cmd-inspect.js");
     expect(() => accessSync(binPath, constants.X_OK)).not.toThrow();
   });
 });
