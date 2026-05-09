@@ -37,6 +37,7 @@ import {
   writeStderr,
   writeStdout,
 } from "./formatters.js";
+import { CLI_VERSION, buildPermissionRule, readCommand } from "./cmd-provision-resources.js";
 import { run } from "./cmd-provision-skills.js";
 
 const mockBootstrap = vi.mocked(bootstrapTracker);
@@ -91,7 +92,7 @@ describe("cmd-provision-skills", () => {
     expect(mockMkdir).toHaveBeenCalled();
     expect(mockWriteFile).toHaveBeenCalledWith(
       expect.stringContaining("deploy/SKILL.md"),
-      expect.stringContaining('!`npx @obsidian-vfs/cli@0.1.0 inspect --body "/obs:deploy"`'),
+      expect.stringContaining(`!\`${readCommand(CLI_VERSION)} "/obs:deploy"\``),
       "utf-8",
     );
   });
@@ -106,7 +107,7 @@ describe("cmd-provision-skills", () => {
       "description: Deploy helper",
       "---",
       "",
-      '!`npx @obsidian-vfs/cli@0.1.0 inspect --body "/obs:deploy"`',
+      `!\`${readCommand(CLI_VERSION)} "/obs:deploy"\``,
       "",
     ].join("\n");
     mockReadFile.mockImplementation((...args: unknown[]) => {
@@ -150,7 +151,7 @@ describe("cmd-provision-skills", () => {
       permissions: { allow: string[] };
     };
     expect(written.permissions.allow).toContainEqual(
-      "Bash(npx @obsidian-vfs/cli@0.1.0 inspect --body *)",
+      buildPermissionRule(CLI_VERSION),
     );
   });
 
@@ -350,7 +351,7 @@ describe("cmd-provision-skills", () => {
       "description: Deployer",
       "---",
       "",
-      '!`npx @obsidian-vfs/cli@0.1.0 inspect --body "/obs:deploy"`',
+      `!\`${readCommand(CLI_VERSION)} "/obs:deploy"\``,
       "",
     ].join("\n");
 

@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { realpathSync } from "node:fs";
 import { parseArgs } from "node:util";
 
 import type {
@@ -207,7 +208,8 @@ async function main(): Promise<void> {
 }
 
 const isEntryPoint =
-  process.argv[1] !== undefined && import.meta.url === new URL(`file://${process.argv[1]}`).href;
+  process.argv[1] !== undefined &&
+  import.meta.url === new URL(`file://${realpathSync(process.argv[1])}`).href;
 
 if (isEntryPoint) {
   void main();

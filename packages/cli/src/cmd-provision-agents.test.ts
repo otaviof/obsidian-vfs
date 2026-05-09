@@ -38,6 +38,7 @@ import {
   writeStderr,
   writeStdout,
 } from "./formatters.js";
+import { CLI_VERSION, buildPermissionRule } from "./cmd-provision-resources.js";
 import { run } from "./cmd-provision-agents.js";
 
 const mockBootstrap = vi.mocked(bootstrapTracker);
@@ -201,7 +202,7 @@ describe("cmd-provision-agents", () => {
       permissions: { allow: string[] };
     };
     expect(written.permissions.allow).toContain(
-      "Bash(npx @obsidian-vfs/cli@0.1.0 inspect --body *)",
+      buildPermissionRule(CLI_VERSION),
     );
   });
 
@@ -214,7 +215,7 @@ describe("cmd-provision-agents", () => {
       if (pathArg.endsWith("settings.local.json")) {
         return Promise.resolve(
           JSON.stringify({
-            permissions: { allow: ["Bash(npx @obsidian-vfs/cli@0.1.0 inspect --body *)"] },
+            permissions: { allow: [buildPermissionRule(CLI_VERSION)] },
           }),
         );
       }
