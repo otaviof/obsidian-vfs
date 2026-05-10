@@ -531,7 +531,7 @@ describe("cmd-provision-skills", () => {
     const writeCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("SKILL.md"));
     expect(writeCall).toBeDefined();
     const content = String(writeCall![1]);
-    expect(content).toContain('argument-hint: "pass the target"');
+    expect(content).toContain("argument-hint: pass the target");
   });
 
   it("proxy omits absent curated fields", async () => {
@@ -768,8 +768,7 @@ describe("cmd-provision-skills", () => {
   });
 
   it("--unset model removes model line from proxy content", async () => {
-    const vaultSource =
-      "---\ndescription: Deploy helper\nmodel: sonnet\n---\n\nDeploy content.\n";
+    const vaultSource = "---\ndescription: Deploy helper\nmodel: sonnet\n---\n\nDeploy content.\n";
     const tracker = makeListSkillsTracker(
       { ok: true, value: [makeDiscoveredResource()] },
       { readFileResult: { ok: true, value: vaultSource } },
@@ -805,8 +804,7 @@ describe("cmd-provision-skills", () => {
   });
 
   it("default behavior unchanged when no --set/--unset", async () => {
-    const vaultSource =
-      "---\ndescription: Deploy helper\nmodel: sonnet\n---\n\nDeploy content.\n";
+    const vaultSource = "---\ndescription: Deploy helper\nmodel: sonnet\n---\n\nDeploy content.\n";
     const tracker = makeListSkillsTracker(
       { ok: true, value: [makeDiscoveredResource()] },
       { readFileResult: { ok: true, value: vaultSource } },

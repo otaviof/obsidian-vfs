@@ -2,6 +2,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import { scrubWikilinks } from "@obsidian-vfs/core";
+import YAML from "yaml";
 
 import type { ProvisionArgs } from "./types.js";
 import { EXIT_USAGE } from "./types.js";
@@ -61,16 +62,16 @@ export async function run(args: ProvisionArgs): Promise<number> {
         throw new Error(`read vault agent ${resource.name}: ${content.error.message}`);
       }
       const { frontmatter, body } = splitFrontmatterAndBody(content.value);
-      const sourceLines = frontmatter ? frontmatter.split("\n") : [];
+      const source = frontmatter ? ((YAML.parse(frontmatter) ?? {}) as Record<string, unknown>) : {};
       const scrubbedBody = scrubWikilinks(body, tracker.context.name);
       const fm = buildFrontmatter({
         name: resource.name,
         description: resource.description,
-        sourceLines,
+        source,
         remapModel: true,
         overrides,
       });
-      const proxyContent = `---\n${fm.join("\n")}\n---\n${scrubbedBody}`;
+      const proxyContent = `---\n${fm}\n---\n${scrubbedBody}`;
       return writeProxyAgent(resource.name, proxyContent, outputDir);
     },
     syncPermissions: (settingsPath) => syncPermissionRule(settingsPath, args.pin),

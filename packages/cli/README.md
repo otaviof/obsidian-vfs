@@ -249,7 +249,7 @@ Provisioning automatically remaps non-Claude `model:` values in vault frontmatte
 | `o3*` | `opus` | Most capable |
 | _(unrecognized)_ | `sonnet` | Default fallback |
 
-Mapping runs during provisioning only — vault source notes are never modified. For skills, mapping happens during frontmatter extraction (`formatCuratedLines`). For agents, mapping happens inside `buildFrontmatter` before `--set`/`--unset` overrides are applied, so `--set model=opus` always writes the value verbatim regardless of the vault source model.
+Mapping runs during provisioning only — vault source notes are never modified. Mapping runs during provisioning inside `buildFrontmatter` for both skills and agents, before `--set`/`--unset` overrides are applied. `--set model=opus` always writes the value verbatim regardless of the vault source model.
 
 ### Project-level vs. user-global provisioning
 

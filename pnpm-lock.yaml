@@ -54,7 +54,6 @@ importers:
       '@obsidian-vfs/core':
         specifier: workspace:^
         version: link:../core
-    devDependencies:
       yaml:
         specifier: ^2.8.4
         version: 2.8.4

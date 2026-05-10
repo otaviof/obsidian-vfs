@@ -4,6 +4,7 @@ import {
   buildFrontmatter,
   NO_OVERRIDES,
   parseFrontmatterOverrides,
+  pickCuratedKeys,
   splitFrontmatterAndBody,
 } from "./build-frontmatter.js";
 
@@ -131,197 +132,254 @@ describe("parseFrontmatterOverrides", () => {
 });
 
 describe("buildFrontmatter", () => {
-  it("no source lines, no overrides: produces name + description", () => {
-    const lines = buildFrontmatter({
+  it("no source, no overrides: produces name + description", () => {
+    const result = buildFrontmatter({
       name: "deploy",
       description: "Deploy helper",
-      sourceLines: [],
+      source: {},
       remapModel: false,
       overrides: NO_OVERRIDES,
     });
-    expect(lines).toEqual(["name: deploy", "description: Deploy helper"]);
+    expect(result).toBe("name: deploy\ndescription: Deploy helper");
   });
 
-  it("source lines with model, remapModel=true: model remapped", () => {
-    const lines = buildFrontmatter({
+  it("source with model, remapModel=true: model remapped", () => {
+    const result = buildFrontmatter({
       name: "deploy",
       description: "Deploy helper",
-      sourceLines: ["model: gpt-4o"],
+      source: { model: "gpt-4o" },
       remapModel: true,
       overrides: NO_OVERRIDES,
     });
-    expect(lines).toContain("model: sonnet");
-    expect(lines).not.toContain("model: gpt-4o");
+    expect(result).toContain("model: sonnet");
+    expect(result).not.toContain("gpt-4o");
   });
 
-  it("source lines with model, remapModel=false: model preserved", () => {
-    const lines = buildFrontmatter({
+  it("source with model, remapModel=false: model preserved", () => {
+    const result = buildFrontmatter({
       name: "deploy",
       description: "Deploy helper",
-      sourceLines: ["model: haiku"],
+      source: { model: "haiku" },
       remapModel: false,
       overrides: NO_OVERRIDES,
     });
-    expect(lines).toContain("model: haiku");
+    expect(result).toContain("model: haiku");
   });
 
   it("--set model=opus replaces mapped model", () => {
     const overrides = { set: new Map([["model", "opus"]]), unset: new Set<string>() };
-    const lines = buildFrontmatter({
+    const result = buildFrontmatter({
       name: "deploy",
       description: "Deploy helper",
-      sourceLines: ["model: gpt-4o"],
+      source: { model: "gpt-4o" },
       remapModel: true,
       overrides,
     });
-    expect(lines).toContain("model: opus");
-    expect(lines).not.toContain("model: sonnet");
+    expect(result).toContain("model: opus");
+    expect(result).not.toContain("model: sonnet");
   });
 
   it("--set description=custom replaces default description", () => {
     const overrides = { set: new Map([["description", "custom"]]), unset: new Set<string>() };
-    const lines = buildFrontmatter({
+    const result = buildFrontmatter({
       name: "deploy",
       description: "Deploy helper",
-      sourceLines: [],
+      source: {},
       remapModel: false,
       overrides,
     });
-    expect(lines).toContain("description: custom");
-    expect(lines).not.toContain("description: Deploy helper");
+    expect(result).toContain("description: custom");
+    expect(result).not.toContain("description: Deploy helper");
   });
 
-  it("--unset model removes model line", () => {
+  it("--unset model removes model", () => {
     const overrides = { set: new Map<string, string>(), unset: new Set(["model"]) };
-    const lines = buildFrontmatter({
+    const result = buildFrontmatter({
       name: "deploy",
       description: "Deploy helper",
-      sourceLines: ["model: sonnet"],
+      source: { model: "sonnet" },
       remapModel: false,
       overrides,
     });
-    expect(lines.some((l) => l.startsWith("model:"))).toBe(false);
+    expect(result).not.toContain("model:");
   });
 
   it("--unset description removes description entirely", () => {
     const overrides = { set: new Map<string, string>(), unset: new Set(["description"]) };
-    const lines = buildFrontmatter({
+    const result = buildFrontmatter({
       name: "deploy",
       description: "Deploy helper",
-      sourceLines: [],
+      source: {},
       remapModel: false,
       overrides,
     });
-    expect(lines.some((l) => l.startsWith("description:"))).toBe(false);
-    expect(lines).toEqual(["name: deploy"]);
+    expect(result).not.toContain("description:");
+    expect(result).toBe("name: deploy");
   });
 
   it("--set context=fork appends new key", () => {
     const overrides = { set: new Map([["context", "fork"]]), unset: new Set<string>() };
-    const lines = buildFrontmatter({
+    const result = buildFrontmatter({
       name: "deploy",
       description: "Deploy helper",
-      sourceLines: [],
+      source: {},
       remapModel: false,
       overrides,
     });
-    expect(lines).toContain("context: fork");
+    expect(result).toContain("context: fork");
   });
 
   it("name is always enforced regardless of overrides", () => {
-    const lines = buildFrontmatter({
+    const result = buildFrontmatter({
       name: "deploy",
       description: "Deploy helper",
-      sourceLines: ["name: wrong-name"],
+      source: { name: "wrong-name" },
       remapModel: false,
       overrides: NO_OVERRIDES,
     });
-    expect(lines).toContain("name: deploy");
-    expect(lines).not.toContain("name: wrong-name");
+    expect(result).toContain("name: deploy");
+    expect(result).not.toContain("name: wrong-name");
   });
 
-  it("preserves line order; new keys appended at end", () => {
+  it("preserves key order; new keys appended at end", () => {
     const overrides = { set: new Map([["context", "fork"]]), unset: new Set<string>() };
-    const lines = buildFrontmatter({
+    const result = buildFrontmatter({
       name: "deploy",
       description: "Deploy helper",
-      sourceLines: ["model: sonnet", "allowed-tools: Bash"],
+      source: { model: "sonnet", "allowed-tools": "Bash" },
       remapModel: false,
       overrides,
     });
-    const modelIdx = lines.indexOf("model: sonnet");
-    const toolsIdx = lines.indexOf("allowed-tools: Bash");
-    const contextIdx = lines.indexOf("context: fork");
+    const modelIdx = result.indexOf("model: sonnet");
+    const toolsIdx = result.indexOf("allowed-tools: Bash");
+    const contextIdx = result.indexOf("context: fork");
     expect(modelIdx).toBeLessThan(toolsIdx);
     expect(toolsIdx).toBeLessThan(contextIdx);
   });
 
   it("combined --set + --unset on different keys", () => {
     const overrides = { set: new Map([["model", "opus"]]), unset: new Set(["allowed-tools"]) };
-    const lines = buildFrontmatter({
+    const result = buildFrontmatter({
       name: "deploy",
       description: "Deploy helper",
-      sourceLines: ["model: sonnet", "allowed-tools: Bash"],
+      source: { model: "sonnet", "allowed-tools": "Bash" },
       remapModel: false,
       overrides,
     });
-    expect(lines).toContain("model: opus");
-    expect(lines.some((l) => l.startsWith("allowed-tools:"))).toBe(false);
+    expect(result).toContain("model: opus");
+    expect(result).not.toContain("allowed-tools:");
   });
 
-  it("empty overrides: identity (source lines + name + description defaults)", () => {
-    const lines = buildFrontmatter({
+  it("empty overrides: identity (source + name + description defaults)", () => {
+    const result = buildFrontmatter({
       name: "deploy",
       description: "Deploy helper",
-      sourceLines: ["model: sonnet", "allowed-tools: Bash"],
+      source: { model: "sonnet", "allowed-tools": "Bash" },
       remapModel: false,
       overrides: NO_OVERRIDES,
     });
-    expect(lines).toEqual([
-      "name: deploy",
-      "description: Deploy helper",
-      "model: sonnet",
-      "allowed-tools: Bash",
-    ]);
+    expect(result).toBe(
+      "name: deploy\ndescription: Deploy helper\nmodel: sonnet\nallowed-tools: Bash",
+    );
   });
 
   it("agent with no frontmatter + --set model=opus", () => {
     const overrides = { set: new Map([["model", "opus"]]), unset: new Set<string>() };
-    const lines = buildFrontmatter({
+    const result = buildFrontmatter({
       name: "architect",
       description: "System architect",
-      sourceLines: [],
+      source: {},
       remapModel: true,
       overrides,
     });
-    expect(lines).toContain("name: architect");
-    expect(lines).toContain("description: System architect");
-    expect(lines).toContain("model: opus");
+    expect(result).toContain("name: architect");
+    expect(result).toContain("description: System architect");
+    expect(result).toContain("model: opus");
   });
 
   it("agent with no frontmatter + --unset description", () => {
     const overrides = { set: new Map<string, string>(), unset: new Set(["description"]) };
-    const lines = buildFrontmatter({
+    const result = buildFrontmatter({
       name: "architect",
       description: "System architect",
-      sourceLines: [],
+      source: {},
       remapModel: true,
       overrides,
     });
-    expect(lines).toEqual(["name: architect"]);
+    expect(result).toBe("name: architect");
   });
 
-  it("source lines with existing description: no duplicate added", () => {
-    const lines = buildFrontmatter({
+  it("source with existing description: no duplicate added", () => {
+    const result = buildFrontmatter({
       name: "deploy",
       description: "Deploy helper",
-      sourceLines: ["description: Vault desc", "model: sonnet"],
+      source: { description: "Vault desc", model: "sonnet" },
       remapModel: false,
       overrides: NO_OVERRIDES,
     });
-    const descLines = lines.filter((l) => l.startsWith("description:"));
-    expect(descLines).toHaveLength(1);
-    expect(descLines[0]).toBe("description: Vault desc");
+    const descMatches = result.match(/description:/g);
+    expect(descMatches).toHaveLength(1);
+    expect(result).toContain("description: Vault desc");
+  });
+
+  it("multi-line description preserved as block scalar", () => {
+    const result = buildFrontmatter({
+      name: "deploy",
+      description: "Deploy helper",
+      source: { description: "Line one\nLine two" },
+      remapModel: false,
+      overrides: NO_OVERRIDES,
+    });
+    expect(result).toContain("Line one");
+    expect(result).toContain("Line two");
+    expect(result).not.toContain("Deploy helper");
+  });
+
+  it("--unset removes multi-line value completely", () => {
+    const overrides = { set: new Map<string, string>(), unset: new Set(["description"]) };
+    const result = buildFrontmatter({
+      name: "deploy",
+      description: "Deploy helper",
+      source: { description: "Line one\nLine two" },
+      remapModel: false,
+      overrides,
+    });
+    expect(result).not.toContain("description");
+    expect(result).not.toContain("Line one");
+    expect(result).not.toContain("Line two");
+  });
+});
+
+describe("pickCuratedKeys", () => {
+  it("filters to curated keys only", () => {
+    const result = pickCuratedKeys({
+      model: "sonnet",
+      "allowed-tools": "Bash, Read",
+      "argument-hint": "pass the target",
+      description: "Some desc",
+      name: "deploy",
+      tools: "Read, Grep",
+      extra: "should be dropped",
+    });
+    expect(result).toEqual({
+      model: "sonnet",
+      "allowed-tools": "Bash, Read",
+      "argument-hint": "pass the target",
+    });
+  });
+
+  it("returns empty Record for empty input", () => {
+    expect(pickCuratedKeys({})).toEqual({});
+  });
+
+  it("excludes name, description, tools, and other non-curated keys", () => {
+    const result = pickCuratedKeys({
+      name: "deploy",
+      description: "Helper",
+      tools: "Read",
+      context: "fork",
+    });
+    expect(Object.keys(result)).toHaveLength(0);
   });
 });
 

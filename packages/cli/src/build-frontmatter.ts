@@ -1,5 +1,6 @@
 import type { VFSResult } from "@obsidian-vfs/core";
 import { mapModelToClaude } from "@obsidian-vfs/core";
+import YAML from "yaml";
 
 /** Parsed frontmatter overrides from --set and --unset flags. */
 export interface FrontmatterOverrides {
@@ -11,7 +12,8 @@ export interface FrontmatterOverrides {
 export interface BuildFrontmatterOptions {
   readonly name: string;
   readonly description: string;
-  readonly sourceLines: readonly string[];
+  /** Parsed YAML frontmatter from vault source. */
+  readonly source: Readonly<Record<string, unknown>>;
   readonly remapModel: boolean;
   readonly overrides: FrontmatterOverrides;
 }
@@ -99,65 +101,65 @@ export function parseFrontmatterOverrides(
   return { ok: true, value: { set: setMap, unset: unsetSet } };
 }
 
-/** Extract the YAML key from a frontmatter line (text before the first `:`). */
-function lineKey(line: string): string | undefined {
-  const idx = line.indexOf(":");
-  return idx > 0 ? line.slice(0, idx) : undefined;
+/** Frontmatter keys forwarded from vault source for skill proxies. */
+const CURATED_KEYS = new Set(["model", "allowed-tools", "argument-hint"]);
+
+/** Filter a parsed frontmatter Record to only curated skill keys. */
+export function pickCuratedKeys(source: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  for (const key of Object.keys(source)) {
+    if (CURATED_KEYS.has(key)) {
+      result[key] = source[key];
+    }
+  }
+  return result;
 }
 
 /**
- * Build final frontmatter lines from vault source, resource metadata, and user overrides.
+ * Build final frontmatter from vault source, resource metadata, and user overrides.
+ * Returns serialized YAML string (without --- fences). Caller wraps.
  */
-export function buildFrontmatter(options: BuildFrontmatterOptions): string[] {
-  const lines = [...options.sourceLines];
+export function buildFrontmatter(options: BuildFrontmatterOptions): string {
+  const record: Record<string, unknown> = { ...options.source };
 
-  // Step 1: model remap (agents path — skills already mapped by formatCuratedLines)
-  if (options.remapModel) {
-    for (let i = 0; i < lines.length; i++) {
-      if (lineKey(lines[i]) === "model") {
-        const value = lines[i].slice(lines[i].indexOf(":") + 1).trim();
-        lines[i] = `model: ${mapModelToClaude(value)}`;
-      }
+  if (options.remapModel && record.model !== undefined) {
+    const raw = record.model;
+    if (typeof raw === "string") {
+      record.model = mapModelToClaude(raw);
+    } else if (typeof raw === "number" || typeof raw === "boolean") {
+      record.model = mapModelToClaude(raw.toString());
     }
   }
 
-  // Step 2: unset pass
-  for (let i = lines.length - 1; i >= 0; i--) {
-    const key = lineKey(lines[i]);
-    if (key !== undefined && options.overrides.unset.has(key)) {
-      lines.splice(i, 1);
-    }
+  for (const key of options.overrides.unset) {
+    delete record[key];
   }
 
-  // Step 3: set pass (replace or append)
   for (const [key, value] of options.overrides.set) {
-    const idx = lines.findIndex((l) => lineKey(l) === key);
-    if (idx >= 0) {
-      lines[idx] = `${key}: ${value}`;
-    } else {
-      lines.push(`${key}: ${value}`);
-    }
+    record[key] = value;
   }
 
-  // Step 4: ensure description default
-  const hasDescription = lines.some((l) => lineKey(l) === "description");
   if (
-    !hasDescription &&
+    record.description === undefined &&
     !options.overrides.unset.has("description") &&
     !options.overrides.set.has("description")
   ) {
-    lines.unshift(`description: ${options.description}`);
+    record.description = options.description;
   }
 
-  // Step 5: ensure name (always — protected from overrides)
-  const nameIdx = lines.findIndex((l) => lineKey(l) === "name");
-  if (nameIdx >= 0) {
-    lines[nameIdx] = `name: ${options.name}`;
-  } else {
-    lines.unshift(`name: ${options.name}`);
+  record.name = options.name;
+
+  const ordered: Record<string, unknown> = { name: record.name };
+  if (record.description !== undefined) {
+    ordered.description = record.description;
+  }
+  for (const key of Object.keys(record)) {
+    if (key !== "name" && key !== "description") {
+      ordered[key] = record[key];
+    }
   }
 
-  return lines;
+  return YAML.stringify(ordered, { lineWidth: 0 }).trimEnd();
 }
 
 /** Split markdown content into raw YAML frontmatter block and body. */

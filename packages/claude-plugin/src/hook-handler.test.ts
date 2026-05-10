@@ -39,7 +39,9 @@ function hookInput(prompt: string): string {
 }
 
 describe("hook-handler", () => {
-  const fakeTracker = { context: { name: "Vault", physicalPath: "/vault" } } as unknown as LocalIndexTracker;
+  const fakeTracker = {
+    context: { name: "Vault", physicalPath: "/vault" },
+  } as unknown as LocalIndexTracker;
 
   beforeEach(() => {
     vi.clearAllMocks();

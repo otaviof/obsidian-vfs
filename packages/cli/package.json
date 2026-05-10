@@ -35,9 +35,7 @@
     "clean": "pnpm exec tsc -b --clean tsconfig.build.json"
   },
   "dependencies": {
-    "@obsidian-vfs/core": "workspace:^"
-  },
-  "devDependencies": {
+    "@obsidian-vfs/core": "workspace:^",
     "yaml": "^2.8.4"
   }
 }

@@ -1,7 +1,8 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { extractCuratedFrontmatter, formatCuratedLines, SKILL_PREFIX } from "@obsidian-vfs/core";
+import { extractFrontmatter, SKILL_PREFIX } from "@obsidian-vfs/core";
+import YAML from "yaml";
 
 import type { ProvisionArgs } from "./types.js";
 import { EXIT_USAGE } from "./types.js";
@@ -13,20 +14,17 @@ import {
   run as runProvision,
   syncPermissionRule,
 } from "./cmd-provision-resources.js";
-import { buildFrontmatter, parseFrontmatterOverrides } from "./build-frontmatter.js";
+import {
+  buildFrontmatter,
+  parseFrontmatterOverrides,
+  pickCuratedKeys,
+} from "./build-frontmatter.js";
 import { formatUsageError, writeStderr } from "./formatters.js";
 
-/** Build the proxy SKILL.md content string from final frontmatter lines. */
-function buildProxyContent(frontmatter: readonly string[], skillName: string, pin: boolean): string {
+/** Build the proxy SKILL.md content string from final frontmatter YAML. */
+function buildProxyContent(frontmatter: string, skillName: string, pin: boolean): string {
   const cmd = readCommand(pin);
-  return [
-    "---",
-    ...frontmatter,
-    "---",
-    "",
-    `!\`${cmd} "${SKILL_PREFIX}${skillName}"\``,
-    "",
-  ].join("\n");
+  return `---\n${frontmatter}\n---\n\n!\`${cmd} "${SKILL_PREFIX}${skillName}"\`\n`;
 }
 
 /** Write a single proxy SKILL.md file, creating the directory if needed. */
@@ -67,15 +65,17 @@ export async function run(args: ProvisionArgs): Promise<number> {
     settingsPath,
     enumerate: (tracker) => tracker.listSkills(),
     writeProxy: async (resource, tracker, outputDir) => {
-      const source = await tracker.readFile(resource.vaultRelativePath);
-      const sourceLines = source.ok
-        ? formatCuratedLines(extractCuratedFrontmatter(source.value))
-        : [];
+      const raw = await tracker.readFile(resource.vaultRelativePath);
+      const parsed = raw.ok
+        ? pickCuratedKeys(
+            (YAML.parse(extractFrontmatter(raw.value) ?? "") ?? {}) as Record<string, unknown>,
+          )
+        : {};
       const frontmatter = buildFrontmatter({
         name: resource.name,
         description: resource.description,
-        sourceLines,
-        remapModel: false,
+        source: parsed,
+        remapModel: true,
         overrides,
       });
       const content = buildProxyContent(frontmatter, resource.name, args.pin);
