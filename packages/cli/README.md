@@ -45,10 +45,10 @@ pnpm cli --help
 Resolve a wikilink, vault-relative path, or `/obs:` skill to its vault path.
 
 ```sh
-pnpm cli resolve "Project Plan"
-pnpm cli resolve "[[Project Plan]]"
-pnpm cli resolve "/obs:obsidian"
-pnpm cli resolve "Note" --json
+npx @obsidian-vfs/cli resolve "Project Plan"
+npx @obsidian-vfs/cli resolve "[[Project Plan]]"
+npx @obsidian-vfs/cli resolve "/obs:obsidian"
+npx @obsidian-vfs/cli resolve "Note" --json
 ```
 
 Uses the Obsidian CLI's `search` with `file:<name>` to find candidates, then picks the exact basename match. When multiple files share the same basename, the shortest vault-relative path wins. This differs from the raw search order — Obsidian's search returns results in its own relevance ranking, which may place partial matches before exact ones.
@@ -58,9 +58,9 @@ Uses the Obsidian CLI's `search` with `file:<name>` to find candidates, then pic
 Inspect a mention — shows resolved path, target type, and content.
 
 ```sh
-pnpm cli inspect "architect"
-pnpm cli inspect "10-projects/plan.md#Architecture"
-pnpm cli inspect "/obs:obsidian"
+npx @obsidian-vfs/cli inspect "architect"
+npx @obsidian-vfs/cli inspect "10-projects/plan.md#Architecture"
+npx @obsidian-vfs/cli inspect "/obs:obsidian"
 ```
 
 | Flag | Description |
@@ -73,9 +73,9 @@ pnpm cli inspect "/obs:obsidian"
 Enumerate all skills discovered from the vault's `skillsDirs` (configured in `.obsidian/obsidian-vfs.json`).
 
 ```sh
-pnpm cli list-skills
-pnpm cli list-skills --description
-pnpm cli list-skills --json
+npx @obsidian-vfs/cli list-skills
+npx @obsidian-vfs/cli list-skills --description
+npx @obsidian-vfs/cli list-skills --json
 ```
 
 Output is compact by default (name and vault-relative path only). Pass `--description` to include the description column.
@@ -85,9 +85,9 @@ Output is compact by default (name and vault-relative path only). Pass `--descri
 Enumerate all agents discovered from the vault's `agentsDirs`.
 
 ```sh
-pnpm cli list-agents
-pnpm cli list-agents --description
-pnpm cli list-agents --json
+npx @obsidian-vfs/cli list-agents
+npx @obsidian-vfs/cli list-agents --description
+npx @obsidian-vfs/cli list-agents --json
 ```
 
 Output is compact by default (name and vault-relative path only). Pass `--description` to include the description column.
@@ -97,13 +97,13 @@ Output is compact by default (name and vault-relative path only). Pass `--descri
 Generate thin proxy files under `.claude/skills/` that Claude Code treats as native skills. Each proxy contains a `!`command`` directive that fetches live content from the vault at invocation time.
 
 ```sh
-pnpm cli provision-skills
-pnpm cli provision-skills --dry-run
-pnpm cli provision-skills --include deploy --include review
-pnpm cli provision-skills --exclude "draft-*"
-pnpm cli provision-skills --pin
-pnpm cli provision-skills --user
-pnpm cli provision-skills --json
+npx @obsidian-vfs/cli provision-skills
+npx @obsidian-vfs/cli provision-skills --dry-run
+npx @obsidian-vfs/cli provision-skills --include deploy --include review
+npx @obsidian-vfs/cli provision-skills --exclude "draft-*"
+npx @obsidian-vfs/cli provision-skills --pin
+npx @obsidian-vfs/cli provision-skills --user
+npx @obsidian-vfs/cli provision-skills --json
 ```
 
 | Flag | Description |
@@ -188,13 +188,13 @@ Two workarounds exist for dynamic content in agents:
 2. **Preload a skill** via the `skills` frontmatter field — the skill _can_ use `!`command``, and its rendered content is injected into the agent's context at startup.
 
 ```sh
-pnpm cli provision-agents
-pnpm cli provision-agents --dry-run
-pnpm cli provision-agents --include architect --include reviewer
-pnpm cli provision-agents --exclude "draft-*"
-pnpm cli provision-agents --pin
-pnpm cli provision-agents --user
-pnpm cli provision-agents --json
+npx @obsidian-vfs/cli provision-agents
+npx @obsidian-vfs/cli provision-agents --dry-run
+npx @obsidian-vfs/cli provision-agents --include architect --include reviewer
+npx @obsidian-vfs/cli provision-agents --exclude "draft-*"
+npx @obsidian-vfs/cli provision-agents --pin
+npx @obsidian-vfs/cli provision-agents --user
+npx @obsidian-vfs/cli provision-agents --json
 ```
 
 | Flag | Description |
@@ -266,7 +266,7 @@ Only affects provisioning output. Does not change runtime behavior of `obs-read`
 
 ```sh
 export OBSIDIAN_VFS_PROJECT_DIR=.
-pnpm cli provision-skills   # emits ./bin/obs-read in proxies
+npx @obsidian-vfs/cli provision-skills   # emits ./bin/obs-read in proxies
 ```
 
 For upstream Claude Code documentation on skills, agents, hooks, and plugins, see the [Claude plugin README](../claude-plugin/README.md#claude-code-documentation).
