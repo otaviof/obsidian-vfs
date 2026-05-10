@@ -22,7 +22,10 @@
     "reset": "pnpm -r run clean && rm -rf node_modules packages/*/node_modules && pnpm install"
   },
   "pnpm": {
-    "shamefullyHoist": false
+    "shamefullyHoist": false,
+    "overrides": {
+      "fast-uri": ">=3.1.2"
+    }
   },
   "devDependencies": {
     "@eslint/js": "^10.0.0",

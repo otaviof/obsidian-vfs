@@ -314,4 +314,29 @@ describe("parseGlobalArgs", () => {
       expect(result.options.pin).toBe(true);
     }
   });
+
+  it("parses --user flag", () => {
+    const result = parseGlobalArgs(["provision-agents", "--user"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.user).toBe(true);
+    }
+  });
+
+  it("--user defaults to false", () => {
+    const result = parseGlobalArgs(["provision-agents"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.user).toBe(false);
+    }
+  });
+
+  it("--user works with provision-skills", () => {
+    const result = parseGlobalArgs(["provision-skills", "--user"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.command).toBe("provision-skills");
+      expect(result.options.user).toBe(true);
+    }
+  });
 });

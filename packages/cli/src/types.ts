@@ -21,6 +21,7 @@ export interface CLIOptions {
   readonly include: readonly string[];
   readonly exclude: readonly string[];
   readonly pin: boolean;
+  readonly user: boolean;
 }
 
 /** Arguments for the inspect command. */
@@ -53,6 +54,7 @@ export interface ProvisionArgs {
   readonly include: readonly string[];
   readonly exclude: readonly string[];
   readonly pin: boolean;
+  readonly user: boolean;
 }
 
 /** Metadata about filtering applied during provisioning. */

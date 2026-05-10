@@ -209,7 +209,11 @@ export function formatListResourcesJSON(output: ListResourcesOutput): string {
 }
 
 /** Format a provision result for terminal display. */
-export function formatProvisionResult(output: ProvisionOutput, resourceKind: string): string {
+export function formatProvisionResult(
+  output: ProvisionOutput,
+  resourceKind: string,
+  settingsLabel?: string,
+): string {
   const prefix = output.dryRun ? "[dry-run] " : "";
   const lines: string[] = [
     `${prefix}Wrote ${output.written.length} ${resourceKind}:`,
@@ -221,9 +225,8 @@ export function formatProvisionResult(output: ProvisionOutput, resourceKind: str
     lines.push(labelLine("skipped", output.skipped.join(", ")));
   }
 
-  lines.push(
-    labelLine("permissions", `added ${output.permissionsAdded} in .claude/settings.local.json`),
-  );
+  const label = settingsLabel ?? ".claude/settings.local.json";
+  lines.push(labelLine("permissions", `added ${output.permissionsAdded} in ${label}`));
 
   const hasFilter = output.filter.include.length > 0 || output.filter.exclude.length > 0;
   if (hasFilter) {
@@ -276,6 +279,7 @@ Options:
   --include <glob>        Only provision resources matching glob (repeatable, provision-*)
   --exclude <glob>        Skip resources matching glob (repeatable, provision-*)
   --pin                   Pin generated commands to the current CLI version (provision-*)
+  --user                  Provision to ~/.claude/ (user-global) instead of .claude/ (project-level)
   -h, --help              Show this help message
 
 Environment:
@@ -301,7 +305,9 @@ Examples:
   ${CLI_CMD} provision-agents
   ${CLI_CMD} provision-agents --dry-run
   ${CLI_CMD} provision-agents --include architect --include reviewer
-  ${CLI_CMD} provision-agents --exclude "draft-*"`;
+  ${CLI_CMD} provision-agents --exclude "draft-*"
+  ${CLI_CMD} provision-agents --user
+  ${CLI_CMD} provision-skills --user --dry-run`;
 }
 
 /** Format a usage error with the correct usage hint. */

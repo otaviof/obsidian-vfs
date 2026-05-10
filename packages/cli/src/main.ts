@@ -50,6 +50,7 @@ export function parseGlobalArgs(
         include: { type: "string", multiple: true, default: [] as string[] },
         exclude: { type: "string", multiple: true, default: [] as string[] },
         pin: { type: "boolean", default: false },
+        user: { type: "boolean", default: false },
         help: { type: "boolean", short: "h", default: false },
       },
       allowPositionals: true,
@@ -76,6 +77,7 @@ export function parseGlobalArgs(
         include: [],
         exclude: [],
         pin: false,
+        user: false,
       },
       positionals: [],
     };
@@ -107,6 +109,7 @@ export function parseGlobalArgs(
       include,
       exclude,
       pin: parsed.values.pin as boolean,
+      user: parsed.values.user as boolean,
     },
     positionals: parsed.positionals.slice(1),
   };
@@ -158,6 +161,7 @@ function buildProvisionArgs(options: CLIOptions): ProvisionArgs {
     include: options.include,
     exclude: options.exclude,
     pin: options.pin,
+    user: options.user,
   };
 }
 

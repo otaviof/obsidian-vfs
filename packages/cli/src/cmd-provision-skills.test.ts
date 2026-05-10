@@ -1,3 +1,5 @@
+import os from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ProvisionArgs } from "./types.js";
@@ -126,6 +128,7 @@ describe("cmd-provision-skills", () => {
     expect(mockFormatResult).toHaveBeenCalledWith(
       expect.objectContaining({ written: [] }),
       "skills",
+      undefined,
     );
   });
 
@@ -224,6 +227,7 @@ describe("cmd-provision-skills", () => {
         errors: expect.arrayContaining([expect.stringContaining("disk full")]) as unknown[],
       }),
       "skills",
+      undefined,
     );
   });
 
@@ -253,6 +257,7 @@ describe("cmd-provision-skills", () => {
         errors: expect.arrayContaining([expect.stringContaining("sync permissions")]) as unknown[],
       }),
       "skills",
+      undefined,
     );
   });
 
@@ -312,6 +317,7 @@ describe("cmd-provision-skills", () => {
         dryRun: true,
       }),
       "skills",
+      undefined,
     );
   });
 
@@ -332,6 +338,7 @@ describe("cmd-provision-skills", () => {
         written: expect.arrayContaining(["deploy", "review", "architect"]) as unknown[],
       }),
       "skills",
+      undefined,
     );
   });
 
@@ -365,6 +372,7 @@ describe("cmd-provision-skills", () => {
     expect(mockFormatResult).toHaveBeenCalledWith(
       expect.objectContaining({ written: ["review"] }),
       "skills",
+      undefined,
     );
   });
 
@@ -385,6 +393,7 @@ describe("cmd-provision-skills", () => {
         filter: expect.objectContaining({ discoveredCount: 2, filteredCount: 1 }) as unknown,
       }),
       "skills",
+      undefined,
     );
   });
 
@@ -405,6 +414,7 @@ describe("cmd-provision-skills", () => {
         skipped: ["architect"],
       }),
       "skills",
+      undefined,
     );
   });
 
@@ -424,6 +434,7 @@ describe("cmd-provision-skills", () => {
         skipped: ["draft-notes"],
       }),
       "skills",
+      undefined,
     );
   });
 
@@ -445,6 +456,7 @@ describe("cmd-provision-skills", () => {
         }) as unknown,
       }),
       "skills",
+      undefined,
     );
   });
 
@@ -465,6 +477,7 @@ describe("cmd-provision-skills", () => {
         dryRun: true,
       }),
       "skills",
+      undefined,
     );
   });
 
@@ -552,6 +565,71 @@ describe("cmd-provision-skills", () => {
         filter: expect.objectContaining({ filteredCount: 0 }) as unknown,
       }),
       "skills",
+      undefined,
+    );
+  });
+
+  it("--user provisions skills to ~/.claude/skills/", async () => {
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ user: true }));
+
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      expect.stringContaining(path.join(".claude", "skills", "deploy", "SKILL.md")),
+      expect.any(String),
+      "utf-8",
+    );
+    const skillCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("SKILL.md"));
+    expect(skillCall).toBeDefined();
+    expect(String(skillCall![0])).toContain(os.homedir());
+  });
+
+  it("--user syncs permissions to ~/.claude/settings.json", async () => {
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    mockReadFile.mockImplementation((...args: unknown[]) => {
+      const pathArg = String(args[0]);
+      if (pathArg.endsWith("settings.json")) {
+        return Promise.resolve(JSON.stringify({ permissions: { allow: [] } }));
+      }
+      return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    });
+
+    await run(makeArgs({ user: true }));
+
+    const settingsCall = mockWriteFile.mock.calls.find(
+      (c) => String(c[0]).endsWith("settings.json") && !String(c[0]).endsWith(".local.json"),
+    );
+    expect(settingsCall).toBeDefined();
+    expect(String(settingsCall![0])).toContain(os.homedir());
+  });
+
+  it("--user dry-run reports correct target paths", async () => {
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ user: true, dryRun: true }));
+
+    expect(mockWriteFile).not.toHaveBeenCalled();
+    expect(mockFormatResult).toHaveBeenCalledWith(
+      expect.objectContaining({ written: ["deploy"], dryRun: true }),
+      "skills",
+      expect.stringContaining("~/.claude/settings.json"),
+    );
+  });
+
+  it("default (no --user) behavior unchanged", async () => {
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs());
+
+    expect(mockFormatResult).toHaveBeenCalledWith(
+      expect.objectContaining({ written: ["deploy"] }),
+      "skills",
+      undefined,
     );
   });
 

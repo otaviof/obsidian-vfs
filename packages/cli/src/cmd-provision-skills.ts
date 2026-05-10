@@ -7,8 +7,8 @@ import { extractCuratedFrontmatter, formatCuratedLines, SKILL_PREFIX } from "@ob
 import type { ProvisionArgs } from "./types.js";
 import type { ProvisionStrategy } from "./cmd-provision-resources.js";
 import {
-  CLAUDE_DIR,
   countPermissionRule,
+  provisionPaths,
   readCommand,
   run as runProvision,
   syncPermissionRule,
@@ -59,9 +59,12 @@ async function writeProxySkill(
 
 /** Execute the provision-skills command. */
 export async function run(args: ProvisionArgs): Promise<number> {
+  const { baseDir, settingsPath } = provisionPaths(args.user);
+
   const skillStrategy: ProvisionStrategy = {
     resourceKind: "skills",
-    outputDir: path.join(CLAUDE_DIR, "skills"),
+    outputDir: path.join(baseDir, "skills"),
+    settingsPath,
     enumerate: (tracker) => tracker.listSkills(),
     writeProxy: async (resource, tracker, outputDir) => {
       const source = await tracker.readFile(resource.vaultRelativePath);

@@ -35,6 +35,7 @@ pnpm cli --help
 | `--json` | Machine-readable JSON output |
 | `--verbose`, `-v` | Timing diagnostics |
 | `--description` | Show descriptions (list-skills, list-agents) |
+| `--user` | Provision to `~/.claude/` (user-global) instead of `.claude/` (project-level) |
 | `--help`, `-h` | Show usage information |
 
 ## Commands
@@ -101,6 +102,7 @@ pnpm cli provision-skills --dry-run
 pnpm cli provision-skills --include deploy --include review
 pnpm cli provision-skills --exclude "draft-*"
 pnpm cli provision-skills --pin
+pnpm cli provision-skills --user
 pnpm cli provision-skills --json
 ```
 
@@ -110,6 +112,7 @@ pnpm cli provision-skills --json
 | `--include <glob>` | Only provision matching skills (repeatable) |
 | `--exclude <glob>` | Skip matching skills (repeatable) |
 | `--pin` | Pin generated commands to the current CLI version |
+| `--user` | Provision to `~/.claude/skills/` and `~/.claude/settings.json` instead of project-level |
 
 #### Why proxy skills?
 
@@ -190,6 +193,7 @@ pnpm cli provision-agents --dry-run
 pnpm cli provision-agents --include architect --include reviewer
 pnpm cli provision-agents --exclude "draft-*"
 pnpm cli provision-agents --pin
+pnpm cli provision-agents --user
 pnpm cli provision-agents --json
 ```
 
@@ -199,6 +203,7 @@ pnpm cli provision-agents --json
 | `--include <glob>` | Only provision matching agents (repeatable) |
 | `--exclude <glob>` | Skip matching agents (repeatable) |
 | `--pin` | Pin generated commands to the current CLI version |
+| `--user` | Provision to `~/.claude/agents/` and `~/.claude/settings.json` instead of project-level |
 
 #### Agent vs. skill proxies
 
@@ -212,6 +217,28 @@ pnpm cli provision-agents --json
 | Content freshness | Always current | Stale until re-provisioned |
 
 Same add-only behavior as skills. Delete `.claude/agents/<name>.md` manually to remove a deprovisioned agent.
+
+### Project-level vs. user-global provisioning
+
+By default, provisioning writes to the project directory:
+
+| Target | Path |
+|--------|------|
+| Skills | `.claude/skills/` |
+| Agents | `.claude/agents/` |
+| Permissions | `.claude/settings.local.json` |
+
+With `--user`, provisioning writes to the user-global directory:
+
+| Target | Path |
+|--------|------|
+| Skills | `~/.claude/skills/` |
+| Agents | `~/.claude/agents/` |
+| Permissions | `~/.claude/settings.json` |
+
+User-global agents and skills are available across all Claude Code sessions without per-project provisioning. Project-level resources take priority when both exist.
+
+**Known limitation:** `--user` combined with `OBSIDIAN_VFS_PROJECT_DIR` produces project-relative `./bin/obs-read` paths in global proxies, which may not resolve correctly from other directories. Avoid combining the two.
 
 ## Environment Variables
 

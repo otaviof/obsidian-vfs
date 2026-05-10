@@ -6,8 +6,8 @@ import { remapModelLine, scrubWikilinks } from "@obsidian-vfs/core";
 import type { ProvisionArgs } from "./types.js";
 import type { ProvisionStrategy } from "./cmd-provision-resources.js";
 import {
-  CLAUDE_DIR,
   countPermissionRule,
+  provisionPaths,
   run as runProvision,
   syncPermissionRule,
 } from "./cmd-provision-resources.js";
@@ -75,9 +75,12 @@ async function writeProxyAgent(
 
 /** Execute the provision-agents command. */
 export async function run(args: ProvisionArgs): Promise<number> {
+  const { baseDir, settingsPath } = provisionPaths(args.user);
+
   const agentStrategy: ProvisionStrategy = {
     resourceKind: "agents",
-    outputDir: path.join(CLAUDE_DIR, "agents"),
+    outputDir: path.join(baseDir, "agents"),
+    settingsPath,
     enumerate: (tracker) => tracker.listAgents(),
     writeProxy: async (resource, tracker, outputDir) => {
       const content = await tracker.readFile(resource.vaultRelativePath);

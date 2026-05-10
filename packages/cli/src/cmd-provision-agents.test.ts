@@ -1,3 +1,5 @@
+import os from "node:os";
+import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { VFSResult } from "@obsidian-vfs/core";
@@ -177,6 +179,7 @@ describe("cmd-provision-agents", () => {
     expect(mockFormatResult).toHaveBeenCalledWith(
       expect.objectContaining({ written: [] }),
       "agents",
+      undefined,
     );
   });
 
@@ -225,6 +228,7 @@ describe("cmd-provision-agents", () => {
     expect(mockFormatResult).toHaveBeenCalledWith(
       expect.objectContaining({ permissionsAdded: 0 }),
       "agents",
+      undefined,
     );
   });
 
@@ -247,6 +251,7 @@ describe("cmd-provision-agents", () => {
     expect(mockFormatResult).toHaveBeenCalledWith(
       expect.objectContaining({ written: ["architect"], dryRun: true }),
       "agents",
+      undefined,
     );
   });
 
@@ -312,6 +317,7 @@ describe("cmd-provision-agents", () => {
         errors: expect.arrayContaining([expect.stringContaining("broken")]) as unknown[],
       }),
       "agents",
+      undefined,
     );
   });
 
@@ -339,6 +345,7 @@ describe("cmd-provision-agents", () => {
         filter: expect.objectContaining({ discoveredCount: 2, filteredCount: 1 }) as unknown,
       }),
       "agents",
+      undefined,
     );
   });
 
@@ -365,6 +372,7 @@ describe("cmd-provision-agents", () => {
         skipped: ["draft-agent"],
       }),
       "agents",
+      undefined,
     );
   });
 
@@ -443,6 +451,7 @@ describe("cmd-provision-agents", () => {
         written: expect.arrayContaining(["architect", "reviewer"]) as unknown[],
       }),
       "agents",
+      undefined,
     );
   });
 
@@ -492,5 +501,69 @@ describe("cmd-provision-agents", () => {
       permissions: { allow: string[] };
     };
     expect(written.permissions.allow).toContainEqual(buildPermissionRule(true));
+  });
+
+  it("--user provisions agents to ~/.claude/agents/", async () => {
+    const tracker = makeAgentTracker();
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ user: true }));
+
+    expect(mockWriteFile).toHaveBeenCalledWith(
+      expect.stringContaining(path.join(".claude", "agents", "architect.md")),
+      expect.any(String),
+      "utf-8",
+    );
+    const agentCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("architect.md"));
+    expect(agentCall).toBeDefined();
+    expect(String(agentCall![0])).toContain(os.homedir());
+  });
+
+  it("--user syncs permissions to ~/.claude/settings.json", async () => {
+    const tracker = makeAgentTracker();
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    mockReadFile.mockImplementation((...args: unknown[]) => {
+      const pathArg = String(args[0]);
+      if (pathArg.endsWith("settings.json")) {
+        return Promise.resolve(JSON.stringify({ permissions: { allow: [] } }));
+      }
+      return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    });
+
+    await run(makeArgs({ user: true }));
+
+    const settingsCall = mockWriteFile.mock.calls.find(
+      (c) => String(c[0]).endsWith("settings.json") && !String(c[0]).endsWith(".local.json"),
+    );
+    expect(settingsCall).toBeDefined();
+    expect(String(settingsCall![0])).toContain(os.homedir());
+  });
+
+  it("--user dry-run reports correct target paths", async () => {
+    const tracker = makeAgentTracker();
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ user: true, dryRun: true }));
+
+    expect(mockWriteFile).not.toHaveBeenCalled();
+    expect(mockFormatResult).toHaveBeenCalledWith(
+      expect.objectContaining({ written: ["architect"], dryRun: true }),
+      "agents",
+      expect.stringContaining("~/.claude/settings.json"),
+    );
+  });
+
+  it("default (no --user) behavior unchanged", async () => {
+    const tracker = makeAgentTracker();
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs());
+
+    expect(mockFormatResult).toHaveBeenCalledWith(
+      expect.objectContaining({ written: ["architect"] }),
+      "agents",
+      undefined,
+    );
   });
 });

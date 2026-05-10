@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
+import os from "node:os";
 import path from "node:path";
 
 import type { DiscoveredResource, LocalIndexTracker, VFSResult } from "@obsidian-vfs/core";
@@ -59,15 +60,32 @@ export interface ProvisionStrategy {
   syncPermissions(settingsPath: string): Promise<{ added: number }>;
   /** Count how many permission rules would be added (read-only, for dry-run). */
   countPermissions(settingsPath: string): Promise<{ added: number }>;
-  /** Output directory relative to project root (e.g. `.claude/skills`). */
+  /** Output directory -- relative to cwd (project-level) or absolute (user-global). */
   readonly outputDir: string;
+  /** Settings file path -- relative to cwd or absolute. */
+  readonly settingsPath: string;
 }
 
 /** Base directory for Claude Code configuration relative to project root. */
-export const CLAUDE_DIR = ".claude";
+const CLAUDE_DIR = ".claude";
 
 /** Settings file path relative to project root. */
 const SETTINGS_PATH = path.join(CLAUDE_DIR, "settings.local.json");
+
+/** Resolve the user-global Claude configuration directory. */
+export function userGlobalClaudeDir(): string {
+  return path.join(os.homedir(), ".claude");
+}
+
+/** Resolve base directory and settings file for provisioning based on the --user flag. */
+export function provisionPaths(user: boolean): {
+  readonly baseDir: string;
+  readonly settingsPath: string;
+} {
+  const baseDir = user ? userGlobalClaudeDir() : CLAUDE_DIR;
+  const settingsFile = user ? "settings.json" : "settings.local.json";
+  return { baseDir, settingsPath: path.join(baseDir, settingsFile) };
+}
 
 /** Ensure the generic permission rule exists in settings. Returns how many were added (0 or 1). */
 export async function syncPermissionRule(
@@ -153,8 +171,8 @@ export async function run(args: ProvisionArgs, strategy: ProvisionStrategy): Pro
   };
 
   const cwd = process.cwd();
-  const outputDir = path.join(cwd, strategy.outputDir);
-  const settingsPath = path.join(cwd, SETTINGS_PATH);
+  const outputDir = path.resolve(cwd, strategy.outputDir);
+  const settingsPath = path.resolve(cwd, strategy.settingsPath);
 
   const written: string[] = [];
   const errors: string[] = [];
@@ -201,10 +219,15 @@ export async function run(args: ProvisionArgs, strategy: ProvisionStrategy): Pro
     filter,
   };
 
+  const settingsLabel =
+    strategy.settingsPath !== SETTINGS_PATH
+      ? strategy.settingsPath.replace(os.homedir(), "~")
+      : undefined;
+
   if (args.json) {
     writeStdout(formatProvisionJSON(output));
   } else {
-    writeStdout(formatProvisionResult(output, strategy.resourceKind));
+    writeStdout(formatProvisionResult(output, strategy.resourceKind, settingsLabel));
   }
 
   if (args.verbose) {
