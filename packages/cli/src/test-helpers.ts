@@ -12,6 +12,8 @@ export const CLI_DEFAULTS = {
   description: false,
   pin: false,
   user: false,
+  set: [],
+  unset: [],
 } as const;
 
 /** Stub implementation for the `formatError` mock shared by all command tests. */

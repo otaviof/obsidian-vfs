@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { VFSResult } from "@obsidian-vfs/core";
 import type { ProvisionArgs } from "./types.js";
-import { EXIT_ERROR, EXIT_SUCCESS } from "./types.js";
+import { EXIT_ERROR, EXIT_SUCCESS, EXIT_USAGE } from "./types.js";
 import {
   CLI_DEFAULTS,
   FORMAT_ERROR_STUB,
@@ -28,6 +28,7 @@ vi.mock("./formatters.js", () => ({
   formatProvisionResult: vi.fn(() => "PROVISION_RESULT"),
   formatProvisionJSON: vi.fn((o: unknown) => JSON.stringify(o)),
   formatVerboseTiming: vi.fn(FORMAT_VERBOSE_TIMING_STUB),
+  formatUsageError: vi.fn((msg: string) => `USAGE: ${msg}`),
   writeStdout: vi.fn(),
   writeStderr: vi.fn(),
 }));
@@ -565,5 +566,99 @@ describe("cmd-provision-agents", () => {
       "agents",
       undefined,
     );
+  });
+
+  it("--set model=opus overrides remapped model in proxy content", async () => {
+    const vaultWithGemini =
+      "---\ndescription: System architect\nmodel: gemini-2.0-flash-lite\n---\n\nYou are an architect.\n";
+    const tracker = makeAgentTracker([makeDiscoveredResource(agentDefaults)], {
+      ok: true,
+      value: vaultWithGemini,
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ set: ["model=opus"] }));
+
+    const writeCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("architect.md"));
+    expect(writeCall).toBeDefined();
+    const content = String(writeCall![1]);
+    expect(content).toContain("model: opus");
+    expect(content).not.toContain("haiku");
+    expect(content).not.toContain("gemini");
+  });
+
+  it("--set description=custom overrides description in proxy content", async () => {
+    const tracker = makeAgentTracker();
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ set: ["description=custom desc"] }));
+
+    const writeCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("architect.md"));
+    expect(writeCall).toBeDefined();
+    const content = String(writeCall![1]);
+    expect(content).toContain("description: custom desc");
+  });
+
+  it("--set with key not in source frontmatter appends it", async () => {
+    const tracker = makeAgentTracker();
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ set: ["context=fork"] }));
+
+    const writeCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("architect.md"));
+    expect(writeCall).toBeDefined();
+    const content = String(writeCall![1]);
+    expect(content).toContain("context: fork");
+  });
+
+  it("--unset model removes model line from proxy content", async () => {
+    const vaultWithModel =
+      "---\ndescription: System architect\nmodel: sonnet\n---\n\nYou are an architect.\n";
+    const tracker = makeAgentTracker([makeDiscoveredResource(agentDefaults)], {
+      ok: true,
+      value: vaultWithModel,
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ unset: ["model"] }));
+
+    const writeCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("architect.md"));
+    expect(writeCall).toBeDefined();
+    const content = String(writeCall![1]);
+    expect(content).not.toContain("model:");
+  });
+
+  it("--unset description removes description from proxy content", async () => {
+    const tracker = makeAgentTracker();
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ unset: ["description"] }));
+
+    const writeCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("architect.md"));
+    expect(writeCall).toBeDefined();
+    const content = String(writeCall![1]);
+    expect(content).not.toContain("description:");
+  });
+
+  it("invalid --set value returns EXIT_USAGE", async () => {
+    const code = await run(makeArgs({ set: ["invalid"] }));
+
+    expect(code).toBe(EXIT_USAGE);
+    expect(mockWriteStderr).toHaveBeenCalled();
+    expect(mockBootstrap).not.toHaveBeenCalled();
+  });
+
+  it("default behavior unchanged when no --set/--unset", async () => {
+    const tracker = makeAgentTracker();
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs());
+
+    const writeCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("architect.md"));
+    expect(writeCall).toBeDefined();
+    const content = String(writeCall![1]);
+    expect(content).toContain("name: architect");
+    expect(content).toContain("description: System architect");
+    expect(content).toContain("tools: Read, Grep");
   });
 });

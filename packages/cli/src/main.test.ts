@@ -339,4 +339,53 @@ describe("parseGlobalArgs", () => {
       expect(result.options.user).toBe(true);
     }
   });
+
+  it("parses --set model=opus", () => {
+    const result = parseGlobalArgs(["provision-skills", "--set", "model=opus"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.set).toEqual(["model=opus"]);
+    }
+  });
+
+  it("parses --unset model", () => {
+    const result = parseGlobalArgs(["provision-agents", "--unset", "model"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.unset).toEqual(["model"]);
+    }
+  });
+
+  it("parses multiple --set and --unset flags", () => {
+    const result = parseGlobalArgs([
+      "provision-agents",
+      "--set",
+      "model=opus",
+      "--set",
+      "allowed-tools=Bash",
+      "--unset",
+      "argument-hint",
+    ]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.set).toEqual(["model=opus", "allowed-tools=Bash"]);
+      expect(result.options.unset).toEqual(["argument-hint"]);
+    }
+  });
+
+  it("--set defaults to empty array", () => {
+    const result = parseGlobalArgs(["provision-skills"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.set).toEqual([]);
+    }
+  });
+
+  it("--unset defaults to empty array", () => {
+    const result = parseGlobalArgs(["provision-skills"]);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.options.unset).toEqual([]);
+    }
+  });
 });

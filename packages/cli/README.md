@@ -104,6 +104,10 @@ npx @obsidian-vfs/cli provision-skills --exclude "draft-*"
 npx @obsidian-vfs/cli provision-skills --pin
 npx @obsidian-vfs/cli provision-skills --user
 npx @obsidian-vfs/cli provision-skills --json
+npx @obsidian-vfs/cli provision-skills --set model=opus
+npx @obsidian-vfs/cli provision-skills --set model=claude-sonnet-4-6 --set allowed-tools=Bash
+npx @obsidian-vfs/cli provision-skills --unset argument-hint
+npx @obsidian-vfs/cli provision-skills --set model=opus --unset argument-hint
 ```
 
 | Flag | Description |
@@ -113,6 +117,8 @@ npx @obsidian-vfs/cli provision-skills --json
 | `--exclude <glob>` | Skip matching skills (repeatable) |
 | `--pin` | Pin generated commands to the current CLI version |
 | `--user` | Provision to `~/.claude/skills/` and `~/.claude/settings.json` instead of project-level |
+| `--set <key=value>` | Override a frontmatter attribute (repeatable) |
+| `--unset <key>` | Remove a frontmatter attribute (repeatable) |
 
 #### Why proxy skills?
 
@@ -127,7 +133,7 @@ The Claude plugin's `@obs:` hook can inject vault content via `additionalContext
 | `context: fork` (subagent isolation) | Supported | Not available |
 | Compaction survival | Re-attached (5K tokens each, 25K budget) | Dropped |
 | `allowed-tools` (pre-authorized permissions) | Supported | Not available |
-| Model/effort override | Via frontmatter | Not available |
+| Model/effort override | Via frontmatter or `--set`/`--unset` | Not available |
 | Live change detection | Watched directories | N/A |
 
 Provisioning bridges this gap: it generates thin proxy files that Claude Code discovers natively, while the actual content is fetched live from the vault.
@@ -195,6 +201,10 @@ npx @obsidian-vfs/cli provision-agents --exclude "draft-*"
 npx @obsidian-vfs/cli provision-agents --pin
 npx @obsidian-vfs/cli provision-agents --user
 npx @obsidian-vfs/cli provision-agents --json
+npx @obsidian-vfs/cli provision-agents --set model=opus
+npx @obsidian-vfs/cli provision-agents --set model=haiku --set allowed-tools="Bash, Read"
+npx @obsidian-vfs/cli provision-agents --unset allowed-tools
+npx @obsidian-vfs/cli provision-agents --set model=opus --unset argument-hint
 ```
 
 | Flag | Description |
@@ -204,6 +214,8 @@ npx @obsidian-vfs/cli provision-agents --json
 | `--exclude <glob>` | Skip matching agents (repeatable) |
 | `--pin` | Pin generated commands to the current CLI version |
 | `--user` | Provision to `~/.claude/agents/` and `~/.claude/settings.json` instead of project-level |
+| `--set <key=value>` | Override a frontmatter attribute (repeatable) |
+| `--unset <key>` | Remove a frontmatter attribute (repeatable) |
 
 #### Agent vs. skill proxies
 
@@ -211,12 +223,33 @@ npx @obsidian-vfs/cli provision-agents --json
 |--------|--------------------|--------------------|
 | Output format | `.claude/skills/<name>/SKILL.md` (directory) | `.claude/agents/<name>.md` (flat file) |
 | Body mechanism | `!`command`` loads fresh content per session | Full content written at provisioning time |
-| Frontmatter | Minimal (name + description) | All fields forwarded from vault |
+| Frontmatter | Minimal (name + description), overridable via `--set`/`--unset` | All fields forwarded from vault, overridable via `--set`/`--unset` |
 | Wikilink scrubbing | At runtime by `obs-read` | At provisioning time by CLI |
 | Permissions | Single generic `Bash(npx ... inspect --body *)` | Same generic rule |
 | Content freshness | Always current | Stale until re-provisioned |
 
 Same add-only behavior as skills. Delete `.claude/agents/<name>.md` manually to remove a deprovisioned agent.
+
+#### Model mapping
+
+Provisioning automatically remaps non-Claude `model:` values in vault frontmatter to the closest Claude equivalent. Claude model names (`haiku`, `sonnet`, `opus`) pass through unchanged.
+
+| Vault model | Maps to | Tier |
+|-------------|---------|------|
+| `gemini-*flash-lite*` | `haiku` | Lightweight |
+| `gpt-4o-mini*` | `haiku` | Lightweight |
+| `gpt-3.5*` | `haiku` | Lightweight |
+| `gemini-*flash*` | `sonnet` | Balanced |
+| `gemini-*pro*` | `sonnet` | Balanced |
+| `gpt-4o` | `sonnet` | Balanced |
+| `gpt-4-turbo*` | `sonnet` | Balanced |
+| `gemini-*ultra*` | `opus` | Most capable |
+| `gpt-4.5*` | `opus` | Most capable |
+| `o1*` | `opus` | Most capable |
+| `o3*` | `opus` | Most capable |
+| _(unrecognized)_ | `sonnet` | Default fallback |
+
+Mapping runs during provisioning only — vault source notes are never modified. For skills, mapping happens during frontmatter extraction (`formatCuratedLines`). For agents, mapping happens inside `buildFrontmatter` before `--set`/`--unset` overrides are applied, so `--set model=opus` always writes the value verbatim regardless of the vault source model.
 
 ### Project-level vs. user-global provisioning
 

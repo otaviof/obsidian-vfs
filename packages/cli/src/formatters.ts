@@ -280,6 +280,8 @@ Options:
   --exclude <glob>        Skip resources matching glob (repeatable, provision-*)
   --pin                   Pin generated commands to the current CLI version (provision-*)
   --user                  Provision to ~/.claude/ (user-global) instead of .claude/ (project-level)
+  --set <key=value>       Override a frontmatter attribute in provisioned files (repeatable, provision-*)
+  --unset <key>           Remove a frontmatter attribute from provisioned files (repeatable, provision-*)
   -h, --help              Show this help message
 
 Environment:
@@ -307,7 +309,11 @@ Examples:
   ${CLI_CMD} provision-agents --include architect --include reviewer
   ${CLI_CMD} provision-agents --exclude "draft-*"
   ${CLI_CMD} provision-agents --user
-  ${CLI_CMD} provision-skills --user --dry-run`;
+  ${CLI_CMD} provision-skills --user --dry-run
+  ${CLI_CMD} provision-skills --set model=opus
+  ${CLI_CMD} provision-agents --set model=claude-sonnet-4-6 --set allowed-tools=Bash
+  ${CLI_CMD} provision-agents --unset allowed-tools
+  ${CLI_CMD} provision-skills --set model=opus --unset argument-hint`;
 }
 
 /** Format a usage error with the correct usage hint. */

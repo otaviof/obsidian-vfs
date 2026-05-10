@@ -3,7 +3,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { ProvisionArgs } from "./types.js";
-import { EXIT_ERROR, EXIT_SUCCESS } from "./types.js";
+import { EXIT_ERROR, EXIT_SUCCESS, EXIT_USAGE } from "./types.js";
 import {
   CLI_DEFAULTS,
   FORMAT_ERROR_STUB,
@@ -27,6 +27,7 @@ vi.mock("./formatters.js", () => ({
   formatProvisionResult: vi.fn(() => "PROVISION_RESULT"),
   formatProvisionJSON: vi.fn((o: unknown) => JSON.stringify(o)),
   formatVerboseTiming: vi.fn(FORMAT_VERBOSE_TIMING_STUB),
+  formatUsageError: vi.fn((msg: string) => `USAGE: ${msg}`),
   writeStdout: vi.fn(),
   writeStderr: vi.fn(),
 }));
@@ -733,5 +734,92 @@ describe("cmd-provision-skills", () => {
       permissions: { allow: string[] };
     };
     expect(written.permissions.allow).toContainEqual(buildPermissionRule(true));
+  });
+
+  it("--set model=opus overrides model in proxy content", async () => {
+    const vaultSource =
+      "---\ndescription: Deploy helper\nmodel: gemini-2.0-flash-lite\n---\n\nDeploy content.\n";
+    const tracker = makeListSkillsTracker(
+      { ok: true, value: [makeDiscoveredResource()] },
+      { readFileResult: { ok: true, value: vaultSource } },
+    );
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ set: ["model=opus"] }));
+
+    const writeCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("SKILL.md"));
+    expect(writeCall).toBeDefined();
+    const content = String(writeCall![1]);
+    expect(content).toContain("model: opus");
+    expect(content).not.toContain("haiku");
+  });
+
+  it("--set description=custom overrides description in proxy content", async () => {
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ set: ["description=custom desc"] }));
+
+    const writeCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("SKILL.md"));
+    expect(writeCall).toBeDefined();
+    const content = String(writeCall![1]);
+    expect(content).toContain("description: custom desc");
+    expect(content).not.toContain("description: Deploy helper");
+  });
+
+  it("--unset model removes model line from proxy content", async () => {
+    const vaultSource =
+      "---\ndescription: Deploy helper\nmodel: sonnet\n---\n\nDeploy content.\n";
+    const tracker = makeListSkillsTracker(
+      { ok: true, value: [makeDiscoveredResource()] },
+      { readFileResult: { ok: true, value: vaultSource } },
+    );
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ unset: ["model"] }));
+
+    const writeCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("SKILL.md"));
+    expect(writeCall).toBeDefined();
+    const content = String(writeCall![1]);
+    expect(content).not.toContain("model:");
+  });
+
+  it("--unset description removes description from proxy content", async () => {
+    const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs({ unset: ["description"] }));
+
+    const writeCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("SKILL.md"));
+    expect(writeCall).toBeDefined();
+    const content = String(writeCall![1]);
+    expect(content).not.toContain("description:");
+  });
+
+  it("invalid --set value returns EXIT_USAGE", async () => {
+    const code = await run(makeArgs({ set: ["invalid"] }));
+
+    expect(code).toBe(EXIT_USAGE);
+    expect(mockWriteStderr).toHaveBeenCalled();
+    expect(mockBootstrap).not.toHaveBeenCalled();
+  });
+
+  it("default behavior unchanged when no --set/--unset", async () => {
+    const vaultSource =
+      "---\ndescription: Deploy helper\nmodel: sonnet\n---\n\nDeploy content.\n";
+    const tracker = makeListSkillsTracker(
+      { ok: true, value: [makeDiscoveredResource()] },
+      { readFileResult: { ok: true, value: vaultSource } },
+    );
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    await run(makeArgs());
+
+    const writeCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("SKILL.md"));
+    expect(writeCall).toBeDefined();
+    const content = String(writeCall![1]);
+    expect(content).toContain("model: sonnet");
+    expect(content).toContain("name: deploy");
+    expect(content).toContain("description: Deploy helper");
   });
 });

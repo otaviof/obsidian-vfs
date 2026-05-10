@@ -1,9 +1,10 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 
-import { remapModelLine, scrubWikilinks } from "@obsidian-vfs/core";
+import { scrubWikilinks } from "@obsidian-vfs/core";
 
 import type { ProvisionArgs } from "./types.js";
+import { EXIT_USAGE } from "./types.js";
 import type { ProvisionStrategy } from "./cmd-provision-resources.js";
 import {
   countPermissionRule,
@@ -11,47 +12,12 @@ import {
   run as runProvision,
   syncPermissionRule,
 } from "./cmd-provision-resources.js";
-
-/** Regex to match a `name:` line in YAML frontmatter. */
-const NAME_LINE_RE = /^name:\s*.+$/m;
-
-/** Split markdown content into raw frontmatter block and body. */
-function splitFrontmatterAndBody(content: string): {
-  frontmatter: string | undefined;
-  body: string;
-} {
-  if (!content.startsWith("---\n")) return { frontmatter: undefined, body: content };
-  const end = content.indexOf("\n---\n", 4);
-  if (end === -1) return { frontmatter: undefined, body: content };
-  return { frontmatter: content.slice(4, end), body: content.slice(end + 5) };
-}
-
-/** Ensure `name:` is present in frontmatter, replacing any existing value. */
-function ensureNameInFrontmatter(frontmatter: string, name: string): string {
-  if (NAME_LINE_RE.test(frontmatter)) {
-    return frontmatter.replace(NAME_LINE_RE, `name: ${name}`);
-  }
-  return `name: ${name}\n${frontmatter}`;
-}
-
-/** Build the proxy agent content from vault source. */
-function buildProxyContent(
-  name: string,
-  description: string,
-  content: string,
-  vaultName: string,
-): string {
-  const { frontmatter, body } = splitFrontmatterAndBody(content);
-  const scrubbedBody = scrubWikilinks(body, vaultName);
-
-  if (frontmatter) {
-    const remapped = remapModelLine(frontmatter);
-    const fm = ensureNameInFrontmatter(remapped, name);
-    return `---\n${fm}\n---\n${scrubbedBody}`;
-  }
-
-  return ["---", `name: ${name}`, `description: ${description}`, "---", "", scrubbedBody].join("\n");
-}
+import {
+  buildFrontmatter,
+  parseFrontmatterOverrides,
+  splitFrontmatterAndBody,
+} from "./build-frontmatter.js";
+import { formatUsageError, writeStderr } from "./formatters.js";
 
 /** Write a single proxy agent file, creating the directory if needed. */
 async function writeProxyAgent(
@@ -75,6 +41,13 @@ async function writeProxyAgent(
 
 /** Execute the provision-agents command. */
 export async function run(args: ProvisionArgs): Promise<number> {
+  const overridesResult = parseFrontmatterOverrides(args.set, args.unset);
+  if (!overridesResult.ok) {
+    writeStderr(formatUsageError(overridesResult.error.message));
+    return EXIT_USAGE;
+  }
+  const overrides = overridesResult.value;
+
   const { baseDir, settingsPath } = provisionPaths(args.user);
 
   const agentStrategy: ProvisionStrategy = {
@@ -87,12 +60,17 @@ export async function run(args: ProvisionArgs): Promise<number> {
       if (!content.ok) {
         throw new Error(`read vault agent ${resource.name}: ${content.error.message}`);
       }
-      const proxyContent = buildProxyContent(
-        resource.name,
-        resource.description,
-        content.value,
-        tracker.context.name,
-      );
+      const { frontmatter, body } = splitFrontmatterAndBody(content.value);
+      const sourceLines = frontmatter ? frontmatter.split("\n") : [];
+      const scrubbedBody = scrubWikilinks(body, tracker.context.name);
+      const fm = buildFrontmatter({
+        name: resource.name,
+        description: resource.description,
+        sourceLines,
+        remapModel: true,
+        overrides,
+      });
+      const proxyContent = `---\n${fm.join("\n")}\n---\n${scrubbedBody}`;
       return writeProxyAgent(resource.name, proxyContent, outputDir);
     },
     syncPermissions: (settingsPath) => syncPermissionRule(settingsPath, args.pin),

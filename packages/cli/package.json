@@ -1,6 +1,6 @@
 {
   "name": "@obsidian-vfs/cli",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "type": "module",
   "description": "CLI for Obsidian VFS — provision skills/agents, inspect vault resources",
   "license": "MIT",
@@ -36,5 +36,8 @@
   },
   "dependencies": {
     "@obsidian-vfs/core": "workspace:^"
+  },
+  "devDependencies": {
+    "yaml": "^2.8.4"
   }
 }

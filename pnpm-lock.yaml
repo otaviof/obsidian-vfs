@@ -37,7 +37,7 @@ importers:
         version: 8.59.2(eslint@10.3.0(jiti@2.7.0))(typescript@6.0.3)
       vitest:
         specifier: ^4.0.0
-        version: 4.1.5(@types/node@22.19.18)(@vitest/coverage-v8@4.1.5)(vite@8.0.11(@types/node@22.19.18)(jiti@2.7.0))
+        version: 4.1.5(@types/node@22.19.18)(@vitest/coverage-v8@4.1.5)(vite@8.0.11(@types/node@22.19.18)(jiti@2.7.0)(yaml@2.8.4))
 
   packages/claude-plugin:
     dependencies:
@@ -54,12 +54,16 @@ importers:
       '@obsidian-vfs/core':
         specifier: workspace:^
         version: link:../core
+    devDependencies:
+      yaml:
+        specifier: ^2.8.4
+        version: 2.8.4
 
   packages/core:
     devDependencies:
       vitest:
         specifier: ^4.0.0
-        version: 4.1.5(@types/node@22.19.18)(@vitest/coverage-v8@4.1.5)(vite@8.0.11(@types/node@22.19.18)(jiti@2.7.0))
+        version: 4.1.5(@types/node@22.19.18)(@vitest/coverage-v8@4.1.5)(vite@8.0.11(@types/node@22.19.18)(jiti@2.7.0)(yaml@2.8.4))
 
   packages/vscode:
     dependencies:
@@ -2147,6 +2151,11 @@ packages:
   yallist@4.0.0:
     resolution: {integrity: sha512-3wdGidZyq5PB084XLES5TpOSRA3wjXAlIWMhum2kRcv/41Sn2emQ0dycQW4uZXLejwKvg6EsvbdlVL+FYEct7A==}
 
+  yaml@2.8.4:
+    resolution: {integrity: sha512-ml/JPOj9fOQK8RNnWojA67GbZ0ApXAUlN2UQclwv2eVgTgn7O9gg9o7paZWKMp4g0H3nTLtS9LVzhkpOFIKzog==}
+    engines: {node: '>= 14.6'}
+    hasBin: true
+
   yauzl@3.3.0:
     resolution: {integrity: sha512-PtGEvEP30p7sbIBJKUBjUnqgTVOyMURc4dLo9iNyAJnNIEz9pm88cCXF21w94Kg3k6RXkeZh5DHOGS0qEONvNQ==}
     engines: {node: '>=12'}
@@ -2742,7 +2751,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.1.0
       tinyrainbow: 3.1.0
-      vitest: 4.1.5(@types/node@22.19.18)(@vitest/coverage-v8@4.1.5)(vite@8.0.11(@types/node@22.19.18)(jiti@2.7.0))
+      vitest: 4.1.5(@types/node@22.19.18)(@vitest/coverage-v8@4.1.5)(vite@8.0.11(@types/node@22.19.18)(jiti@2.7.0)(yaml@2.8.4))
 
   '@vitest/expect@4.1.5':
     dependencies:
@@ -2753,13 +2762,13 @@ snapshots:
       chai: 6.2.2
       tinyrainbow: 3.1.0
 
-  '@vitest/mocker@4.1.5(vite@8.0.11(@types/node@22.19.18)(jiti@2.7.0))':
+  '@vitest/mocker@4.1.5(vite@8.0.11(@types/node@22.19.18)(jiti@2.7.0)(yaml@2.8.4))':
     dependencies:
       '@vitest/spy': 4.1.5
       estree-walker: 3.0.3
       magic-string: 0.30.21
     optionalDependencies:
-      vite: 8.0.11(@types/node@22.19.18)(jiti@2.7.0)
+      vite: 8.0.11(@types/node@22.19.18)(jiti@2.7.0)(yaml@2.8.4)
 
   '@vitest/pretty-format@4.1.5':
     dependencies:
@@ -4173,7 +4182,7 @@ snapshots:
 
   version-range@4.15.0: {}
 
-  vite@8.0.11(@types/node@22.19.18)(jiti@2.7.0):
+  vite@8.0.11(@types/node@22.19.18)(jiti@2.7.0)(yaml@2.8.4):
     dependencies:
       lightningcss: 1.32.0
       picomatch: 4.0.4
@@ -4184,11 +4193,12 @@ snapshots:
       '@types/node': 22.19.18
       fsevents: 2.3.3
       jiti: 2.7.0
+      yaml: 2.8.4
 
-  vitest@4.1.5(@types/node@22.19.18)(@vitest/coverage-v8@4.1.5)(vite@8.0.11(@types/node@22.19.18)(jiti@2.7.0)):
+  vitest@4.1.5(@types/node@22.19.18)(@vitest/coverage-v8@4.1.5)(vite@8.0.11(@types/node@22.19.18)(jiti@2.7.0)(yaml@2.8.4)):
     dependencies:
       '@vitest/expect': 4.1.5
-      '@vitest/mocker': 4.1.5(vite@8.0.11(@types/node@22.19.18)(jiti@2.7.0))
+      '@vitest/mocker': 4.1.5(vite@8.0.11(@types/node@22.19.18)(jiti@2.7.0)(yaml@2.8.4))
       '@vitest/pretty-format': 4.1.5
       '@vitest/runner': 4.1.5
       '@vitest/snapshot': 4.1.5
@@ -4205,7 +4215,7 @@ snapshots:
       tinyexec: 1.1.2
       tinyglobby: 0.2.16
       tinyrainbow: 3.1.0
-      vite: 8.0.11(@types/node@22.19.18)(jiti@2.7.0)
+      vite: 8.0.11(@types/node@22.19.18)(jiti@2.7.0)(yaml@2.8.4)
       why-is-node-running: 2.3.0
     optionalDependencies:
       '@types/node': 22.19.18
@@ -4245,6 +4255,8 @@ snapshots:
   xmlbuilder@11.0.1: {}
 
   yallist@4.0.0: {}
+
+  yaml@2.8.4: {}
 
   yauzl@3.3.0:
     dependencies:
