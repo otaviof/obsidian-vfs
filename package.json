@@ -22,7 +22,7 @@
     "check:versions:npm": "hack/check-version.sh packages/core/package.json packages/cli/package.json",
     "check:versions:vscode": "hack/check-version.sh packages/vscode/package.json",
     "check:published:npm": "hack/check-published.sh npm @obsidian-vfs/cli packages/cli/package.json",
-    "check:published:vscode": "hack/check-published.sh vscode obsidian-vfs.obsidian-vfs packages/vscode/package.json",
+    "check:published:vscode": "hack/check-published.sh vscode otaviof.obsidian-vfs packages/vscode/package.json",
     "publish:npm": "pnpm publish:npm:core && pnpm publish:npm:cli",
     "publish:npm:core": "hack/publish-npm.sh packages/core",
     "publish:npm:cli": "hack/publish-npm.sh packages/cli",
