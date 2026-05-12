@@ -26,7 +26,7 @@
     "publish:npm": "pnpm publish:npm:core && pnpm publish:npm:cli",
     "publish:npm:core": "hack/publish-npm.sh packages/core",
     "publish:npm:cli": "hack/publish-npm.sh packages/cli",
-    "publish:vscode": "pnpm --filter obsidian-vfs exec vsce publish --packagePath obsidian-vfs.vsix",
+    "publish:vscode": "pnpm --filter obsidian-vfs run publish",
     "reset": "pnpm -r run clean && rm -rf node_modules packages/*/node_modules && pnpm install"
   },
   "pnpm": {
