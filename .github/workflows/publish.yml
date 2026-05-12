@@ -1,0 +1,72 @@
+---
+name: Publish
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'packages/*/package.json'
+  workflow_dispatch:
+
+concurrency:
+  group: publish
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  detect:
+    runs-on: ubuntu-latest
+    outputs:
+      npm: ${{ steps.npm.outputs.publish }}
+      vscode: ${{ steps.vscode.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - id: npm
+        run: pnpm check:published:npm
+
+      - id: vscode
+        run: pnpm check:published:vscode
+
+  npm:
+    needs: detect
+    if: needs.detect.outputs.npm == 'true'
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+        with:
+          registry-url: https://registry.npmjs.org
+
+      - run: pnpm check:versions:npm
+
+      - run: pnpm run ci
+
+      - run: pnpm publish:npm:core
+        continue-on-error: true
+
+      - run: pnpm publish:npm:cli
+
+  vscode:
+    needs: detect
+    if: needs.detect.outputs.vscode == 'true'
+    runs-on: ubuntu-latest
+    environment: vscode-marketplace
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - run: pnpm run ci
+
+      - run: pnpm package:vscode
+
+      - run: pnpm publish:vscode
+        env:
+          VSCE_PAT: ${{ secrets.VSCE_PAT }}

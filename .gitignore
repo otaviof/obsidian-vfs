@@ -1,5 +1,6 @@
-.env
 .claude
+.env
+*.tgz
 *.tsbuildinfo
 *.vsix
 coverage/

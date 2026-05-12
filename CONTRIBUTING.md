@@ -34,6 +34,12 @@ TypeScript 6 strict, ESM-only (`"type": "module"`) | pnpm 11 workspaces, Node 22
 | `pnpm package:vscode` | Build + package VS Code extension (`.vsix`) |
 | `pnpm cli` | Run the CLI (after building) |
 | `pnpm audit` | Check dependencies for known vulnerabilities |
+| `pnpm check:bundles` | Verify tracked Claude plugin bundles match build output |
+| `pnpm check:versions:npm` | Verify core/cli versions match |
+| `pnpm check:versions:vscode` | Print VS Code extension version |
+| `pnpm check:published:npm` | Check if npm packages need publishing |
+| `pnpm check:published:vscode` | Check if VS Code extension needs publishing |
+| `pnpm publish:vscode` | Publish VS Code extension to marketplace (requires `VSCE_PAT`) |
 | `pnpm reset` | Wipe and reinstall `node_modules` |
 
 **Do NOT run bare `pnpm ci`** — that is pnpm's clean-install and wipes `node_modules`. Use `pnpm run ci`.
@@ -84,15 +90,14 @@ Shared ignores across `.gitignore`, `.prettierignore`, `eslint.config.ts`: `node
 
 **Claude plugin** (`plugin.json`): independent version tracking marketplace releases. The plugin stays `private: true` — it is not published to npm.
 
-### Publishing to npm
+### Publishing
 
-Manual workflow:
+1. Bump versions in the relevant `package.json` files (core + cli must match).
+2. Merge to `main`.
 
-1. Bump versions in `packages/core/package.json` and `packages/cli/package.json` (must match).
-2. Run `pnpm run ci` — lint, build, test must pass.
-3. `cd packages/core && npm publish --access public`
-4. `cd packages/cli && npm publish --access public`
-5. Verify: `npx @obsidian-vfs/cli@<version> --help`
+The `publish.yml` workflow runs automatically on every push to `main`, detects which packages have unpublished versions, and publishes only those. If no versions changed, nothing is published.
+
+To publish manually: `gh workflow run publish.yml`
 
 ## Developing the CLI
 

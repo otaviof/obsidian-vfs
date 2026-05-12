@@ -1,0 +1,29 @@
+---
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/setup
+
+      - run: pnpm lint
+
+      - run: pnpm format:check
+
+      - run: pnpm build
+
+      - run: pnpm test
+
+      - run: pnpm check:bundles

@@ -2,6 +2,9 @@
   <img src="packages/vscode/obsidian-vfs.png" alt="Obsidian VFS" width="200" />
   <br>
   <br>
+  <a href="https://github.com/otaviof/obsidian-vfs/actions/workflows/ci.yml"><img src="https://github.com/otaviof/obsidian-vfs/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/otaviof/obsidian-vfs/actions/workflows/audit.yml"><img src="https://github.com/otaviof/obsidian-vfs/actions/workflows/audit.yml/badge.svg" alt="Audit"></a>
+  <br>
   <a href="https://www.npmjs.com/package/@obsidian-vfs/core"><img src="https://img.shields.io/npm/v/@obsidian-vfs/core?label=%40obsidian-vfs%2Fcore" alt="@obsidian-vfs/core"></a>
   <a href="https://www.npmjs.com/package/@obsidian-vfs/cli"><img src="https://img.shields.io/npm/v/@obsidian-vfs/cli?label=%40obsidian-vfs%2Fcli" alt="@obsidian-vfs/cli"></a>
 </p>
