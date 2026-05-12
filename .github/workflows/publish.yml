@@ -22,7 +22,7 @@ jobs:
       npm: ${{ steps.npm.outputs.publish }}
       vscode: ${{ steps.vscode.outputs.publish }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/setup
 
       - id: npm
@@ -40,7 +40,7 @@ jobs:
       contents: read
       id-token: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/setup
         with:
           registry-url: https://registry.npmjs.org
@@ -60,7 +60,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: vscode-marketplace
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/setup
 
       - run: pnpm run ci
