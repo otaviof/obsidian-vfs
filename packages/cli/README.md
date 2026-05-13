@@ -68,9 +68,11 @@ npx @obsidian-vfs/cli inspect "/obs:obsidian"
 | `--body` | Output only the raw content body (no metadata headers, no truncation) |
 | `--full` | Show full content without truncation |
 
+The plugin's [`obs-read`](../claude-plugin/README.md#obs-read) bin script calls `inspect --body` internally for hook-triggered reads. `inspect` is the general-purpose CLI command; `obs-read` is a thin entry point used by plugin hooks at runtime.
+
 ### `list-skills`
 
-Enumerate all skills discovered from the vault's `skillsDirs` (configured in `.obsidian/obsidian-vfs.json`).
+Enumerate all skills discovered from the vault's `skillsDirs` (see [Vault Configuration](../../README.md#vault-configuration)).
 
 ```sh
 npx @obsidian-vfs/cli list-skills
@@ -175,7 +177,7 @@ When `OBSIDIAN_VFS_PROJECT_DIR` is set, the rule uses the local path instead: `B
 
 #### Behavior
 
-- Enumerates every `skillsDir` in `.obsidian/obsidian-vfs.json`, finds subdirectories containing `SKILL.md`, extracts frontmatter, and writes proxy files.
+- Enumerates every `skillsDir` from the [vault config](../../README.md#vault-configuration), finds subdirectories containing `SKILL.md`, extracts frontmatter, and writes proxy files.
 - Writes are idempotent — identical proxies are skipped.
 - Skill names validated against `/^[a-zA-Z0-9._-]+$/`; shell metacharacters rejected.
 - When multiple `skillsDirs` contain a skill with the same name, the first directory wins.

@@ -27,7 +27,7 @@ TypeScript 6 strict, ESM-only (`"type": "module"`) | pnpm 11 workspaces, Node 22
 |---------|-------------|
 | `pnpm build` | Build all packages (`tsc -b`) |
 | `pnpm test` | Run tests (Vitest) |
-| `pnpm run ci` | Full check: lint, build, test (in sequence) |
+| `pnpm run ci` | Full check: lint, build, test (not bare `pnpm ci`, which wipes `node_modules`) |
 | `pnpm lint` | Run ESLint |
 | `pnpm format` | Format with Prettier |
 | `pnpm format:check` | Check formatting without writing |
@@ -41,8 +41,6 @@ TypeScript 6 strict, ESM-only (`"type": "module"`) | pnpm 11 workspaces, Node 22
 | `pnpm check:published:vscode` | Check if VS Code extension needs publishing |
 | `pnpm publish:vscode` | Publish VS Code extension to marketplace (requires `VSCE_PAT`) |
 | `pnpm reset` | Wipe and reinstall `node_modules` |
-
-**Do NOT run bare `pnpm ci`** — that is pnpm's clean-install and wipes `node_modules`. Use `pnpm run ci`.
 
 ## Architecture
 
@@ -80,7 +78,7 @@ The consumer packages (`vscode`, `claude-plugin`, `cli`) depend on `core` but ha
 
 ### Ignore Patterns
 
-Shared ignores across `.gitignore`, `.prettierignore`, `eslint.config.ts`: `node_modules/`, `dist/`, `coverage/`. When adding generated/vendored directories, add to all three files. Exception: `bundle/` is ignored by ESLint and Prettier but **not** `.gitignore` — it must be tracked in git for marketplace installs.
+Shared ignores across `.gitignore`, `.prettierignore`, `eslint.config.ts`: `node_modules/`, `dist/`, `coverage/`. When adding generated/vendored directories, add to all three files. Exception: `bundle/` is ignored by ESLint and Prettier but tracked in git — it must be committed for marketplace installs.
 
 ### Versioning
 

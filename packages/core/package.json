@@ -3,7 +3,7 @@
   "version": "0.1.4",
   "type": "module",
   "description": "Core library for Obsidian VFS — vault resolution, content processing, path security",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/otaviof/obsidian-vfs",

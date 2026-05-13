@@ -11,7 +11,7 @@ Shared engine for Obsidian VFS. Provides `obs://` URI resolution, file I/O, Obsi
 - **Frontmatter** — Extraction, curation, and formatting of YAML frontmatter. Model field mapping to Claude model identifiers via `mapModelToClaude()`.
 - **Caching** — Generic `LRUCache<K, V>` with TTL expiration.
 - **Security** — `path.resolve` + vault-root prefix check on all I/O. Symlink rejection outside vault. `allowedFolders` enforcement.
-- **Configuration** — Vault config from `.obsidian/obsidian-vfs.json` (`agentsDirs`, `skillsDirs`, `allowedFolders`).
+- **Configuration** — Vault config from [`.obsidian/obsidian-vfs.json`](../../README.md#vault-configuration) (`agentsDirs`, `skillsDirs`, `allowedFolders`).
 
 ## Exports
 
@@ -21,6 +21,17 @@ The package exposes two entry points:
 |-------|------|---------|
 | `.` | `dist/index.js` | All production exports |
 | `./testing` | `dist/test-helpers.js` | Test utilities and mocks |
+
+### Testing Utilities
+
+The `./testing` entry point provides test doubles for consumer packages:
+
+| Utility | Description |
+|---------|-------------|
+| `mockCLI(overrides?)` | Fully-stubbed `ObsidianCLI` mock with optional per-method overrides |
+| `mockFsFunction(fn)` | Type-safe cast wrapper for mocked `node:fs/promises` functions |
+| `makeLocalIndexTrackerWith(methodName, result, extraMethods?, contextOverrides?)` | Build a mock `LocalIndexTracker` whose single method resolves to a given `VFSResult` |
+| `makeDiscoveredResource(overrides?)` | Build a `DiscoveredResource` with sensible defaults |
 
 ### Key Exports
 
