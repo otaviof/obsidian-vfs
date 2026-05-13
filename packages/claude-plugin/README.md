@@ -6,6 +6,10 @@ Claude Code plugin that intercepts `UserPromptSubmit`, `UserPromptExpansion`, an
 - **`UserPromptExpansion`** — detects vault-sourced proxy skills (provisioned via CLI), resolves `obs://` URIs in the skill's content to pre-load linked notes.
 - **`SubagentStart`** — scans provisioned agent definitions for `obs://` URIs and resolves linked notes into the agent's context.
 
+## Related Tools
+
+This Claude Code plugin enables Claude to read and search Obsidian vaults via mention syntax. If you use **VS Code**, the companion [VSCode extension](../vscode/) provides a virtual file system for browsing, editing, and navigating vault notes directly in the editor.
+
 ## Mention Syntax
 
 Two mention formats are supported:

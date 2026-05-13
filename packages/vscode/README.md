@@ -65,6 +65,10 @@ The `obs://` FileSystemProvider remains registered for internal operations (stat
 - The Explorer tree view and the workspace folders both appear in the sidebar. This duplication is an accepted trade-off — the tree view provides custom UI (welcome view, context menus), while the workspace folders enable Quick Open and cross-extension visibility.
 - The vault's `.git` repository is automatically added to `git.ignoredRepositories` (user-level setting) when workspace folders are mounted, preventing VS Code's Git extension from listing it in Source Control. The entry is removed when `obsidianVFS.workspace` is disabled.
 
+## Related Tools
+
+This VSCode extension provides file-system access and UI integration for Obsidian vaults. If you use **Claude Code**, the companion [`@obsidian-vfs/claude-plugin`](https://github.com/otaviof/obsidian-vfs/tree/main/packages/claude-plugin) enables Claude to read and search your vault via `@obs:` mentions and automatically resolves wikilinks in agent definitions and skills.
+
 ## Prerequisites
 
 - [Obsidian](https://obsidian.md) installed with a vault open

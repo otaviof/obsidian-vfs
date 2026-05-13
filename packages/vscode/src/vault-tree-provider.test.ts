@@ -93,13 +93,15 @@ describe("VaultTreeDataProvider", () => {
     } as never);
 
     const tracker = mockTracker({
-      stat: vi.fn().mockImplementation((path: string) =>
-        Promise.resolve(
-          path === "notes/todo.md"
-            ? { ok: true, value: { type: "file", mtime: 0, ctime: 0, size: 42 } }
-            : { ok: true, value: { type: "directory", mtime: 0, ctime: 0, size: 0 } },
+      stat: vi
+        .fn()
+        .mockImplementation((path: string) =>
+          Promise.resolve(
+            path === "notes/todo.md"
+              ? { ok: true, value: { type: "file", mtime: 0, ctime: 0, size: 42 } }
+              : { ok: true, value: { type: "directory", mtime: 0, ctime: 0, size: 0 } },
+          ),
         ),
-      ),
     });
     const provider = new VaultTreeDataProvider(tracker);
     const children = await provider.getChildren();
