@@ -96,6 +96,7 @@ export function createVscodeMock(
     mock.Uri = createMockUri();
   }
   if (parts.window) {
+    mock.env = { clipboard: { writeText: vi.fn() } };
     const outputChannel = { appendLine: vi.fn(), dispose: vi.fn() };
     mock.window = {
       createOutputChannel: vi.fn(() => outputChannel),

@@ -47,14 +47,14 @@ describe("registerCommands", () => {
     vi.clearAllMocks();
   });
 
-  it("registers four commands", () => {
+  it("registers five commands", () => {
     const ctx = fakeContext();
     const tracker = mockTracker();
     const tree = fakeTreeProvider();
     const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
     registerCommands(ctx as never, tracker, tree as never, channel);
 
-    expect(vscode.commands.registerCommand).toHaveBeenCalledTimes(4);
+    expect(vscode.commands.registerCommand).toHaveBeenCalledTimes(5);
     expect(vscode.commands.registerCommand).toHaveBeenCalledWith(
       "obsidianVFS.mount",
       expect.any(Function),
@@ -69,6 +69,10 @@ describe("registerCommands", () => {
     );
     expect(vscode.commands.registerCommand).toHaveBeenCalledWith(
       "obsidianVFS.searchNotes",
+      expect.any(Function),
+    );
+    expect(vscode.commands.registerCommand).toHaveBeenCalledWith(
+      "obsidianVFS.copyPath",
       expect.any(Function),
     );
   });
@@ -593,5 +597,90 @@ describe("searchNotes command", () => {
     await handler();
 
     expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+  });
+});
+
+describe("copyPath command", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("copies obs:// URI when active editor has obs:// scheme", async () => {
+    const tracker = mockTracker();
+
+    Object.defineProperty(vscode.window, "activeTextEditor", {
+      value: { document: { uri: { scheme: SCHEME, path: "/notes/todo.md" } } },
+      writable: true,
+      configurable: true,
+    });
+
+    const ctx = fakeContext();
+    const tree = fakeTreeProvider();
+    const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
+    registerCommands(ctx as never, tracker, tree as never, channel);
+
+    const handler = vi
+      .mocked(vscode.commands.registerCommand)
+      .mock.calls.find((c) => c[0] === "obsidianVFS.copyPath")![1] as () => Promise<void>;
+    await handler();
+
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(vscode.env.clipboard.writeText).toHaveBeenCalledWith("obs://TestVault/notes/todo.md");
+
+    Object.defineProperty(vscode.window, "activeTextEditor", {
+      value: undefined,
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  it("copies obs:// URI when active editor has file:// scheme under vault", async () => {
+    const tracker = mockTracker();
+
+    Object.defineProperty(vscode.window, "activeTextEditor", {
+      value: { document: { uri: { scheme: "file", fsPath: "/vault/notes/todo.md" } } },
+      writable: true,
+      configurable: true,
+    });
+
+    const ctx = fakeContext();
+    const tree = fakeTreeProvider();
+    const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
+    registerCommands(ctx as never, tracker, tree as never, channel);
+
+    const handler = vi
+      .mocked(vscode.commands.registerCommand)
+      .mock.calls.find((c) => c[0] === "obsidianVFS.copyPath")![1] as () => Promise<void>;
+    await handler();
+
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(vscode.env.clipboard.writeText).toHaveBeenCalledWith("obs://TestVault/notes/todo.md");
+
+    Object.defineProperty(vscode.window, "activeTextEditor", {
+      value: undefined,
+      writable: true,
+      configurable: true,
+    });
+  });
+
+  it("shows info message when no vault file is active", async () => {
+    Object.defineProperty(vscode.window, "activeTextEditor", {
+      value: undefined,
+      writable: true,
+      configurable: true,
+    });
+
+    const tracker = mockTracker();
+    const ctx = fakeContext();
+    const tree = fakeTreeProvider();
+    const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
+    registerCommands(ctx as never, tracker, tree as never, channel);
+
+    const handler = vi
+      .mocked(vscode.commands.registerCommand)
+      .mock.calls.find((c) => c[0] === "obsidianVFS.copyPath")![1] as () => Promise<void>;
+    await handler();
+
+    expect(vscode.window.showInformationMessage).toHaveBeenCalledWith("No Obsidian VFS file active");
   });
 });

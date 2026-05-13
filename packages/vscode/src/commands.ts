@@ -1,5 +1,6 @@
 import * as vscode from "vscode";
 import type { LocalIndexTracker } from "@obsidian-vfs/core";
+import { buildObsUri } from "@obsidian-vfs/core";
 
 import { SCHEME, toFileUri, toVaultPath, toVaultPathFromFile } from "./uri-adapter.js";
 import type { VaultTreeDataProvider } from "./vault-tree-provider.js";
@@ -76,6 +77,27 @@ async function openInObsidianCommand(
   }
 }
 
+/** Copy the active file's `obs://` URI to the clipboard. */
+async function copyPathCommand(tracker: LocalIndexTracker): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
+  if (editor?.document.uri.scheme !== SCHEME && editor?.document.uri.scheme !== "file") {
+    await vscode.window.showInformationMessage("No Obsidian VFS file active");
+    return;
+  }
+
+  const vaultPath =
+    editor.document.uri.scheme === SCHEME
+      ? toVaultPath(editor.document.uri)
+      : toVaultPathFromFile(editor.document.uri, tracker.context.physicalPath);
+
+  const obsUri = buildObsUri({
+    vaultName: tracker.context.name,
+    path: vaultPath,
+    section: undefined,
+  });
+  await vscode.env.clipboard.writeText(obsUri);
+}
+
 /** Search vault notes via Quick Pick and open the selected file. */
 async function searchNotesCommand(tracker: LocalIndexTracker): Promise<void> {
   const result = await tracker.listFiles();
@@ -111,5 +133,6 @@ export function registerCommands(
       openInObsidianCommand(tracker, outputChannel),
     ),
     vscode.commands.registerCommand("obsidianVFS.searchNotes", () => searchNotesCommand(tracker)),
+    vscode.commands.registerCommand("obsidianVFS.copyPath", () => copyPathCommand(tracker)),
   );
 }

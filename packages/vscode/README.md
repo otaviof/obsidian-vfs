@@ -15,6 +15,7 @@ Browse, search, and edit your [Obsidian](https://obsidian.md) vault directly in 
 - **Wikilink navigation**, click `[[links]]` in Markdown to jump between notes (resolves to `file://` paths for seamless navigation in workspace folders)
 - **Search notes** via Quick Pick across all vault Markdown files
 - **Open in Obsidian**, jump to the current file in the Obsidian app
+- **Copy path** as `obs://` URI to the clipboard (`Shift+Alt+Cmd+C` on `obs://` files)
 - **Auto-mount** configured folders on startup
 - **Status bar** showing vault name and connection mode (`full` / `degraded`)
 - **Workspace folder**, vault browsable in Explorer with Quick Open (`Cmd+P`) and Search (`Ctrl+Shift+F`) support
@@ -30,6 +31,7 @@ Available via the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`):
 | `Obsidian VFS: Unmount Folder` | Remove a mounted vault folder from the tree view |
 | `Obsidian VFS: Open in Obsidian` | Open the active vault file in the Obsidian app (works from both `obs://` and `file://` documents) |
 | `Obsidian VFS: Search Notes` | Quick Pick search across all vault Markdown files |
+| `Obsidian VFS: Copy Path` | Copy the active file's `obs://` URI to the clipboard (`Shift+Alt+Cmd+C` on `obs://` files) |
 
 ## Settings
 
