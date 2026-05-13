@@ -35,6 +35,6 @@
     "clean": "pnpm exec tsc -b --clean tsconfig.build.json"
   },
   "devDependencies": {
-    "vitest": "^4.0.0"
+    "vitest": "^4.1.6"
   }
 }
