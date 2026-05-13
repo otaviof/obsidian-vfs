@@ -47,16 +47,20 @@ describe("registerCommands", () => {
     vi.clearAllMocks();
   });
 
-  it("registers five commands", () => {
+  it("registers six commands", () => {
     const ctx = fakeContext();
     const tracker = mockTracker();
     const tree = fakeTreeProvider();
     const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
     registerCommands(ctx as never, tracker, tree as never, channel);
 
-    expect(vscode.commands.registerCommand).toHaveBeenCalledTimes(5);
+    expect(vscode.commands.registerCommand).toHaveBeenCalledTimes(6);
     expect(vscode.commands.registerCommand).toHaveBeenCalledWith(
       "obsidianVFS.mount",
+      expect.any(Function),
+    );
+    expect(vscode.commands.registerCommand).toHaveBeenCalledWith(
+      "obsidianVFS.mountNote",
       expect.any(Function),
     );
     expect(vscode.commands.registerCommand).toHaveBeenCalledWith(
@@ -277,6 +281,173 @@ describe("mount command", () => {
   });
 });
 
+describe("mountNote command", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("shows Quick Pick with vault notes and updates config", async () => {
+    mockReadAutoMount.mockReturnValue([]);
+    const { update } = setupConfigMock();
+
+    const tracker = mockTracker({
+      listFiles: vi.fn().mockResolvedValue({
+        ok: true,
+        value: ["docs/overview.md", "notes/todo.md"],
+      }),
+    });
+
+    const ctx = fakeContext();
+    const tree = fakeTreeProvider();
+    const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
+    registerCommands(ctx as never, tracker, tree as never, channel);
+
+    vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
+      label: "overview",
+      description: "docs/overview.md",
+    });
+
+    const handler = vi
+      .mocked(vscode.commands.registerCommand)
+      .mock.calls.find((c) => c[0] === "obsidianVFS.mountNote")![1] as () => Promise<void>;
+    await handler();
+
+    expect(vscode.window.showQuickPick).toHaveBeenCalledWith(
+      [
+        { label: "overview", description: "docs/overview.md" },
+        { label: "todo", description: "notes/todo.md" },
+      ],
+      expect.objectContaining({ matchOnDescription: true }),
+    );
+    expect(update).toHaveBeenCalledWith(
+      "autoMount",
+      ["docs/overview.md"],
+      vscode.ConfigurationTarget.Workspace,
+    );
+    expect(tree.refresh).toHaveBeenCalled();
+  });
+
+  it("excludes already-mounted notes from Quick Pick", async () => {
+    mockReadAutoMount.mockReturnValue(["docs/overview.md"]);
+    setupConfigMock();
+
+    const tracker = mockTracker({
+      listFiles: vi.fn().mockResolvedValue({
+        ok: true,
+        value: ["docs/overview.md", "notes/todo.md"],
+      }),
+    });
+
+    const ctx = fakeContext();
+    const tree = fakeTreeProvider();
+    const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
+    registerCommands(ctx as never, tracker, tree as never, channel);
+
+    vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
+      label: "todo",
+      description: "notes/todo.md",
+    });
+
+    const handler = vi
+      .mocked(vscode.commands.registerCommand)
+      .mock.calls.find((c) => c[0] === "obsidianVFS.mountNote")![1] as () => Promise<void>;
+    await handler();
+
+    expect(vscode.window.showQuickPick).toHaveBeenCalledWith(
+      [{ label: "todo", description: "notes/todo.md" }],
+      expect.objectContaining({ matchOnDescription: true }),
+    );
+  });
+
+  it("does nothing when user cancels Quick Pick", async () => {
+    mockReadAutoMount.mockReturnValue([]);
+    const { update } = setupConfigMock();
+
+    const tracker = mockTracker({
+      listFiles: vi.fn().mockResolvedValue({
+        ok: true,
+        value: ["notes/todo.md"],
+      }),
+    });
+
+    const ctx = fakeContext();
+    const tree = fakeTreeProvider();
+    const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
+    registerCommands(ctx as never, tracker, tree as never, channel);
+
+    vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce(undefined);
+
+    const handler = vi
+      .mocked(vscode.commands.registerCommand)
+      .mock.calls.find((c) => c[0] === "obsidianVFS.mountNote")![1] as () => Promise<void>;
+    await handler();
+
+    expect(update).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when listFiles returns empty", async () => {
+    const tracker = mockTracker({
+      listFiles: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+    });
+
+    const ctx = fakeContext();
+    const tree = fakeTreeProvider();
+    const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
+    registerCommands(ctx as never, tracker, tree as never, channel);
+
+    const handler = vi
+      .mocked(vscode.commands.registerCommand)
+      .mock.calls.find((c) => c[0] === "obsidianVFS.mountNote")![1] as () => Promise<void>;
+    await handler();
+
+    expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when all notes already mounted", async () => {
+    mockReadAutoMount.mockReturnValue(["docs/overview.md", "notes/todo.md"]);
+
+    const tracker = mockTracker({
+      listFiles: vi.fn().mockResolvedValue({
+        ok: true,
+        value: ["docs/overview.md", "notes/todo.md"],
+      }),
+    });
+
+    const ctx = fakeContext();
+    const tree = fakeTreeProvider();
+    const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
+    registerCommands(ctx as never, tracker, tree as never, channel);
+
+    const handler = vi
+      .mocked(vscode.commands.registerCommand)
+      .mock.calls.find((c) => c[0] === "obsidianVFS.mountNote")![1] as () => Promise<void>;
+    await handler();
+
+    expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+  });
+
+  it("does nothing when listFiles returns error", async () => {
+    const tracker = mockTracker({
+      listFiles: vi.fn().mockResolvedValue({
+        ok: false,
+        error: { code: "CLI_ERROR", message: "failed" },
+      }),
+    });
+
+    const ctx = fakeContext();
+    const tree = fakeTreeProvider();
+    const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
+    registerCommands(ctx as never, tracker, tree as never, channel);
+
+    const handler = vi
+      .mocked(vscode.commands.registerCommand)
+      .mock.calls.find((c) => c[0] === "obsidianVFS.mountNote")![1] as () => Promise<void>;
+    await handler();
+
+    expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+  });
+});
+
 describe("unmount command", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -322,7 +493,7 @@ describe("unmount command", () => {
     await unmountHandler();
 
     expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
-      "No Obsidian VFS folders mounted",
+      "No Obsidian VFS entries mounted",
     );
   });
 

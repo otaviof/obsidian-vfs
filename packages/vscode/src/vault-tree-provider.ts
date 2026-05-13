@@ -59,18 +59,22 @@ export class VaultTreeDataProvider
     if (element) {
       return this.#readChildren(element.vaultPath);
     }
-    return this.#getRootChildren();
+    return await this.#getRootChildren();
   }
 
-  /** Read configured `autoMount` folders as root tree nodes. */
-  #getRootChildren(): VaultTreeItem[] {
+  /** Read configured `autoMount` entries as root tree nodes. */
+  async #getRootChildren(): Promise<VaultTreeItem[]> {
     const mounted = readAutoMount();
     if (mounted.length === 0) return [];
 
     const { name, physicalPath } = this.#tracker.context;
-    return mounted.map(
-      (folder) => new VaultTreeItem(folder || name, folder, "directory", physicalPath),
-    );
+    const items: VaultTreeItem[] = [];
+    for (const entry of mounted) {
+      const statResult = await this.#tracker.stat(entry);
+      const type: VFSFileType = statResult.ok ? statResult.value.type : "directory";
+      items.push(new VaultTreeItem(entry || name, entry, type, physicalPath));
+    }
+    return items;
   }
 
   /** List directory contents as tree items. */

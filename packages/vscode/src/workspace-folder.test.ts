@@ -4,6 +4,13 @@ import { createVscodeMock } from "./test-mocks.js";
 
 vi.mock("vscode", () => createVscodeMock({ workspace: true, uri: true }));
 
+vi.mock("node:fs", () => ({
+  default: {
+    statSync: vi.fn(() => ({ isDirectory: () => true })),
+  },
+}));
+
+import fs from "node:fs";
 import * as vscode from "vscode";
 
 import { SCHEME } from "./uri-adapter.js";
@@ -99,6 +106,7 @@ describe("addVaultWorkspaceFolder", () => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
     workspace.workspaceFolders = undefined;
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as never);
   });
 
   it("returns skipped when autoMount is empty", () => {
@@ -193,6 +201,50 @@ describe("addVaultWorkspaceFolder", () => {
 
     const result = addVaultWorkspaceFolder("/vault", ["Notes"]);
     expect(result).toEqual({ status: "skipped", reason: "no local workspace folder open" });
+    expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
+  });
+
+  it("filters out file entries from workspace folders", () => {
+    workspace.workspaceFolders = [
+      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
+    ];
+
+    vi.mocked(fs.statSync).mockImplementation((p) => {
+      if (String(p).endsWith("Notes")) return { isDirectory: () => true } as never;
+      return { isDirectory: () => false } as never;
+    });
+
+    const result = addVaultWorkspaceFolder("/vault", ["Notes", "docs/readme.md"]);
+    expect(result).toEqual({ status: "added" });
+    expect(workspace.updateWorkspaceFolders).toHaveBeenCalledWith(1, 0, {
+      uri: expect.objectContaining({ scheme: "file", fsPath: "/vault/Notes" }) as unknown,
+      name: `${FOLDER_NAME_PREFIX}Notes`,
+    });
+  });
+
+  it("returns skipped when all autoMount entries are files", () => {
+    workspace.workspaceFolders = [
+      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
+    ];
+
+    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => false } as never);
+
+    const result = addVaultWorkspaceFolder("/vault", ["docs/readme.md"]);
+    expect(result).toEqual({ status: "skipped", reason: "no mountable directories in autoMount" });
+    expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
+  });
+
+  it("handles stat failure gracefully by excluding the entry", () => {
+    workspace.workspaceFolders = [
+      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
+    ];
+
+    vi.mocked(fs.statSync).mockImplementation(() => {
+      throw new Error("ENOENT");
+    });
+
+    const result = addVaultWorkspaceFolder("/vault", ["missing-folder"]);
+    expect(result).toEqual({ status: "skipped", reason: "no mountable directories in autoMount" });
     expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
   });
 });

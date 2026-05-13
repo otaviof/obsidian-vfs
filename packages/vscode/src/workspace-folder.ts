@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import path from "node:path";
 
 import * as vscode from "vscode";
@@ -65,7 +66,8 @@ export function includeVaultInGitDetection(physicalPath: string): Thenable<void>
 }
 
 /**
- * Add autoMount folders as individual workspace folders for Explorer browsing.
+ * Add autoMount directories as individual workspace folders for Explorer browsing.
+ * File entries are filtered out since workspace folders must be directories.
  * Appends at the end to avoid extension host restart.
  */
 export function addVaultWorkspaceFolder(
@@ -85,7 +87,18 @@ export function addVaultWorkspaceFolder(
     return { status: "skipped", reason: "no local workspace folder open" };
   }
 
-  const newFolders = autoMount.map((folder) => ({
+  const directories = autoMount.filter((entry) => {
+    try {
+      return fs.statSync(path.join(physicalPath, entry)).isDirectory();
+    } catch {
+      return false;
+    }
+  });
+  if (directories.length === 0) {
+    return { status: "skipped", reason: "no mountable directories in autoMount" };
+  }
+
+  const newFolders = directories.map((folder) => ({
     uri: toFileUri(folder, physicalPath),
     name: `${FOLDER_NAME_PREFIX}${folder}`,
   }));

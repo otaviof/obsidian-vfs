@@ -9,7 +9,7 @@ Browse, search, and edit your [Obsidian](https://obsidian.md) vault directly in 
 
 ## Features
 
-- **Mount vault folders** into the Explorer tree view
+- **Mount vault folders or individual notes** into the Explorer tree view
 - **Browse and read** Markdown files through the `obs://` virtual file system
 - **Edit existing files** with writes going directly to the vault on disk
 - **Wikilink navigation**, click `[[links]]` in Markdown to jump between notes (resolves to `file://` paths for seamless navigation in workspace folders)
@@ -28,7 +28,8 @@ Available via the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`):
 | Command | Description |
 |---------|-------------|
 | `Obsidian VFS: Mount Folder` | Pick a top-level vault folder and add it to the Explorer tree view |
-| `Obsidian VFS: Unmount Folder` | Remove a mounted vault folder from the tree view |
+| `Obsidian VFS: Mount Note` | Search vault notes and add one to the Explorer tree view |
+| `Obsidian VFS: Unmount Entry` | Remove a mounted vault entry from the tree view |
 | `Obsidian VFS: Open in Obsidian` | Open the active vault file in the Obsidian app (works from both `obs://` and `file://` documents) |
 | `Obsidian VFS: Search Notes` | Quick Pick search across all vault Markdown files |
 | `Obsidian VFS: Copy Path` | Copy the active file's `obs://` URI to the clipboard (`Shift+Alt+Cmd+C` on `obs://` files) |
@@ -42,7 +43,7 @@ Configure via **Settings UI** or `settings.json`:
 | `obsidianVFS.cliPath` | `string` | `"obsidian"` | Path to the Obsidian CLI binary |
 | `obsidianVFS.timeoutMs` | `number` | `10000` | CLI operation timeout in milliseconds |
 | `obsidianVFS.treeViewTitle` | `string` | `""` | Custom title for the Explorer tree view (defaults to `obs://<vault>`) |
-| `obsidianVFS.autoMount` | `string[]` | `[]` | Vault-relative folders to display in the Explorer tree view on activation |
+| `obsidianVFS.autoMount` | `string[]` | `[]` | Vault-relative paths (folders or notes) to display in the Explorer tree view on activation |
 | `obsidianVFS.explorer` | `boolean` | `true` | Show the Obsidian VFS tree view in the Explorer sidebar |
 | `obsidianVFS.statusBar` | `boolean` | `true` | Show vault name and mode in the status bar |
 | `obsidianVFS.workspace` | `boolean` | `true` | Add the vault as a workspace folder for Explorer browsing (see below) |

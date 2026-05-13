@@ -66,14 +66,77 @@ describe("VaultTreeDataProvider", () => {
       }),
     } as never);
 
-    const tracker = mockTracker();
+    const tracker = mockTracker({
+      stat: vi.fn().mockResolvedValue({
+        ok: true,
+        value: { type: "directory", mtime: 0, ctime: 0, size: 0 },
+      }),
+    });
     const provider = new VaultTreeDataProvider(tracker);
     const children = await provider.getChildren();
 
     expect(children).toHaveLength(2);
     expect(children[0].label).toBe("10-projects");
     expect(children[0].vaultPath).toBe("10-projects");
+    expect(children[0].collapsibleState).toBe(vscode.TreeItemCollapsibleState.Collapsed);
     expect(children[1].label).toBe("20-areas");
+
+    provider.dispose();
+  });
+
+  it("renders file-type root entries with no collapse arrow", async () => {
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+      get: vi.fn((_key: string, defaultValue: unknown) => {
+        if (_key === "autoMount") return ["10-projects", "notes/todo.md"];
+        return defaultValue;
+      }),
+    } as never);
+
+    const tracker = mockTracker({
+      stat: vi.fn().mockImplementation((path: string) =>
+        Promise.resolve(
+          path === "notes/todo.md"
+            ? { ok: true, value: { type: "file", mtime: 0, ctime: 0, size: 42 } }
+            : { ok: true, value: { type: "directory", mtime: 0, ctime: 0, size: 0 } },
+        ),
+      ),
+    });
+    const provider = new VaultTreeDataProvider(tracker);
+    const children = await provider.getChildren();
+
+    expect(children).toHaveLength(2);
+    expect(children[0].collapsibleState).toBe(vscode.TreeItemCollapsibleState.Collapsed);
+    expect(children[0].contextValue).toBe("obsFolder");
+    expect(children[1].label).toBe("notes/todo.md");
+    expect(children[1].collapsibleState).toBe(vscode.TreeItemCollapsibleState.None);
+    expect(children[1].contextValue).toBe("obsFile");
+    expect(children[1].command).toMatchObject({ command: "vscode.open", title: "Open" });
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(tracker.stat).toHaveBeenCalledTimes(2);
+
+    provider.dispose();
+  });
+
+  it("falls back to directory when stat fails", async () => {
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+      get: vi.fn((_key: string, defaultValue: unknown) => {
+        if (_key === "autoMount") return ["missing-entry"];
+        return defaultValue;
+      }),
+    } as never);
+
+    const tracker = mockTracker({
+      stat: vi.fn().mockResolvedValue({
+        ok: false,
+        error: { code: "FILE_NOT_FOUND", message: "not found" },
+      }),
+    });
+    const provider = new VaultTreeDataProvider(tracker);
+    const children = await provider.getChildren();
+
+    expect(children).toHaveLength(1);
+    expect(children[0].collapsibleState).toBe(vscode.TreeItemCollapsibleState.Collapsed);
+    expect(children[0].contextValue).toBe("obsFolder");
 
     provider.dispose();
   });

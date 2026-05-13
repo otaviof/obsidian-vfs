@@ -34,16 +34,48 @@ async function mountCommand(
   treeProvider.refresh();
 }
 
-/** Remove a folder from `obsidianVFS.autoMount` and refresh the tree. */
+/** Add a single note to `obsidianVFS.autoMount` and refresh the tree. */
+async function mountNoteCommand(
+  tracker: LocalIndexTracker,
+  treeProvider: VaultTreeDataProvider,
+): Promise<void> {
+  const result = await tracker.listFiles();
+  if (!result.ok || result.value.length === 0) return;
+
+  const mounted = new Set(readAutoMount());
+  const available = result.value.filter((f) => !mounted.has(f));
+  if (available.length === 0) return;
+
+  const items = available.map((filePath) => ({
+    // Safe: split("/") always returns at least one element
+    label: filePath.replace(/\.md$/i, "").split("/").pop()!,
+    description: filePath,
+  }));
+
+  const picked = await vscode.window.showQuickPick(items, {
+    placeHolder: "Select a vault note to mount",
+    matchOnDescription: true,
+  });
+  if (!picked?.description) return;
+
+  const updated = [...mounted, picked.description];
+  await vscode.workspace
+    .getConfiguration("obsidianVFS")
+    .update("autoMount", updated, vscode.ConfigurationTarget.Workspace);
+
+  treeProvider.refresh();
+}
+
+/** Remove an entry from `obsidianVFS.autoMount` and refresh the tree. */
 async function unmountCommand(treeProvider: VaultTreeDataProvider): Promise<void> {
   const mounted = readAutoMount();
   if (mounted.length === 0) {
-    await vscode.window.showInformationMessage("No Obsidian VFS folders mounted");
+    await vscode.window.showInformationMessage("No Obsidian VFS entries mounted");
     return;
   }
 
   const picked = await vscode.window.showQuickPick(mounted, {
-    placeHolder: "Select a folder to unmount",
+    placeHolder: "Select an entry to unmount",
   });
   if (!picked) return;
 
@@ -128,6 +160,9 @@ export function registerCommands(
 ): void {
   context.subscriptions.push(
     vscode.commands.registerCommand("obsidianVFS.mount", () => mountCommand(tracker, treeProvider)),
+    vscode.commands.registerCommand("obsidianVFS.mountNote", () =>
+      mountNoteCommand(tracker, treeProvider),
+    ),
     vscode.commands.registerCommand("obsidianVFS.unmount", () => unmountCommand(treeProvider)),
     vscode.commands.registerCommand("obsidianVFS.openInObsidian", () =>
       openInObsidianCommand(tracker, outputChannel),
