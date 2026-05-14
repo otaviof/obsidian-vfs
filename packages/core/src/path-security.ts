@@ -135,3 +135,29 @@ export async function validatePath(
 
   return checkSymlink(canonical.value, options.vaultRoot);
 }
+
+/**
+ * Like `validatePath` but for write operations where the target may not exist.
+ * Walks up to the nearest existing ancestor for the symlink check instead of
+ * requiring the full path to exist. Returns the canonicalized absolute path.
+ */
+export async function validatePathForWrite(
+  virtualPath: string,
+  options: PathSecurityOptions,
+): Promise<VFSResult<string>> {
+  const canonical = canonicalizePath(virtualPath, options.vaultRoot);
+  if (!canonical.ok) return canonical;
+
+  const allowed = checkAllowedFolder(canonical.value, options);
+  if (!allowed.ok) return allowed;
+
+  let ancestor = canonical.value;
+  for (;;) {
+    const result = await checkSymlink(ancestor, options.vaultRoot);
+    if (result.ok) return { ok: true, value: canonical.value };
+    if (result.error.code !== "FILE_NOT_FOUND") return result;
+    const parent = path.dirname(ancestor);
+    if (parent === ancestor) return result;
+    ancestor = parent;
+  }
+}

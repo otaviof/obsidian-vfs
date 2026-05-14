@@ -1,6 +1,6 @@
 {
   "name": "@obsidian-vfs/cli",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "type": "module",
   "description": "CLI for Obsidian VFS — provision skills/agents, inspect vault resources",
   "license": "Apache-2.0",

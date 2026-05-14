@@ -40,6 +40,7 @@ export function createMockFileSystemError(): Record<
 export function createMockUri(): {
   from: Mock;
   file: Mock;
+  parse: Mock;
 } {
   return {
     from: vi.fn((c: { scheme: string; authority?: string; path: string }) => ({
@@ -56,6 +57,19 @@ export function createMockUri(): {
       fsPath: filePath,
       toString: () => `file://${filePath}`,
     })),
+    parse: vi.fn((value: string) => {
+      const match = /^([a-z]+):\/\/([^/]*)(\/.*)?$/.exec(value);
+      if (match) {
+        return {
+          scheme: match[1],
+          authority: match[2] || "",
+          path: match[3] || "/",
+          fsPath: match[3] || "/",
+          toString: () => value,
+        };
+      }
+      return { scheme: "file", authority: "", path: value, fsPath: value, toString: () => value };
+    }),
   };
 }
 
@@ -133,6 +147,10 @@ export function createVscodeMock(
       updateWorkspaceFolders: vi.fn(),
       onDidChangeConfiguration: vi.fn(() => ({ dispose: vi.fn() })),
       workspaceFolders: undefined,
+      fs: {
+        readFile: vi.fn(),
+        copy: vi.fn(),
+      },
     };
   }
   if (parts.commands) {

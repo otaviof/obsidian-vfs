@@ -46,6 +46,10 @@ vi.mock("./vault-tree-provider.js", () => ({
   }),
 }));
 
+vi.mock("./tree-drag-drop.js", () => ({
+  VaultTreeDragAndDropController: vi.fn(),
+}));
+
 vi.mock("./status-bar.js", () => ({
   StatusBarManager: vi.fn().mockImplementation(function (this: Record<string, unknown>) {
     this.show = vi.fn();
@@ -81,6 +85,7 @@ import { FOLDER_NAME_PREFIX } from "./workspace-folder.js";
 import { ObsidianFileSystemProvider } from "./file-system-provider.js";
 import { StatusBarManager } from "./status-bar.js";
 import { VaultTreeDataProvider } from "./vault-tree-provider.js";
+import { VaultTreeDragAndDropController } from "./tree-drag-drop.js";
 import { WikilinkDocumentLinkProvider } from "./wikilink-provider.js";
 import {
   addVaultWorkspaceFolder,
@@ -161,7 +166,11 @@ describe("activate", () => {
       { isCaseSensitive: true, isReadonly: false },
     );
     expect(VaultTreeDataProvider).toHaveBeenCalledWith(fakeTracker);
-    expect(vscode.window.createTreeView).toHaveBeenCalledWith("obsidianVFS", expect.anything());
+    expect(VaultTreeDragAndDropController).toHaveBeenCalledWith("MyVault");
+    expect(vscode.window.createTreeView).toHaveBeenCalledWith(
+      "obsidianVFS",
+      expect.objectContaining({ dragAndDropController: expect.anything() }),
+    );
     const treeView = vi.mocked(vscode.window.createTreeView).mock.results[0].value as {
       title: string;
     };

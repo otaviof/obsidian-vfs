@@ -7,6 +7,7 @@ import {
   checkSymlink,
   isAllowedPath,
   validatePath,
+  validatePathForWrite,
 } from "./path-security.js";
 import { mockFsFunction } from "./test-helpers.js";
 
@@ -318,5 +319,93 @@ describe("validatePath", () => {
     if (!result.ok) {
       expect(result.error.code).toBe("PERMISSION_DENIED");
     }
+  });
+});
+
+describe("validatePathForWrite", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns validated path when file exists", async () => {
+    realpathMock.mockResolvedValue("/vault/notes/foo.md");
+    const result = await validatePathForWrite("notes/foo.md", EMPTY_OPTS);
+    expect(result).toEqual({ ok: true, value: "/vault/notes/foo.md" });
+  });
+
+  it("succeeds for non-existent file in existing directory", async () => {
+    const enoent = new Error("ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    realpathMock
+      .mockRejectedValueOnce(enoent) // /vault/notes/new.md does not exist
+      .mockResolvedValueOnce("/vault/notes"); // /vault/notes exists
+    const result = await validatePathForWrite("notes/new.md", EMPTY_OPTS);
+    expect(result).toEqual({ ok: true, value: "/vault/notes/new.md" });
+  });
+
+  it("succeeds for non-existent nested directories", async () => {
+    const enoent = new Error("ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    realpathMock
+      .mockRejectedValueOnce(enoent) // /vault/a/b/c.md
+      .mockRejectedValueOnce(enoent) // /vault/a/b
+      .mockRejectedValueOnce(enoent) // /vault/a
+      .mockResolvedValueOnce("/vault"); // /vault exists
+    const result = await validatePathForWrite("a/b/c.md", EMPTY_OPTS);
+    expect(result).toEqual({ ok: true, value: "/vault/a/b/c.md" });
+  });
+
+  it("fails on symlink escape in ancestor", async () => {
+    const enoent = new Error("ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    realpathMock
+      .mockRejectedValueOnce(enoent) // /vault/link/new.md
+      .mockResolvedValueOnce("/outside"); // /vault/link resolves outside
+    const result = await validatePathForWrite("link/new.md", EMPTY_OPTS);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("PERMISSION_DENIED");
+    }
+  });
+
+  it("fails on path traversal", async () => {
+    const result = await validatePathForWrite("../../etc/passwd", EMPTY_OPTS);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("PERMISSION_DENIED");
+    }
+    expect(realpathMock).not.toHaveBeenCalled();
+  });
+
+  it("fails on blocked folder", async () => {
+    const result = await validatePathForWrite("private/new.md", {
+      ...EMPTY_OPTS,
+      blocked: ["private"],
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("PERMISSION_DENIED");
+    }
+    expect(realpathMock).not.toHaveBeenCalled();
+  });
+
+  it("fails on allowed folder violation", async () => {
+    const result = await validatePathForWrite("other/new.md", {
+      ...EMPTY_OPTS,
+      allowed: ["notes"],
+    });
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("PERMISSION_DENIED");
+    }
+    expect(realpathMock).not.toHaveBeenCalled();
+  });
+
+  it("returns canonicalized path, not realpath of ancestor", async () => {
+    const enoent = new Error("ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    realpathMock.mockRejectedValueOnce(enoent).mockResolvedValueOnce("/vault/notes");
+    const result = await validatePathForWrite("notes/new.md", EMPTY_OPTS);
+    expect(result).toEqual({ ok: true, value: "/vault/notes/new.md" });
   });
 });

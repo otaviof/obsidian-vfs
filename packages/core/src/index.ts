@@ -83,6 +83,7 @@ export { EXIT_SUCCESS, EXIT_ERROR, EXIT_USAGE } from "./exit-codes.js";
  */
 export {
   validatePath,
+  validatePathForWrite,
   canonicalizePath,
   isAllowedPath,
   checkBlockedFolder,

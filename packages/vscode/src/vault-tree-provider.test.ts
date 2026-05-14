@@ -267,6 +267,58 @@ describe("VaultTreeDataProvider", () => {
 
     provider.dispose();
   });
+
+  describe("getParent", () => {
+    it("returns undefined for root-level items", () => {
+      const tracker = mockTracker();
+      const provider = new VaultTreeDataProvider(tracker);
+      const item = new VaultTreeItem("notes", "notes", "directory", "/vault");
+
+      expect(provider.getParent(item)).toBeUndefined();
+
+      provider.dispose();
+    });
+
+    it("returns parent folder for nested file", () => {
+      const tracker = mockTracker();
+      const provider = new VaultTreeDataProvider(tracker);
+      const item = new VaultTreeItem("readme.md", "docs/readme.md", "file", "/vault");
+
+      const parent = provider.getParent(item);
+      expect(parent).toBeDefined();
+      expect(parent!.label).toBe("docs");
+      expect(parent!.vaultPath).toBe("docs");
+      expect(parent!.contextValue).toBe("obsFolder");
+
+      provider.dispose();
+    });
+
+    it("returns parent folder for deeply nested item", () => {
+      const tracker = mockTracker();
+      const provider = new VaultTreeDataProvider(tracker);
+      const item = new VaultTreeItem("plan.md", "projects/active/plan.md", "file", "/vault");
+
+      const parent = provider.getParent(item);
+      expect(parent).toBeDefined();
+      expect(parent!.label).toBe("active");
+      expect(parent!.vaultPath).toBe("projects/active");
+
+      provider.dispose();
+    });
+
+    it("returns parent for nested directory", () => {
+      const tracker = mockTracker();
+      const provider = new VaultTreeDataProvider(tracker);
+      const item = new VaultTreeItem("sub", "notes/sub", "directory", "/vault");
+
+      const parent = provider.getParent(item);
+      expect(parent).toBeDefined();
+      expect(parent!.label).toBe("notes");
+      expect(parent!.vaultPath).toBe("notes");
+
+      provider.dispose();
+    });
+  });
 });
 
 describe("readAutoMount", () => {

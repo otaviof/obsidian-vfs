@@ -1,7 +1,7 @@
-import { mkdir, writeFile as fsWriteFile } from "node:fs/promises";
+import { mkdir, rename as fsRename, rm, writeFile as fsWriteFile } from "node:fs/promises";
 import path from "node:path";
 import * as vscode from "vscode";
-import { readVirtualFile, validatePath } from "@obsidian-vfs/core";
+import { readVirtualFile, validatePath, validatePathForWrite } from "@obsidian-vfs/core";
 import type {
   FileChangeEvent,
   FileChangeType,
@@ -110,7 +110,7 @@ export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
     options: { readonly create: boolean; readonly overwrite: boolean },
   ): Promise<void> {
     const vaultPath = toVaultPath(uri);
-    const pathResult = await validatePath(vaultPath, this.#securityOptions);
+    const pathResult = await validatePathForWrite(vaultPath, this.#securityOptions);
     if (!pathResult.ok) throwVFSError(pathResult, uri);
 
     const statResult = await this.#tracker.stat(vaultPath);
@@ -122,22 +122,62 @@ export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
     if (exists && !options.overwrite) {
       throwFileExists(uri);
     }
+    await mkdir(path.dirname(pathResult.value), { recursive: true });
     await fsWriteFile(pathResult.value, content);
   }
 
   async createDirectory(uri: vscode.Uri): Promise<void> {
     const vaultPath = toVaultPath(uri);
-    const pathResult = await validatePath(vaultPath, this.#securityOptions);
+    const pathResult = await validatePathForWrite(vaultPath, this.#securityOptions);
     if (!pathResult.ok) throwVFSError(pathResult, uri);
     await mkdir(pathResult.value, { recursive: true });
   }
 
-  delete(): Promise<void> {
-    throw vscode.FileSystemError.NoPermissions(`Not supported on ${SCHEME}:// scheme`);
+  async copy(
+    source: vscode.Uri,
+    destination: vscode.Uri,
+    options: { readonly overwrite: boolean },
+  ): Promise<void> {
+    const content = await vscode.workspace.fs.readFile(source);
+    await this.writeFile(destination, content, { create: true, overwrite: options.overwrite });
+    this.#onDidChangeFile.fire([{ type: vscode.FileChangeType.Created, uri: destination }]);
   }
 
-  rename(): Promise<void> {
-    throw vscode.FileSystemError.NoPermissions(`Not supported on ${SCHEME}:// scheme`);
+  async delete(uri: vscode.Uri, options: { readonly recursive: boolean }): Promise<void> {
+    const vaultPath = toVaultPath(uri);
+    const pathResult = await validatePath(vaultPath, this.#securityOptions);
+    if (!pathResult.ok) throwVFSError(pathResult, uri);
+    await rm(pathResult.value, { recursive: options.recursive });
+  }
+
+  async rename(
+    oldUri: vscode.Uri,
+    newUri: vscode.Uri,
+    options: { readonly overwrite: boolean },
+  ): Promise<void> {
+    if (oldUri.scheme === SCHEME && newUri.scheme === SCHEME) {
+      const oldVaultPath = toVaultPath(oldUri);
+      const oldPathResult = await validatePath(oldVaultPath, this.#securityOptions);
+      if (!oldPathResult.ok) throwVFSError(oldPathResult, oldUri);
+
+      const newVaultPath = toVaultPath(newUri);
+      const newPathResult = await validatePathForWrite(newVaultPath, this.#securityOptions);
+      if (!newPathResult.ok) throwVFSError(newPathResult, newUri);
+
+      if (!options.overwrite) {
+        const statResult = await this.#tracker.stat(newVaultPath);
+        if (statResult.ok) throwFileExists(newUri);
+      }
+
+      await mkdir(path.dirname(newPathResult.value), { recursive: true });
+      await fsRename(oldPathResult.value, newPathResult.value);
+      return;
+    }
+
+    await vscode.workspace.fs.copy(oldUri, newUri, { overwrite: options.overwrite });
+    if (oldUri.scheme === SCHEME) {
+      await this.delete(oldUri, { recursive: false });
+    }
   }
 
   /** Subscribe to file change events, filtering by watched prefix. */

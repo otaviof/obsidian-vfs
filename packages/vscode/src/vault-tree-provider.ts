@@ -63,6 +63,19 @@ export class VaultTreeDataProvider
     return element;
   }
 
+  getParent(element: VaultTreeItem): VaultTreeItem | undefined {
+    const lastSlash = element.vaultPath.lastIndexOf("/");
+    if (lastSlash < 0) return undefined;
+    const parentPath = element.vaultPath.substring(0, lastSlash);
+    const parentName = parentPath.substring(parentPath.lastIndexOf("/") + 1);
+    return new VaultTreeItem(
+      parentName,
+      parentPath,
+      "directory",
+      this.#tracker.context.physicalPath,
+    );
+  }
+
   async getChildren(element?: VaultTreeItem): Promise<VaultTreeItem[]> {
     if (!this.#enabled) return [];
     if (element) {

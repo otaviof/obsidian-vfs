@@ -5,6 +5,7 @@ import { SCHEME } from "./uri-adapter.js";
 import { registerCommands } from "./commands.js";
 import { ObsidianFileSystemProvider } from "./file-system-provider.js";
 import { StatusBarManager } from "./status-bar.js";
+import { VaultTreeDragAndDropController } from "./tree-drag-drop.js";
 import { VaultTreeDataProvider } from "./vault-tree-provider.js";
 import { WikilinkDocumentLinkProvider } from "./wikilink-provider.js";
 import {
@@ -50,7 +51,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const treeProvider = new VaultTreeDataProvider(tracker);
   context.subscriptions.push(treeProvider);
-  const treeView = vscode.window.createTreeView("obsidianVFS", { treeDataProvider: treeProvider });
+  const dragAndDropController = new VaultTreeDragAndDropController(tracker.context.name);
+  const treeView = vscode.window.createTreeView("obsidianVFS", {
+    treeDataProvider: treeProvider,
+    dragAndDropController,
+  });
   const cfg = vscode.workspace.getConfiguration("obsidianVFS");
   treeView.title =
     cfg.get<string>("treeViewTitle", "") || `${FOLDER_NAME_PREFIX}${tracker.context.name}`;
