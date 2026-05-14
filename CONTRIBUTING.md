@@ -68,7 +68,7 @@ The consumer packages (`vscode`, `claude-plugin`, `cli`) depend on `core` but ha
 - **CLI parsing** — `search`/`backlinks` return JSON; `vault`/`files`/`folders`/`read` return plain text. Exit code always 0. Detect errors via `Error:` stdout prefix.
 - **Reads bypass CLI** — `readVirtualFile` uses `node:fs` directly.
 - **Degraded mode** (Obsidian not running) — reads/enumeration via `node:fs`; search, wikilinks unavailable.
-- **Security** — `path.resolve` + vault-root prefix check on all I/O. Reject symlinks outside vault. `allowedFolders` enforced on all operations.
+- **Security** — `path.resolve` + vault-root prefix check on all I/O. Reject symlinks outside vault. `allowed`/`blocked` enforced on all general vault content; `agents`/`skills` implicitly allowed.
 
 ### File Layout
 

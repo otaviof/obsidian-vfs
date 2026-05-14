@@ -15,7 +15,7 @@ const readdirMock = mockFsFunction(readdir);
 const statMock = mockFsFunction(stat);
 const realpathMock = mockFsFunction(realpath);
 
-const OPTIONS = { vaultRoot: "/vault", allowedFolders: [] as string[] };
+const OPTIONS = { vaultRoot: "/vault", allowed: [] as string[], blocked: [] as string[] };
 
 function makeDirent(name: string, isDir: boolean): Dirent {
   return {
@@ -71,11 +71,18 @@ describe("readDirectory", () => {
     if (!result.ok) expect(result.error.code).toBe("PERMISSION_DENIED");
   });
 
-  it("enforces allowedFolders on children", async () => {
-    const options = { vaultRoot: "/vault", allowedFolders: ["notes"] };
+  it("enforces allowed on children", async () => {
+    const options = { ...OPTIONS, allowed: ["notes"] };
     readdirMock.mockResolvedValueOnce([makeDirent("notes", true), makeDirent("private", true)]);
     const result = await readDirectory(".", options);
     expect(result).toEqual({ ok: true, value: [["notes", "directory"]] });
+  });
+
+  it("returns PERMISSION_DENIED for blocked parent", async () => {
+    const options = { ...OPTIONS, blocked: ["private"] };
+    const result = await readDirectory("private", options);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("PERMISSION_DENIED");
   });
 
   it("returns FILE_NOT_FOUND on ENOENT", async () => {
@@ -113,6 +120,20 @@ describe("readDirectory", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("CLI_ERROR");
   });
+
+  it("returns PERMISSION_DENIED for subdirectory inside blocked folder", async () => {
+    const options = { ...OPTIONS, blocked: ["private"] };
+    const result = await readDirectory("private/subdir", options);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("PERMISSION_DENIED");
+  });
+
+  it("filters blocked children", async () => {
+    const options = { ...OPTIONS, blocked: ["notes/draft"] };
+    readdirMock.mockResolvedValueOnce([makeDirent("draft", true), makeDirent("public", true)]);
+    const result = await readDirectory("notes", options);
+    expect(result).toEqual({ ok: true, value: [["public", "directory"]] });
+  });
 });
 
 describe("listMarkdownFiles", () => {
@@ -132,8 +153,8 @@ describe("listMarkdownFiles", () => {
     expect(result).toEqual({ ok: true, value: ["visible.md"] });
   });
 
-  it("searches only allowedFolders when specified", async () => {
-    const options = { vaultRoot: "/vault", allowedFolders: ["notes", "docs"] };
+  it("searches only allowed when specified", async () => {
+    const options = { ...OPTIONS, allowed: ["notes", "docs"] };
     readdirMock.mockResolvedValueOnce(["intro.md"]).mockResolvedValueOnce(["guide.md"]);
     const result = await listMarkdownFiles(options);
     expect(result).toEqual({
@@ -149,7 +170,7 @@ describe("listMarkdownFiles", () => {
   });
 
   it("skips unreadable directories", async () => {
-    const options = { vaultRoot: "/vault", allowedFolders: ["bad", "good"] };
+    const options = { ...OPTIONS, allowed: ["bad", "good"] };
     readdirMock.mockRejectedValueOnce(new Error("ENOENT")).mockResolvedValueOnce(["note.md"]);
     const result = await listMarkdownFiles(options);
     expect(result).toEqual({ ok: true, value: ["good/note.md"] });
@@ -159,6 +180,20 @@ describe("listMarkdownFiles", () => {
     readdirMock.mockResolvedValueOnce(["sub/deep/note.md", "top.md"]);
     const result = await listMarkdownFiles(OPTIONS);
     expect(result).toEqual({ ok: true, value: ["sub/deep/note.md", "top.md"] });
+  });
+
+  it("excludes files in blocked folders", async () => {
+    const options = { ...OPTIONS, allowed: ["notes"], blocked: ["notes/draft"] };
+    readdirMock.mockResolvedValueOnce(["public/doc.md", "draft/wip.md"]);
+    const result = await listMarkdownFiles(options);
+    expect(result).toEqual({ ok: true, value: ["notes/public/doc.md"] });
+  });
+
+  it("excludes blocked files without allowed", async () => {
+    const options = { ...OPTIONS, blocked: ["private"] };
+    readdirMock.mockResolvedValueOnce(["notes/doc.md", "private/secret.md"]);
+    const result = await listMarkdownFiles(options);
+    expect(result).toEqual({ ok: true, value: ["notes/doc.md"] });
   });
 });
 

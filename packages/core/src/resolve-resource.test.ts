@@ -11,7 +11,11 @@ vi.mock("node:fs/promises", () => ({
 const { access } = await import("node:fs/promises");
 const accessMock = mockFsFunction(access);
 
-const SECURITY_OPTIONS = { vaultRoot: "/vault", allowedFolders: [] as string[] };
+const SECURITY_OPTIONS = {
+  vaultRoot: "/vault",
+  allowed: [] as string[],
+  blocked: [] as string[],
+};
 
 describe("resolveResource", () => {
   beforeEach(() => {
@@ -68,12 +72,18 @@ describe("resolveResource", () => {
     expect(accessMock).not.toHaveBeenCalled();
   });
 
-  it("skips directory outside allowedFolders", async () => {
-    const options = { vaultRoot: "/vault", allowedFolders: ["notes"] };
-    const result = await resolveResource("item", ["private"], options);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("FILE_NOT_FOUND");
-    expect(accessMock).not.toHaveBeenCalled();
+  it("resolves regardless of allowed (implicitly allowed)", async () => {
+    accessMock.mockResolvedValueOnce(undefined);
+    const options = { ...SECURITY_OPTIONS, allowed: ["notes"] };
+    const result = await resolveResource("item", ["agents"], options);
+    expect(result).toEqual({ ok: true, value: "agents/item.md" });
+  });
+
+  it("resolves regardless of blocked (implicitly allowed)", async () => {
+    accessMock.mockResolvedValueOnce(undefined);
+    const options = { ...SECURITY_OPTIONS, blocked: ["agents"] };
+    const result = await resolveResource("item", ["agents"], options);
+    expect(result).toEqual({ ok: true, value: "agents/item.md" });
   });
 
   it("trims name whitespace", async () => {
@@ -138,12 +148,18 @@ describe("resolveSkillResource", () => {
     expect(accessMock).not.toHaveBeenCalled();
   });
 
-  it("skips directory outside allowedFolders", async () => {
-    const options = { vaultRoot: "/vault", allowedFolders: ["notes"] };
-    const result = await resolveSkillResource("item", ["private"], options);
-    expect(result.ok).toBe(false);
-    if (!result.ok) expect(result.error.code).toBe("FILE_NOT_FOUND");
-    expect(accessMock).not.toHaveBeenCalled();
+  it("resolves regardless of allowed (implicitly allowed)", async () => {
+    accessMock.mockResolvedValueOnce(undefined);
+    const options = { ...SECURITY_OPTIONS, allowed: ["notes"] };
+    const result = await resolveSkillResource("item", ["skills"], options);
+    expect(result).toEqual({ ok: true, value: "skills/item/SKILL.md" });
+  });
+
+  it("resolves regardless of blocked (implicitly allowed)", async () => {
+    accessMock.mockResolvedValueOnce(undefined);
+    const options = { ...SECURITY_OPTIONS, blocked: ["skills"] };
+    const result = await resolveSkillResource("item", ["skills"], options);
+    expect(result).toEqual({ ok: true, value: "skills/item/SKILL.md" });
   });
 
   it("treats name with .md as literal directory name", async () => {

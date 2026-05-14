@@ -135,7 +135,12 @@ describe("activate", () => {
 
   it("wires all components on successful bootstrap", async () => {
     const fakeTracker = {
-      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+      context: {
+        name: "MyVault",
+        physicalPath: "/vault",
+        mode: "full",
+        vfsConfig: { agents: [], skills: [], allowed: [], blocked: [] },
+      },
     } as unknown as LocalIndexTracker;
 
     mockBootstrap.mockResolvedValueOnce({
@@ -182,7 +187,12 @@ describe("activate", () => {
 
   it("adds workspace folder when workspace is true", async () => {
     const fakeTracker = {
-      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+      context: {
+        name: "MyVault",
+        physicalPath: "/vault",
+        mode: "full",
+        vfsConfig: { agents: [], skills: [], allowed: [], blocked: [] },
+      },
     } as unknown as LocalIndexTracker;
 
     mockBootstrap.mockResolvedValueOnce({
@@ -200,13 +210,22 @@ describe("activate", () => {
 
     await activate(fakeContext() as never);
 
-    expect(mockAddWF).toHaveBeenCalledWith("/vault", ["Notes"]);
+    expect(mockAddWF).toHaveBeenCalledWith("/vault", ["Notes"], {
+      vaultRoot: "/vault",
+      allowed: [],
+      blocked: [],
+    });
     expect(mockExcludeGit).toHaveBeenCalledWith("/vault");
   });
 
   it("skips workspace folder when workspace is false", async () => {
     const fakeTracker = {
-      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+      context: {
+        name: "MyVault",
+        physicalPath: "/vault",
+        mode: "full",
+        vfsConfig: { agents: [], skills: [], allowed: [], blocked: [] },
+      },
     } as unknown as LocalIndexTracker;
 
     mockBootstrap.mockResolvedValueOnce({
@@ -229,7 +248,12 @@ describe("activate", () => {
 
   it("logs workspace folder result when workspace is true and added", async () => {
     const fakeTracker = {
-      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+      context: {
+        name: "MyVault",
+        physicalPath: "/vault",
+        mode: "full",
+        vfsConfig: { agents: [], skills: [], allowed: [], blocked: [] },
+      },
     } as unknown as LocalIndexTracker;
 
     mockBootstrap.mockResolvedValueOnce({
@@ -256,7 +280,12 @@ describe("activate", () => {
 
   it("logs workspace folder result when workspace is true and skipped", async () => {
     const fakeTracker = {
-      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+      context: {
+        name: "MyVault",
+        physicalPath: "/vault",
+        mode: "full",
+        vfsConfig: { agents: [], skills: [], allowed: [], blocked: [] },
+      },
     } as unknown as LocalIndexTracker;
 
     mockBootstrap.mockResolvedValueOnce({
@@ -285,7 +314,12 @@ describe("activate", () => {
 
   it("does not show status bar when statusBar is false", async () => {
     const fakeTracker = {
-      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+      context: {
+        name: "MyVault",
+        physicalPath: "/vault",
+        mode: "full",
+        vfsConfig: { agents: [], skills: [], allowed: [], blocked: [] },
+      },
     } as unknown as LocalIndexTracker;
 
     mockBootstrap.mockResolvedValueOnce({
@@ -311,7 +345,12 @@ describe("activate", () => {
 
   it("shows status bar when statusBar is true", async () => {
     const fakeTracker = {
-      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+      context: {
+        name: "MyVault",
+        physicalPath: "/vault",
+        mode: "full",
+        vfsConfig: { agents: [], skills: [], allowed: [], blocked: [] },
+      },
     } as unknown as LocalIndexTracker;
 
     mockBootstrap.mockResolvedValueOnce({
@@ -337,7 +376,12 @@ describe("activate", () => {
 
   it("does not set explorerEnabled context when explorer is false", async () => {
     const fakeTracker = {
-      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+      context: {
+        name: "MyVault",
+        physicalPath: "/vault",
+        mode: "full",
+        vfsConfig: { agents: [], skills: [], allowed: [], blocked: [] },
+      },
     } as unknown as LocalIndexTracker;
 
     mockBootstrap.mockResolvedValueOnce({
@@ -362,7 +406,12 @@ describe("activate", () => {
 
   it("sets explorerEnabled context when explorer is true", async () => {
     const fakeTracker = {
-      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+      context: {
+        name: "MyVault",
+        physicalPath: "/vault",
+        mode: "full",
+        vfsConfig: { agents: [], skills: [], allowed: [], blocked: [] },
+      },
     } as unknown as LocalIndexTracker;
 
     mockBootstrap.mockResolvedValueOnce({
@@ -394,7 +443,12 @@ describe("configuration change listener", () => {
 
   it("registers onDidChangeConfiguration listener", async () => {
     const fakeTracker = {
-      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+      context: {
+        name: "MyVault",
+        physicalPath: "/vault",
+        mode: "full",
+        vfsConfig: { agents: [], skills: [], allowed: [], blocked: [] },
+      },
     } as unknown as LocalIndexTracker;
 
     mockBootstrap.mockResolvedValueOnce({
@@ -409,7 +463,12 @@ describe("configuration change listener", () => {
 
   it("updates explorerEnabled context when explorer config changes to true", async () => {
     const fakeTracker = {
-      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+      context: {
+        name: "MyVault",
+        physicalPath: "/vault",
+        mode: "full",
+        vfsConfig: { agents: [], skills: [], allowed: [], blocked: [] },
+      },
     } as unknown as LocalIndexTracker;
 
     mockBootstrap.mockResolvedValueOnce({
@@ -446,7 +505,12 @@ describe("configuration change listener", () => {
 
   it("updates explorerEnabled context when explorer config changes to false", async () => {
     const fakeTracker = {
-      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+      context: {
+        name: "MyVault",
+        physicalPath: "/vault",
+        mode: "full",
+        vfsConfig: { agents: [], skills: [], allowed: [], blocked: [] },
+      },
     } as unknown as LocalIndexTracker;
 
     mockBootstrap.mockResolvedValueOnce({
@@ -481,7 +545,12 @@ describe("configuration change listener", () => {
 
   it("shows status bar when statusBar config changes to true", async () => {
     const fakeTracker = {
-      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+      context: {
+        name: "MyVault",
+        physicalPath: "/vault",
+        mode: "full",
+        vfsConfig: { agents: [], skills: [], allowed: [], blocked: [] },
+      },
     } as unknown as LocalIndexTracker;
 
     mockBootstrap.mockResolvedValueOnce({
@@ -519,7 +588,12 @@ describe("configuration change listener", () => {
 
   it("hides status bar when statusBar config changes to false", async () => {
     const fakeTracker = {
-      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+      context: {
+        name: "MyVault",
+        physicalPath: "/vault",
+        mode: "full",
+        vfsConfig: { agents: [], skills: [], allowed: [], blocked: [] },
+      },
     } as unknown as LocalIndexTracker;
 
     mockBootstrap.mockResolvedValueOnce({
@@ -557,7 +631,12 @@ describe("configuration change listener", () => {
 
   it("adds workspace folder when workspace config changes to true", async () => {
     const fakeTracker = {
-      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+      context: {
+        name: "MyVault",
+        physicalPath: "/vault",
+        mode: "full",
+        vfsConfig: { agents: [], skills: [], allowed: [], blocked: [] },
+      },
     } as unknown as LocalIndexTracker;
 
     mockBootstrap.mockResolvedValueOnce({
@@ -590,13 +669,22 @@ describe("configuration change listener", () => {
     configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.workspace" });
 
     expect(mockRemoveWF).toHaveBeenCalledWith("/vault");
-    expect(mockAddWF).toHaveBeenCalledWith("/vault", ["Notes"]);
+    expect(mockAddWF).toHaveBeenCalledWith("/vault", ["Notes"], {
+      vaultRoot: "/vault",
+      allowed: [],
+      blocked: [],
+    });
     expect(mockExcludeGit).toHaveBeenCalledWith("/vault");
   });
 
   it("removes workspace folders when workspace config changes to false", async () => {
     const fakeTracker = {
-      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+      context: {
+        name: "MyVault",
+        physicalPath: "/vault",
+        mode: "full",
+        vfsConfig: { agents: [], skills: [], allowed: [], blocked: [] },
+      },
     } as unknown as LocalIndexTracker;
 
     mockBootstrap.mockResolvedValueOnce({
@@ -634,7 +722,12 @@ describe("configuration change listener", () => {
 
   it("refreshes workspace folders when autoMount config changes", async () => {
     const fakeTracker = {
-      context: { name: "MyVault", physicalPath: "/vault", mode: "full" },
+      context: {
+        name: "MyVault",
+        physicalPath: "/vault",
+        mode: "full",
+        vfsConfig: { agents: [], skills: [], allowed: [], blocked: [] },
+      },
     } as unknown as LocalIndexTracker;
 
     mockBootstrap.mockResolvedValueOnce({
@@ -667,7 +760,11 @@ describe("configuration change listener", () => {
     configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.autoMount" });
 
     expect(mockRemoveWF).toHaveBeenCalledWith("/vault");
-    expect(mockAddWF).toHaveBeenCalledWith("/vault", ["Notes", "Projects"]);
+    expect(mockAddWF).toHaveBeenCalledWith("/vault", ["Notes", "Projects"], {
+      vaultRoot: "/vault",
+      allowed: [],
+      blocked: [],
+    });
   });
 });
 

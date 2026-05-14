@@ -3,7 +3,9 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   canonicalizePath,
   checkAllowedFolder,
+  checkBlockedFolder,
   checkSymlink,
+  isAllowedPath,
   validatePath,
 } from "./path-security.js";
 import { mockFsFunction } from "./test-helpers.js";
@@ -14,6 +16,8 @@ vi.mock("node:fs/promises", () => ({
 
 const { realpath } = await import("node:fs/promises");
 const realpathMock = mockFsFunction(realpath);
+
+const EMPTY_OPTS = { vaultRoot: "/vault", allowed: [] as string[], blocked: [] as string[] };
 
 describe("canonicalizePath", () => {
   const vaultRoot = "/vault";
@@ -50,27 +54,83 @@ describe("canonicalizePath", () => {
   });
 });
 
-describe("checkAllowedFolder", () => {
-  it("passes through when allowedFolders is empty", () => {
-    const result = checkAllowedFolder("/vault/any/path.md", {
-      vaultRoot: "/vault",
-      allowedFolders: [],
+describe("checkBlockedFolder", () => {
+  it("passes through when blocked is empty", () => {
+    const result = checkBlockedFolder("/vault/any/path.md", EMPTY_OPTS);
+    expect(result).toEqual({ ok: true, value: "/vault/any/path.md" });
+  });
+
+  it("rejects path within blocked folder", () => {
+    const result = checkBlockedFolder("/vault/private/secret.md", {
+      ...EMPTY_OPTS,
+      blocked: ["private"],
     });
+    expect(result).toEqual({
+      ok: false,
+      error: { code: "PERMISSION_DENIED", message: "Path within blocked folders" },
+    });
+  });
+
+  it("rejects path equal to blocked folder", () => {
+    const result = checkBlockedFolder("/vault/private", {
+      ...EMPTY_OPTS,
+      blocked: ["private"],
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: { code: "PERMISSION_DENIED", message: "Path within blocked folders" },
+    });
+  });
+
+  it("accepts path outside blocked folders", () => {
+    const result = checkBlockedFolder("/vault/notes/foo.md", {
+      ...EMPTY_OPTS,
+      blocked: ["private"],
+    });
+    expect(result).toEqual({ ok: true, value: "/vault/notes/foo.md" });
+  });
+
+  it("rejects nested path within blocked folder", () => {
+    const result = checkBlockedFolder("/vault/notes/draft/wip.md", {
+      ...EMPTY_OPTS,
+      blocked: ["notes/draft"],
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: { code: "PERMISSION_DENIED", message: "Path within blocked folders" },
+    });
+  });
+
+  it("handles overlapping blocked entries", () => {
+    const result = checkBlockedFolder("/vault/notes/draft/nested/file.md", {
+      ...EMPTY_OPTS,
+      blocked: ["notes", "notes/draft"],
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: { code: "PERMISSION_DENIED", message: "Path within blocked folders" },
+    });
+  });
+});
+
+describe("checkAllowedFolder", () => {
+  it("passes through when allowed is empty and blocked is empty", () => {
+    const result = checkAllowedFolder("/vault/any/path.md", EMPTY_OPTS);
     expect(result).toEqual({ ok: true, value: "/vault/any/path.md" });
   });
 
   it("accepts path within allowed folder", () => {
     const result = checkAllowedFolder("/vault/notes/foo.md", {
-      vaultRoot: "/vault",
-      allowedFolders: ["notes"],
+      ...EMPTY_OPTS,
+      allowed: ["notes"],
     });
     expect(result).toEqual({ ok: true, value: "/vault/notes/foo.md" });
   });
 
   it("rejects path outside all allowed folders", () => {
     const result = checkAllowedFolder("/vault/private/secret.md", {
-      vaultRoot: "/vault",
-      allowedFolders: ["notes", "agents"],
+      ...EMPTY_OPTS,
+      allowed: ["notes", "agents"],
     });
     expect(result).toEqual({
       ok: false,
@@ -80,34 +140,87 @@ describe("checkAllowedFolder", () => {
 
   it("accepts path in second allowed folder", () => {
     const result = checkAllowedFolder("/vault/agents/bot.md", {
-      vaultRoot: "/vault",
-      allowedFolders: ["notes", "agents"],
+      ...EMPTY_OPTS,
+      allowed: ["notes", "agents"],
     });
     expect(result).toEqual({ ok: true, value: "/vault/agents/bot.md" });
   });
 
   it("accepts path within nested allowed folder", () => {
     const result = checkAllowedFolder("/vault/projects/active/todo.md", {
-      vaultRoot: "/vault",
-      allowedFolders: ["projects/active"],
+      ...EMPTY_OPTS,
+      allowed: ["projects/active"],
     });
     expect(result).toEqual({ ok: true, value: "/vault/projects/active/todo.md" });
   });
 
-  it("accepts vault root when allowedFolders is non-empty", () => {
+  it("accepts vault root when allowed is non-empty", () => {
     const result = checkAllowedFolder("/vault", {
-      vaultRoot: "/vault",
-      allowedFolders: ["notes", "agents"],
+      ...EMPTY_OPTS,
+      allowed: ["notes", "agents"],
+    });
+    expect(result).toEqual({ ok: true, value: "/vault" });
+  });
+
+  it("accepts vault root when blocked entries exist", () => {
+    const result = checkAllowedFolder("/vault", {
+      ...EMPTY_OPTS,
+      blocked: ["private", "notes/draft"],
     });
     expect(result).toEqual({ ok: true, value: "/vault" });
   });
 
   it("accepts intermediate ancestor of allowed folder", () => {
     const result = checkAllowedFolder("/vault/projects", {
-      vaultRoot: "/vault",
-      allowedFolders: ["projects/active"],
+      ...EMPTY_OPTS,
+      allowed: ["projects/active"],
     });
     expect(result).toEqual({ ok: true, value: "/vault/projects" });
+  });
+
+  it("blocked takes precedence over allowed", () => {
+    const result = checkAllowedFolder("/vault/notes/draft/wip.md", {
+      ...EMPTY_OPTS,
+      allowed: ["notes"],
+      blocked: ["notes/draft"],
+    });
+    expect(result).toEqual({
+      ok: false,
+      error: { code: "PERMISSION_DENIED", message: "Path within blocked folders" },
+    });
+  });
+
+  it("accepts allowed path not in blocked", () => {
+    const result = checkAllowedFolder("/vault/notes/public/doc.md", {
+      ...EMPTY_OPTS,
+      allowed: ["notes"],
+      blocked: ["notes/draft"],
+    });
+    expect(result).toEqual({ ok: true, value: "/vault/notes/public/doc.md" });
+  });
+});
+
+describe("isAllowedPath", () => {
+  it("returns true for path within allowed", () => {
+    expect(isAllowedPath("notes/foo.md", { ...EMPTY_OPTS, allowed: ["notes"] })).toBe(true);
+  });
+
+  it("returns false for path outside allowed", () => {
+    expect(isAllowedPath("private/secret.md", { ...EMPTY_OPTS, allowed: ["notes"] })).toBe(false);
+  });
+
+  it("returns false for path within blocked", () => {
+    expect(isAllowedPath("notes/draft/wip.md", { ...EMPTY_OPTS, blocked: ["notes/draft"] })).toBe(
+      false,
+    );
+  });
+
+  it("returns true for unrestricted config", () => {
+    expect(isAllowedPath("anything/here.md", EMPTY_OPTS)).toBe(true);
+  });
+
+  it("returns false for traversal path", () => {
+    expect(isAllowedPath("../../etc/passwd", EMPTY_OPTS)).toBe(false);
   });
 });
 
@@ -161,17 +274,23 @@ describe("validatePath", () => {
 
   it("returns validated path when all checks pass", async () => {
     realpathMock.mockResolvedValue("/vault/notes/foo.md");
-    const result = await validatePath("notes/foo.md", {
-      vaultRoot: "/vault",
-      allowedFolders: [],
-    });
+    const result = await validatePath("notes/foo.md", EMPTY_OPTS);
     expect(result).toEqual({ ok: true, value: "/vault/notes/foo.md" });
   });
 
   it("fails on path traversal", async () => {
-    const result = await validatePath("../../etc/passwd", {
-      vaultRoot: "/vault",
-      allowedFolders: [],
+    const result = await validatePath("../../etc/passwd", EMPTY_OPTS);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("PERMISSION_DENIED");
+    }
+    expect(realpathMock).not.toHaveBeenCalled();
+  });
+
+  it("fails on allowed violation", async () => {
+    const result = await validatePath("private/secret.md", {
+      ...EMPTY_OPTS,
+      allowed: ["notes"],
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -180,10 +299,10 @@ describe("validatePath", () => {
     expect(realpathMock).not.toHaveBeenCalled();
   });
 
-  it("fails on allowedFolder violation", async () => {
-    const result = await validatePath("private/secret.md", {
-      vaultRoot: "/vault",
-      allowedFolders: ["notes"],
+  it("fails on blocked violation", async () => {
+    const result = await validatePath("notes/draft/wip.md", {
+      ...EMPTY_OPTS,
+      blocked: ["notes/draft"],
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {
@@ -194,10 +313,7 @@ describe("validatePath", () => {
 
   it("fails on symlink escape", async () => {
     realpathMock.mockResolvedValue("/outside/secret.md");
-    const result = await validatePath("link.md", {
-      vaultRoot: "/vault",
-      allowedFolders: [],
-    });
+    const result = await validatePath("link.md", EMPTY_OPTS);
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("PERMISSION_DENIED");

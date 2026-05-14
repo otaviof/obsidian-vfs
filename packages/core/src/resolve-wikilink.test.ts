@@ -16,7 +16,8 @@ function makeOptions(overrides: Partial<ResolveWikilinkOptions> = {}): ResolveWi
     cli: mockCLI(),
     cache: new LRUCache<string, string>(100),
     vaultRoot: "/vault",
-    allowedFolders: [],
+    allowed: [],
+    blocked: [],
     mode: "full",
     ...overrides,
   };
@@ -118,11 +119,11 @@ describe("resolveWikilink", () => {
     });
   });
 
-  it("respects allowedFolders in glob", async () => {
+  it("respects allowed in glob", async () => {
     readdirMock.mockResolvedValueOnce(["deep/changelog.md"]);
     const options = makeOptions({
       mode: "degraded",
-      allowedFolders: ["notes"],
+      allowed: ["notes"],
     });
 
     const result = await resolveWikilink("changelog", options);
@@ -247,5 +248,40 @@ describe("resolveWikilink", () => {
       ok: true,
       value: { resolvedPath: "docs/Changelog.md", candidates },
     });
+  });
+
+  it("rejects path-based wikilink outside allowed folders", async () => {
+    const options = makeOptions({ allowed: ["notes"] });
+    const result = await resolveWikilink("private/secret", options);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("PERMISSION_DENIED");
+  });
+
+  it("rejects path-based wikilink inside blocked folders", async () => {
+    const options = makeOptions({ blocked: ["notes/draft"] });
+    const result = await resolveWikilink("notes/draft/wip", options);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("PERMISSION_DENIED");
+  });
+
+  it("accepts path-based wikilink within allowed and not blocked", async () => {
+    const options = makeOptions({ allowed: ["notes"], blocked: ["notes/draft"] });
+    const result = await resolveWikilink("notes/public/doc", options);
+    expect(result).toEqual({
+      ok: true,
+      value: { resolvedPath: "notes/public/doc.md", candidates: [] },
+    });
+  });
+
+  it("respects blocked folders in glob fallback (degraded mode)", async () => {
+    readdirMock.mockResolvedValueOnce(["notes/draft/secret.md"]);
+    const options = makeOptions({
+      mode: "degraded",
+      blocked: ["notes/draft"],
+    });
+
+    const result = await resolveWikilink("secret", options);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("FILE_NOT_FOUND");
   });
 });

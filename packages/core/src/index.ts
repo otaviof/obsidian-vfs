@@ -79,9 +79,14 @@ export type { BootstrapResult } from "./bootstrap.js";
 export { EXIT_SUCCESS, EXIT_ERROR, EXIT_USAGE } from "./exit-codes.js";
 
 /**
- * Path security: canonicalize, validate, and check symlinks.
+ * Path security: canonicalize, validate, check symlinks, and folder restrictions.
  */
-export { validatePath, canonicalizePath } from "./path-security.js";
+export {
+  validatePath,
+  canonicalizePath,
+  isAllowedPath,
+  checkBlockedFolder,
+} from "./path-security.js";
 
 /**
  * Concrete implementations — CLI wrapper and async queue.

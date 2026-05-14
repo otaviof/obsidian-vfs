@@ -19,7 +19,7 @@ Two mention formats are supported:
 Resolve through the full chain: agents, skills, files, then wikilinks.
 
 ```
-@obs:architect                     # Agent by name (from agentsDirs)
+@obs:architect                     # Agent by name (from agents dirs)
 @obs:10-projects/plan.md           # File by vault-relative path
 @obs:plan.md#Architecture          # Section within a file
 ```
@@ -29,7 +29,7 @@ Resolve through the full chain: agents, skills, files, then wikilinks.
 Always resolve as a skill. No fallback to agents, files, or wikilinks.
 
 ```
-/obs:obsidian                      # Skill by name (from skillsDirs)
+/obs:obsidian                      # Skill by name (from skills dirs)
 /obs:obsidian#Usage                # Section within a skill
 ```
 

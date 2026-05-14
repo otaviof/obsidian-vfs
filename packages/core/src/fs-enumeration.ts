@@ -2,7 +2,12 @@ import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 
 import type { PathSecurityOptions } from "./path-security.js";
-import { canonicalizePath, checkAllowedFolder, validatePath } from "./path-security.js";
+import {
+  canonicalizePath,
+  checkAllowedFolder,
+  checkBlockedFolder,
+  validatePath,
+} from "./path-security.js";
 import type { VFSFileStat, VFSFileType, VFSResult } from "./types.js";
 
 /**
@@ -14,6 +19,9 @@ export async function readDirectory(
 ): Promise<VFSResult<readonly [string, VFSFileType][]>> {
   const canonical = canonicalizePath(virtualPath, options.vaultRoot);
   if (!canonical.ok) return canonical;
+
+  const parentAllowed = checkAllowedFolder(canonical.value, options);
+  if (!parentAllowed.ok) return parentAllowed;
 
   let entries;
   try {
@@ -63,8 +71,8 @@ function hasDotSegment(relativePath: string): boolean {
  */
 export async function listMarkdownFiles(options: PathSecurityOptions): Promise<VFSResult<string[]>> {
   const searchDirs =
-    options.allowedFolders.length > 0
-      ? options.allowedFolders.map((f) => path.resolve(options.vaultRoot, f))
+    options.allowed.length > 0
+      ? options.allowed.map((f) => path.resolve(options.vaultRoot, f))
       : [options.vaultRoot];
 
   const files: string[] = [];
@@ -82,6 +90,15 @@ export async function listMarkdownFiles(options: PathSecurityOptions): Promise<V
       if (hasDotSegment(entry)) continue;
       files.push(path.relative(options.vaultRoot, path.join(dir, entry)));
     }
+  }
+
+  if (options.blocked.length > 0) {
+    const filtered = files.filter((f) => {
+      const abs = path.resolve(options.vaultRoot, f);
+      return checkBlockedFolder(abs, options).ok;
+    });
+    filtered.sort();
+    return { ok: true, value: filtered };
   }
 
   files.sort();

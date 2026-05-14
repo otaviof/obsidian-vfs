@@ -13,7 +13,7 @@ const readFileMock = mockFsFunction(readFile);
 const realpathMock = mockFsFunction(realpath);
 
 describe("readVirtualFile", () => {
-  const options = { vaultRoot: "/vault", allowedFolders: [] as string[] };
+  const options = { vaultRoot: "/vault", allowed: [] as string[], blocked: [] as string[] };
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -38,10 +38,11 @@ describe("readVirtualFile", () => {
     expect(readFileMock).not.toHaveBeenCalled();
   });
 
-  it("rejects allowedFolders violation", async () => {
+  it("rejects allowed violation", async () => {
     const result = await readVirtualFile("private/secret.md", {
       vaultRoot: "/vault",
-      allowedFolders: ["notes"],
+      allowed: ["notes"],
+      blocked: [],
     });
     expect(result.ok).toBe(false);
     if (!result.ok) {

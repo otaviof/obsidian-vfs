@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 
-import { resolveExecConfig } from "@obsidian-vfs/core";
+import { canonicalizePath, resolveExecConfig } from "@obsidian-vfs/core";
 
 import { bootstrapTracker } from "./bootstrap.js";
 import { formatContext } from "./context-formatter.js";
@@ -50,9 +50,10 @@ export function parseSubagentInput(raw: string): SubagentInput | null {
 /** Handle a SubagentStart event for provisioned agents with obs:// URIs. */
 export async function handleSubagentStart(input: SubagentInput): Promise<SubagentOutput> {
   const agentsRoot = join(input.cwd, ".claude", "agents");
-  const agentPath = join(agentsRoot, `${input.agent_type}.md`);
-  if (!resolve(agentPath).startsWith(resolve(agentsRoot) + "/")) return {};
+  const agentFile = `${input.agent_type}.md`;
+  if (!canonicalizePath(agentFile, agentsRoot).ok) return {};
 
+  const agentPath = join(agentsRoot, agentFile);
   let content: string;
   try {
     content = await readFile(agentPath, "utf8");

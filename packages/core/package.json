@@ -1,6 +1,6 @@
 {
   "name": "@obsidian-vfs/core",
-  "version": "0.1.4",
+  "version": "0.2.0",
   "type": "module",
   "description": "Core library for Obsidian VFS — vault resolution, content processing, path security",
   "license": "Apache-2.0",

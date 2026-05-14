@@ -37,9 +37,10 @@ const DEFAULT_TRACKER_CONTEXT = {
   physicalPath: "/Users/me/vault",
   name: "My Vault",
   vfsConfig: {
-    allowedFolders: [] as readonly string[],
-    skillsDirs: [] as string[],
-    agentsDirs: [] as string[],
+    allowed: [] as readonly string[],
+    blocked: [] as readonly string[],
+    skills: [] as string[],
+    agents: [] as string[],
   },
   mode: "full" as const,
 };

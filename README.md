@@ -39,17 +39,27 @@ Place a JSON file at `.obsidian/obsidian-vfs.json` inside your vault. All fields
 
 ```json
 {
-  "agentsDirs": ["path/to/agents"],
-  "skillsDirs": ["path/to/skills"],
-  "allowedFolders": ["folder-a", "folder-b"]
+  "agents": ["path/to/agents"],
+  "skills": ["path/to/skills"],
+  "allowed": ["folder-a", "folder-b"],
+  "blocked": ["folder-a/private"]
 }
 ```
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `agentsDirs` | `string[]` | Vault-relative folders containing agent definitions (flat `.md` files) |
-| `skillsDirs` | `string[]` | Vault-relative folders containing skill definitions (`name/SKILL.md`) |
-| `allowedFolders` | `string[]` | Restrict all read operations to these vault-relative folders. Empty = full vault access |
+| `agents` | `string[]` | Vault-relative directories containing agent definitions (flat `.md` files) |
+| `skills` | `string[]` | Vault-relative directories containing skill definitions (`name/SKILL.md`) |
+| `allowed` | `string[]` | Restrict general vault access to these directories. Empty = full vault access |
+| `blocked` | `string[]` | Deny access to these directories (evaluated before `allowed`) |
+
+### Two-Tier Access Model
+
+`allowed` and `blocked` restrict general vault content — notes, wikilinks, directory browsing, and workspace mounts. `agents` and `skills` directories are implicitly allowed and exempt from these restrictions.
+
+`blocked` is evaluated first (deny wins). When a path matches both `allowed` and `blocked`, it is blocked. A `blocked` entry may be a child of an `allowed` entry (carving an exception), but not a parent — that configuration is rejected at load time.
+
+Wikilinks inside allowed notes that reference disallowed targets are visible but inert: the text remains, but the target cannot be resolved, read, or clicked.
 
 ## Contributing
 

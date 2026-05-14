@@ -72,7 +72,7 @@ The plugin's [`obs-read`](../claude-plugin/README.md#obs-read) bin script calls 
 
 ### `list-skills`
 
-Enumerate all skills discovered from the vault's `skillsDirs` (see [Vault Configuration](../../README.md#vault-configuration)).
+Enumerate all skills discovered from the vault's `skills` directories (see [Vault Configuration](../../README.md#vault-configuration)).
 
 ```sh
 npx @obsidian-vfs/cli list-skills
@@ -84,7 +84,7 @@ Output is compact by default (name and vault-relative path only). Pass `--descri
 
 ### `list-agents`
 
-Enumerate all agents discovered from the vault's `agentsDirs`.
+Enumerate all agents discovered from the vault's `agents` directories.
 
 ```sh
 npx @obsidian-vfs/cli list-agents
@@ -177,10 +177,10 @@ When `OBSIDIAN_VFS_PROJECT_DIR` is set, the rule uses the local path instead: `B
 
 #### Behavior
 
-- Enumerates every `skillsDir` from the [vault config](../../README.md#vault-configuration), finds subdirectories containing `SKILL.md`, extracts frontmatter, and writes proxy files.
+- Enumerates every `skills` directory from the [vault config](../../README.md#vault-configuration), finds subdirectories containing `SKILL.md`, extracts frontmatter, and writes proxy files.
 - Writes are idempotent — identical proxies are skipped.
 - Skill names validated against `/^[a-zA-Z0-9._-]+$/`; shell metacharacters rejected.
-- When multiple `skillsDirs` contain a skill with the same name, the first directory wins.
+- When multiple `skills` directories contain a skill with the same name, the first directory wins.
 - Add-only — never removes proxy files or permission rules. Delete `.claude/skills/<name>/` and the corresponding rule from `.claude/settings.local.json` manually.
 - When a filter is active (`--include`/`--exclude`), unmatched skills appear as `skipped` but existing proxies are never removed.
 

@@ -3,6 +3,8 @@ import path from "node:path";
 
 import * as vscode from "vscode";
 
+import { canonicalizePath, type PathSecurityOptions, isAllowedPath } from "@obsidian-vfs/core";
+
 import { SCHEME, toFileUri } from "./uri-adapter.js";
 
 /** Result of attempting to add the vault as a workspace folder. */
@@ -19,7 +21,8 @@ function isObsidianManagedFolder(folder: vscode.WorkspaceFolder, physicalPath: s
   if (folder.uri.scheme === SCHEME) return true;
   if (folder.uri.scheme !== "file") return false;
   const fsPath = folder.uri.fsPath;
-  const isUnderVault = fsPath === physicalPath || fsPath.startsWith(physicalPath + path.sep);
+  const relative = path.relative(physicalPath, fsPath);
+  const isUnderVault = canonicalizePath(relative, physicalPath).ok;
   return folder.name.startsWith(FOLDER_NAME_PREFIX) && isUnderVault;
 }
 
@@ -68,11 +71,13 @@ export function includeVaultInGitDetection(physicalPath: string): Thenable<void>
 /**
  * Add autoMount directories as individual workspace folders for Explorer browsing.
  * File entries are filtered out since workspace folders must be directories.
+ * Entries outside allowed folders or inside blocked folders are skipped.
  * Appends at the end to avoid extension host restart.
  */
 export function addVaultWorkspaceFolder(
   physicalPath: string,
   autoMount: readonly string[],
+  security?: PathSecurityOptions,
 ): AddWorkspaceFolderResult {
   if (autoMount.length === 0) {
     return { status: "skipped", reason: "no autoMount folders configured" };
@@ -88,6 +93,7 @@ export function addVaultWorkspaceFolder(
   }
 
   const directories = autoMount.filter((entry) => {
+    if (security && !isAllowedPath(entry, security)) return false;
     try {
       return fs.statSync(path.join(physicalPath, entry)).isDirectory();
     } catch {

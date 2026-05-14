@@ -27,9 +27,10 @@ async function createTracker(
   cliOverrides: Parameters<typeof mockCLI>[0] = {},
 ): Promise<LocalIndexTracker> {
   const config = {
-    agentsDirs: [],
-    skillsDirs: [],
-    allowedFolders: [],
+    agents: [],
+    skills: [],
+    allowed: [],
+    blocked: [],
     ...configOverrides,
   };
 
@@ -47,7 +48,7 @@ async function createTracker(
 
 describe("resolveMention", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
     realpathMock.mockImplementation((...args: unknown[]) => Promise.resolve(args[0]));
     readdirMock.mockResolvedValue([]);
   });
@@ -68,7 +69,7 @@ describe("resolveMention", () => {
 
   it("resolves agent mention", async () => {
     accessMock.mockResolvedValueOnce(undefined);
-    const tracker = await createTracker({ agentsDirs: ["agents"] });
+    const tracker = await createTracker({ agents: ["agents"] });
 
     readFileMock.mockResolvedValueOnce(Buffer.from("agent content"));
 
@@ -188,7 +189,7 @@ describe("resolveMention", () => {
 
   it("resolves skill mention", async () => {
     accessMock.mockResolvedValueOnce(undefined);
-    const tracker = await createTracker({ skillsDirs: ["skills"] });
+    const tracker = await createTracker({ skills: ["skills"] });
 
     readFileMock.mockResolvedValueOnce(Buffer.from("skill content"));
 
@@ -258,7 +259,7 @@ describe("resolveMention", () => {
     }
   });
 
-  it("returns direct path when both access and wikilink fail", async () => {
+  it("returns error when both access and wikilink fail", async () => {
     const enoent = new Error("ENOENT") as NodeJS.ErrnoException;
     enoent.code = "ENOENT";
     accessMock.mockRejectedValueOnce(enoent);
@@ -270,6 +271,34 @@ describe("resolveMention", () => {
     const result = await resolveMention("@obs:notes/gone.md", tracker);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("FILE_NOT_FOUND");
+  });
+
+  it("rejects path outside allowed folders", async () => {
+    const tracker = await createTracker({ allowed: ["notes"] });
+
+    const result = await resolveMention("@obs:private/secret.md", tracker);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("PERMISSION_DENIED");
+  });
+
+  it("rejects path inside blocked folders", async () => {
+    const tracker = await createTracker({ blocked: ["notes/draft"] });
+
+    const result = await resolveMention("@obs:notes/draft/wip.md", tracker);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("PERMISSION_DENIED");
+  });
+
+  it("rejects skill mention when skill folder is outside allowed", async () => {
+    accessMock.mockResolvedValueOnce(undefined);
+    const tracker = await createTracker({
+      skills: ["skills"],
+      allowed: ["notes"],
+    });
+
+    const result = await resolveMention("@obs:my-skill", tracker);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("PERMISSION_DENIED");
   });
 });
 
@@ -302,14 +331,14 @@ describe("resolveSkillMention", () => {
   });
 
   it("returns INVALID_URI on missing /obs: prefix", async () => {
-    const tracker = await createTracker({ skillsDirs: ["skills"] });
+    const tracker = await createTracker({ skills: ["skills"] });
     const result = await resolveSkillMention("@obs:obsidian", tracker);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("INVALID_URI");
   });
 
   it("returns INVALID_URI on empty reference", async () => {
-    const tracker = await createTracker({ skillsDirs: ["skills"] });
+    const tracker = await createTracker({ skills: ["skills"] });
     const result = await resolveSkillMention("/obs:", tracker);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("INVALID_URI");
@@ -317,7 +346,7 @@ describe("resolveSkillMention", () => {
 
   it("resolves /obs:obsidian as skill", async () => {
     accessMock.mockResolvedValueOnce(undefined);
-    const tracker = await createTracker({ skillsDirs: ["skills"] });
+    const tracker = await createTracker({ skills: ["skills"] });
 
     readFileMock.mockResolvedValueOnce(Buffer.from("skill content"));
 
@@ -332,7 +361,7 @@ describe("resolveSkillMention", () => {
 
   it("extracts section from /obs: mention", async () => {
     accessMock.mockResolvedValueOnce(undefined);
-    const tracker = await createTracker({ skillsDirs: ["skills"] });
+    const tracker = await createTracker({ skills: ["skills"] });
 
     readFileMock.mockResolvedValueOnce(
       Buffer.from("# Overview\nIntro\n## Usage\nHow to use\n## Other"),
@@ -352,7 +381,7 @@ describe("resolveSkillMention", () => {
     enoent.code = "ENOENT";
     accessMock.mockRejectedValueOnce(enoent);
 
-    const tracker = await createTracker({ skillsDirs: ["skills"] });
+    const tracker = await createTracker({ skills: ["skills"] });
 
     const result = await resolveSkillMention("/obs:missing", tracker);
     expect(result.ok).toBe(false);
@@ -362,7 +391,7 @@ describe("resolveSkillMention", () => {
   });
 
   it("returns INVALID_URI for /obs:#section (empty path)", async () => {
-    const tracker = await createTracker({ skillsDirs: ["skills"] });
+    const tracker = await createTracker({ skills: ["skills"] });
     const result = await resolveSkillMention("/obs:#Heading", tracker);
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("INVALID_URI");

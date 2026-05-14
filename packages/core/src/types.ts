@@ -30,9 +30,10 @@ export type VFSResult<T> = { ok: true; value: T } | { ok: false; error: VFSError
  * Shape of `.obsidian/obsidian-vfs.json`, paths (directories) the vault exposes.
  */
 export interface VFSConfig {
-  agentsDirs: string[];
-  skillsDirs: string[];
-  allowedFolders: string[];
+  agents: string[];
+  skills: string[];
+  allowed: string[];
+  blocked: string[];
 }
 
 /**

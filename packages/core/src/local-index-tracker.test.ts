@@ -32,9 +32,10 @@ describe("LocalIndexTracker", () => {
         expect(result.value.context.name).toBe("TestVault");
         expect(result.value.context.physicalPath).toBe("/vault");
         expect(result.value.context.vfsConfig).toEqual({
-          agentsDirs: [],
-          skillsDirs: [],
-          allowedFolders: [],
+          agents: [],
+          skills: [],
+          allowed: [],
+          blocked: [],
         });
       }
     });
@@ -44,9 +45,10 @@ describe("LocalIndexTracker", () => {
         if (args[1] === "utf-8") {
           return Promise.resolve(
             JSON.stringify({
-              agentsDirs: ["agents"],
-              skillsDirs: ["skills"],
-              allowedFolders: ["notes"],
+              agents: ["agents"],
+              skills: ["skills"],
+              allowed: ["notes"],
+              blocked: [],
             }),
           );
         }
@@ -55,7 +57,7 @@ describe("LocalIndexTracker", () => {
       const result = await LocalIndexTracker.create(mockCLI());
       expect(result.ok).toBe(true);
       if (result.ok) {
-        expect(result.value.context.vfsConfig.agentsDirs).toEqual(["agents"]);
+        expect(result.value.context.vfsConfig.agents).toEqual(["agents"]);
       }
     });
 
@@ -101,7 +103,7 @@ describe("LocalIndexTracker", () => {
 
     it("fails on invalid config shape", async () => {
       readFileMock.mockImplementation((...args: unknown[]) => {
-        if (args[1] === "utf-8") return Promise.resolve(JSON.stringify({ agentsDirs: 42 }));
+        if (args[1] === "utf-8") return Promise.resolve(JSON.stringify({ agents: 42 }));
         return Promise.reject(new Error("unexpected"));
       });
       const result = await LocalIndexTracker.create(mockCLI());
@@ -143,9 +145,10 @@ describe("LocalIndexTracker", () => {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(Object.isFrozen(result.value.context.vfsConfig)).toBe(true);
-      expect(Object.isFrozen(result.value.context.vfsConfig.allowedFolders)).toBe(true);
-      expect(Object.isFrozen(result.value.context.vfsConfig.agentsDirs)).toBe(true);
-      expect(Object.isFrozen(result.value.context.vfsConfig.skillsDirs)).toBe(true);
+      expect(Object.isFrozen(result.value.context.vfsConfig.allowed)).toBe(true);
+      expect(Object.isFrozen(result.value.context.vfsConfig.blocked)).toBe(true);
+      expect(Object.isFrozen(result.value.context.vfsConfig.agents)).toBe(true);
+      expect(Object.isFrozen(result.value.context.vfsConfig.skills)).toBe(true);
     });
 
     it("freezes context", async () => {
@@ -216,10 +219,10 @@ describe("LocalIndexTracker", () => {
       }
     });
 
-    it("respects allowedFolders", async () => {
+    it("respects allowed", async () => {
       readFileMock.mockImplementation((...args: unknown[]) => {
         if (args[1] === "utf-8") {
-          return Promise.resolve(JSON.stringify({ allowedFolders: ["notes"] }));
+          return Promise.resolve(JSON.stringify({ allowed: ["notes"] }));
         }
         return Promise.reject(new Error("unexpected"));
       });
@@ -282,10 +285,10 @@ describe("LocalIndexTracker", () => {
   });
 
   describe("resolveAgent", () => {
-    it("delegates to resolveResource with agentsDirs", async () => {
+    it("delegates to resolveResource with agents", async () => {
       readFileMock.mockImplementation((...args: unknown[]) => {
         if (args[1] === "utf-8") {
-          return Promise.resolve(JSON.stringify({ agentsDirs: ["agents"], allowedFolders: [] }));
+          return Promise.resolve(JSON.stringify({ agents: ["agents"], allowed: [] }));
         }
         return Promise.reject(new Error("unexpected"));
       });
@@ -303,10 +306,10 @@ describe("LocalIndexTracker", () => {
   });
 
   describe("resolveSkill", () => {
-    it("delegates to resolveResource with skillsDirs", async () => {
+    it("delegates to resolveResource with skills", async () => {
       readFileMock.mockImplementation((...args: unknown[]) => {
         if (args[1] === "utf-8") {
-          return Promise.resolve(JSON.stringify({ skillsDirs: ["skills"], allowedFolders: [] }));
+          return Promise.resolve(JSON.stringify({ skills: ["skills"], allowed: [] }));
         }
         return Promise.reject(new Error("unexpected"));
       });
@@ -362,10 +365,10 @@ describe("LocalIndexTracker", () => {
   });
 
   describe("listSkills", () => {
-    async function createTrackerWithSkills(skillsDirs: string[]) {
+    async function createTrackerWithSkills(skills: string[]) {
       readFileMock.mockImplementation((...args: unknown[]) => {
         if (args[1] === "utf-8") {
-          return Promise.resolve(JSON.stringify({ skillsDirs, allowedFolders: [] }));
+          return Promise.resolve(JSON.stringify({ skills, allowed: [] }));
         }
         return Promise.reject(new Error("unexpected"));
       });
@@ -374,7 +377,7 @@ describe("LocalIndexTracker", () => {
       return result.value;
     }
 
-    it("enumerates skills from single skillsDir", async () => {
+    it("enumerates skills from single skills dir", async () => {
       const tracker = await createTrackerWithSkills(["skills"]);
 
       const { readdir } = await import("node:fs/promises");
@@ -404,7 +407,7 @@ describe("LocalIndexTracker", () => {
       });
     });
 
-    it("deduplicates across multiple skillsDirs (first wins)", async () => {
+    it("deduplicates across multiple skills dirs (first wins)", async () => {
       const tracker = await createTrackerWithSkills(["skills-a", "skills-b"]);
 
       const { readdir } = await import("node:fs/promises");
@@ -461,7 +464,7 @@ describe("LocalIndexTracker", () => {
       expect(result.value[0].description).toBe("Obsidian vault skill: plain");
     });
 
-    it("returns empty list when skillsDirs is empty", async () => {
+    it("returns empty list when skills is empty", async () => {
       const tracker = await createTrackerWithSkills([]);
 
       const result = await tracker.listSkills();
@@ -489,7 +492,7 @@ describe("LocalIndexTracker", () => {
       expect(result.value[0].name).toBe("actual-skill");
     });
 
-    it("continues when a skillsDir fails to enumerate", async () => {
+    it("continues when a skills dir fails to enumerate", async () => {
       const tracker = await createTrackerWithSkills(["bad-dir", "good-dir"]);
 
       const { readdir } = await import("node:fs/promises");
@@ -510,7 +513,7 @@ describe("LocalIndexTracker", () => {
       expect(result.value[0].vaultRelativePath).toBe("good-dir/deploy/SKILL.md");
     });
 
-    it("collects distinct skills from multiple skillsDirs", async () => {
+    it("collects distinct skills from multiple dirs", async () => {
       const tracker = await createTrackerWithSkills(["dir-a", "dir-b"]);
 
       const { readdir } = await import("node:fs/promises");
@@ -619,10 +622,10 @@ describe("LocalIndexTracker", () => {
   });
 
   describe("listAgents", () => {
-    async function createTrackerWithAgents(agentsDirs: string[]) {
+    async function createTrackerWithAgents(agents: string[]) {
       readFileMock.mockImplementation((...args: unknown[]) => {
         if (args[1] === "utf-8") {
-          return Promise.resolve(JSON.stringify({ agentsDirs, allowedFolders: [] }));
+          return Promise.resolve(JSON.stringify({ agents, allowed: [] }));
         }
         return Promise.reject(new Error("unexpected"));
       });
@@ -631,7 +634,7 @@ describe("LocalIndexTracker", () => {
       return result.value;
     }
 
-    it("enumerates agents from single agentsDir", async () => {
+    it("enumerates agents from single agents dir", async () => {
       const tracker = await createTrackerWithAgents(["agents"]);
 
       const { readdir } = await import("node:fs/promises");
@@ -663,7 +666,7 @@ describe("LocalIndexTracker", () => {
       });
     });
 
-    it("deduplicates across multiple agentsDirs (first wins)", async () => {
+    it("deduplicates across multiple agents dirs (first wins)", async () => {
       const tracker = await createTrackerWithAgents(["agents-a", "agents-b"]);
 
       const { readdir } = await import("node:fs/promises");
@@ -718,7 +721,7 @@ describe("LocalIndexTracker", () => {
       expect(result.value[0].description).toBe("Obsidian vault agent: plain");
     });
 
-    it("returns empty list when agentsDirs is empty", async () => {
+    it("returns empty list when agents is empty", async () => {
       const tracker = await createTrackerWithAgents([]);
 
       const result = await tracker.listAgents();
@@ -748,7 +751,7 @@ describe("LocalIndexTracker", () => {
       expect(result.value[0].name).toBe("good-agent");
     });
 
-    it("continues when an agentsDir fails to enumerate", async () => {
+    it("continues when an agents dir fails to enumerate", async () => {
       const tracker = await createTrackerWithAgents(["bad-dir", "good-dir"]);
 
       const { readdir } = await import("node:fs/promises");
@@ -769,7 +772,7 @@ describe("LocalIndexTracker", () => {
       expect(result.value[0].vaultRelativePath).toBe("good-dir/architect.md");
     });
 
-    it("collects distinct agents from multiple agentsDirs", async () => {
+    it("collects distinct agents from multiple dirs", async () => {
       const tracker = await createTrackerWithAgents(["dir-a", "dir-b"]);
 
       const { readdir } = await import("node:fs/promises");

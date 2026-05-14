@@ -67,9 +67,10 @@ export class LocalIndexTracker {
 
   private constructor(context: VaultContext, cache: LRUCache<string, string>, cli: ObsidianCLI) {
     const frozenConfig = Object.freeze({
-      agentsDirs: Object.freeze([...context.vfsConfig.agentsDirs]),
-      skillsDirs: Object.freeze([...context.vfsConfig.skillsDirs]),
-      allowedFolders: Object.freeze([...context.vfsConfig.allowedFolders]),
+      agents: Object.freeze([...context.vfsConfig.agents]),
+      skills: Object.freeze([...context.vfsConfig.skills]),
+      allowed: Object.freeze([...context.vfsConfig.allowed]),
+      blocked: Object.freeze([...context.vfsConfig.blocked]),
     });
     this.context = Object.freeze({
       ...context,
@@ -79,7 +80,8 @@ export class LocalIndexTracker {
     this.cli = cli;
     this.#securityOptions = {
       vaultRoot: context.physicalPath,
-      allowedFolders: frozenConfig.allowedFolders,
+      allowed: frozenConfig.allowed,
+      blocked: frozenConfig.blocked,
     };
     this.#watcher = null;
   }
@@ -130,7 +132,7 @@ export class LocalIndexTracker {
       vfsConfig = configResult.value;
     } catch (err) {
       if ((err as NodeJS.ErrnoException).code === "ENOENT") {
-        vfsConfig = { agentsDirs: [], skillsDirs: [], allowedFolders: [] };
+        vfsConfig = { agents: [], skills: [], allowed: [], blocked: [] };
       } else {
         return {
           ok: false,
@@ -180,19 +182,20 @@ export class LocalIndexTracker {
       cli: this.cli,
       cache: this.cache,
       vaultRoot: this.context.physicalPath,
-      allowedFolders: this.context.vfsConfig.allowedFolders,
+      allowed: this.context.vfsConfig.allowed,
+      blocked: this.context.vfsConfig.blocked,
       mode: this.context.mode,
     });
   }
 
-  /** Resolve an agent by name from configured agentsDirs. */
+  /** Resolve an agent by name from configured agents directories. */
   async resolveAgent(name: string): Promise<VFSResult<string>> {
-    return resolveResource(name, this.context.vfsConfig.agentsDirs, this.#securityOptions);
+    return resolveResource(name, this.context.vfsConfig.agents, this.#securityOptions);
   }
 
-  /** Resolve a skill by name as a directory containing SKILL.md from configured skillsDirs. */
+  /** Resolve a skill by name as a directory containing SKILL.md. */
   async resolveSkill(name: string): Promise<VFSResult<string>> {
-    return resolveSkillResource(name, this.context.vfsConfig.skillsDirs, this.#securityOptions);
+    return resolveSkillResource(name, this.context.vfsConfig.skills, this.#securityOptions);
   }
 
   /** Parse and resolve an `@obs:` mention to a full MentionResult. */
@@ -215,13 +218,13 @@ export class LocalIndexTracker {
     return statVirtualFile(virtualPath, this.#securityOptions);
   }
 
-  /** Enumerate all skills from configured skillsDirs with deduplication. */
+  /** Enumerate all skills from configured skills directories with deduplication. */
   async listSkills(): Promise<VFSResult<DiscoveredResource[]>> {
-    const { skillsDirs } = this.context.vfsConfig;
+    const { skills } = this.context.vfsConfig;
     const seen = new Set<string>();
-    const skills: DiscoveredResource[] = [];
+    const result: DiscoveredResource[] = [];
 
-    for (const dir of skillsDirs) {
+    for (const dir of skills) {
       const entries = await this.readDirectory(dir);
       if (!entries.ok) continue;
 
@@ -236,20 +239,20 @@ export class LocalIndexTracker {
         const description =
           extractFrontmatterDescription(content.value) ?? `Obsidian vault skill: ${name}`;
 
-        skills.push({ name, description, vaultRelativePath: skillPath });
+        result.push({ name, description, vaultRelativePath: skillPath });
       }
     }
 
-    return { ok: true, value: skills };
+    return { ok: true, value: result };
   }
 
-  /** Enumerate all agents from configured agentsDirs with deduplication. */
+  /** Enumerate all agents from configured agents directories with deduplication. */
   async listAgents(): Promise<VFSResult<DiscoveredResource[]>> {
-    const { agentsDirs } = this.context.vfsConfig;
+    const { agents } = this.context.vfsConfig;
     const seen = new Set<string>();
-    const agents: DiscoveredResource[] = [];
+    const result: DiscoveredResource[] = [];
 
-    for (const dir of agentsDirs) {
+    for (const dir of agents) {
       const entries = await this.readDirectory(dir);
       if (!entries.ok) continue;
 
@@ -266,11 +269,11 @@ export class LocalIndexTracker {
         const description =
           extractFrontmatterDescription(content.value) ?? `Obsidian vault agent: ${name}`;
 
-        agents.push({ name, description, vaultRelativePath: agentPath });
+        result.push({ name, description, vaultRelativePath: agentPath });
       }
     }
 
-    return { ok: true, value: agents };
+    return { ok: true, value: result };
   }
 
   /** Start watching the vault for file changes. Returns a Disposable to stop. */
@@ -293,7 +296,6 @@ export class LocalIndexTracker {
     if (!this.#watcher) {
       this.startWatching();
     }
-    // Safe: startWatching() always assigns #watcher before returning
     return this.#watcher!.onDidChange(listener);
   }
 }

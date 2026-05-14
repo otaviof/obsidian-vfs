@@ -95,7 +95,8 @@ describe("ObsidianFileSystemProvider", () => {
       expect(result).toBe(bytes);
       expect(mockReadVirtualFile).toHaveBeenCalledWith("note.md", {
         vaultRoot: "/vault",
-        allowedFolders: [],
+        allowed: [],
+        blocked: [],
       });
     });
 

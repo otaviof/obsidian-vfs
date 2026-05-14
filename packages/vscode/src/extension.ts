@@ -1,5 +1,7 @@
 import * as vscode from "vscode";
 
+import type { PathSecurityOptions } from "@obsidian-vfs/core";
+
 import { bootstrapFromConfig, readConfig } from "./bootstrap.js";
 import { SCHEME } from "./uri-adapter.js";
 import { registerCommands } from "./commands.js";
@@ -77,8 +79,18 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   if (config.statusBar) {
     statusBar.show();
   }
+  const securityOptions: PathSecurityOptions = {
+    vaultRoot: tracker.context.physicalPath,
+    allowed: tracker.context.vfsConfig.allowed,
+    blocked: tracker.context.vfsConfig.blocked,
+  };
+
   if (config.workspace) {
-    const wfResult = addVaultWorkspaceFolder(tracker.context.physicalPath, config.autoMount);
+    const wfResult = addVaultWorkspaceFolder(
+      tracker.context.physicalPath,
+      config.autoMount,
+      securityOptions,
+    );
     const detail = "reason" in wfResult ? ` — ${wfResult.reason}` : "";
     outputChannel.appendLine(`Workspace folder: ${wfResult.status}${detail}`);
     await excludeVaultFromGitDetection(tracker.context.physicalPath);
@@ -107,7 +119,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       ) {
         removeVaultWorkspaceFolders(tracker.context.physicalPath);
         if (updated.workspace) {
-          addVaultWorkspaceFolder(tracker.context.physicalPath, updated.autoMount);
+          addVaultWorkspaceFolder(tracker.context.physicalPath, updated.autoMount, securityOptions);
           void excludeVaultFromGitDetection(tracker.context.physicalPath);
         } else {
           void includeVaultInGitDetection(tracker.context.physicalPath);

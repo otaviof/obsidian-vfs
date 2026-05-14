@@ -4,12 +4,13 @@ import path from "node:path";
 import type { VFSResult } from "./types.js";
 
 /**
- * Immutable parameters for path security checks — vault root and optional
- * folder allowlist.
+ * Immutable parameters for path security checks — vault root, folder allowlist,
+ * and folder blocklist.
  */
 export interface PathSecurityOptions {
   readonly vaultRoot: string;
-  readonly allowedFolders: readonly string[];
+  readonly allowed: readonly string[];
+  readonly blocked: readonly string[];
 }
 
 /**
@@ -28,19 +29,41 @@ export function canonicalizePath(virtualPath: string, vaultRoot: string): VFSRes
 }
 
 /**
- * When `allowedFolders` is non-empty, verify that `absolutePath` falls within at
+ * Verify that `absolutePath` does not fall within any blocked folder. Synchronous.
+ */
+export function checkBlockedFolder(
+  absolutePath: string,
+  options: PathSecurityOptions,
+): VFSResult<string> {
+  for (const folder of options.blocked) {
+    const blockedAbs = path.resolve(options.vaultRoot, folder);
+    if (absolutePath === blockedAbs || absolutePath.startsWith(blockedAbs + path.sep)) {
+      return {
+        ok: false,
+        error: { code: "PERMISSION_DENIED", message: "Path within blocked folders" },
+      };
+    }
+  }
+  return { ok: true, value: absolutePath };
+}
+
+/**
+ * When `allowed` is non-empty, verify that `absolutePath` falls within at
  * least one allowed folder (resolved relative to `vaultRoot`). Empty allowlist
- * permits all vault paths. Synchronous — no I/O.
+ * permits all vault paths. Checks `blocked` first — deny wins. Synchronous.
  */
 export function checkAllowedFolder(
   absolutePath: string,
   options: PathSecurityOptions,
 ): VFSResult<string> {
-  if (options.allowedFolders.length === 0) {
+  const blockedResult = checkBlockedFolder(absolutePath, options);
+  if (!blockedResult.ok) return blockedResult;
+
+  if (options.allowed.length === 0) {
     return { ok: true, value: absolutePath };
   }
 
-  for (const folder of options.allowedFolders) {
+  for (const folder of options.allowed) {
     const allowed = path.resolve(options.vaultRoot, folder);
     if (absolutePath === allowed || absolutePath.startsWith(allowed + path.sep)) {
       return { ok: true, value: absolutePath };
@@ -54,6 +77,15 @@ export function checkAllowedFolder(
     ok: false,
     error: { code: "PERMISSION_DENIED", message: "Path not within allowed folders" },
   };
+}
+
+/**
+ * Convenience predicate: is `virtualPath` reachable given `allowed`/`blocked`?
+ */
+export function isAllowedPath(virtualPath: string, options: PathSecurityOptions): boolean {
+  const canonical = canonicalizePath(virtualPath, options.vaultRoot);
+  if (!canonical.ok) return false;
+  return checkAllowedFolder(canonical.value, options).ok;
 }
 
 /**
@@ -88,7 +120,7 @@ export async function checkSymlink(
 }
 
 /**
- * Compose all path security checks in order: canonicalize → allowedFolders →
+ * Compose all path security checks in order: canonicalize → allowed/blocked →
  * symlink. Short-circuits on first failure. Returns the validated absolute path.
  */
 export async function validatePath(

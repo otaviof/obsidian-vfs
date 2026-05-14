@@ -3,6 +3,7 @@ import path from "node:path";
 import type { ObsidianCLI } from "./cli.js";
 import { listMarkdownFiles } from "./fs-enumeration.js";
 import type { LRUCache } from "./lru-cache.js";
+import { isAllowedPath, type PathSecurityOptions } from "./path-security.js";
 import type { VFSResult, WikilinkResolution } from "./types.js";
 
 /**
@@ -12,8 +13,14 @@ export interface ResolveWikilinkOptions {
   readonly cli: ObsidianCLI;
   readonly cache: LRUCache<string, string>;
   readonly vaultRoot: string;
-  readonly allowedFolders: readonly string[];
+  readonly allowed: readonly string[];
+  readonly blocked: readonly string[];
   readonly mode: "full" | "degraded";
+}
+
+/** Build a PathSecurityOptions from the wikilink options. */
+function securityOptions(options: ResolveWikilinkOptions): PathSecurityOptions {
+  return { vaultRoot: options.vaultRoot, allowed: options.allowed, blocked: options.blocked };
 }
 
 async function globFallback(
@@ -21,10 +28,7 @@ async function globFallback(
   options: ResolveWikilinkOptions,
 ): Promise<string | undefined> {
   const target = normalizedName.toLowerCase();
-  const result = await listMarkdownFiles({
-    vaultRoot: options.vaultRoot,
-    allowedFolders: options.allowedFolders,
-  });
+  const result = await listMarkdownFiles(securityOptions(options));
   if (!result.ok) return undefined;
 
   for (const filePath of result.value) {
@@ -74,6 +78,12 @@ export async function resolveWikilink(
       };
     }
     const directPath = normalizedName + ".md";
+    if (!isAllowedPath(directPath, securityOptions(options))) {
+      return {
+        ok: false,
+        error: { code: "PERMISSION_DENIED", message: "Path not within allowed folders" },
+      };
+    }
     return { ok: true, value: { resolvedPath: directPath, candidates: [] } };
   }
 

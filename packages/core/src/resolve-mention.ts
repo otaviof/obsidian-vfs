@@ -2,6 +2,8 @@ import { access } from "node:fs/promises";
 import path from "node:path";
 
 import type { LocalIndexTracker } from "./local-index-tracker.js";
+import type { PathSecurityOptions } from "./path-security.js";
+import { isAllowedPath } from "./path-security.js";
 import type { MentionResult, VFSResult } from "./types.js";
 import { processContent } from "./content-slice.js";
 import { resolveResource, resolveSkillResource } from "./resolve-resource.js";
@@ -52,12 +54,12 @@ async function readAndProcess(
 async function resolveNonAgent(
   namePart: string,
   tracker: LocalIndexTracker,
-  securityOptions: { vaultRoot: string; allowedFolders: readonly string[] },
+  securityOptions: PathSecurityOptions,
 ): Promise<VFSResult<{ targetType: "file" | "skill"; resolvedPath: string }>> {
-  if (tracker.context.vfsConfig.skillsDirs.length > 0) {
+  if (tracker.context.vfsConfig.skills.length > 0) {
     const skillResult = await resolveSkillResource(
       namePart,
-      tracker.context.vfsConfig.skillsDirs,
+      tracker.context.vfsConfig.skills,
       securityOptions,
     );
     if (skillResult.ok) {
@@ -66,6 +68,13 @@ async function resolveNonAgent(
   }
 
   if (namePart.includes("/") || namePart.toLowerCase().endsWith(".md")) {
+    if (!isAllowedPath(namePart, securityOptions)) {
+      return {
+        ok: false,
+        error: { code: "PERMISSION_DENIED", message: "Path not within allowed folders" },
+      };
+    }
+
     const absolutePath = path.resolve(securityOptions.vaultRoot, namePart);
     try {
       await access(absolutePath);
@@ -76,7 +85,8 @@ async function resolveNonAgent(
         cli: tracker.cli,
         cache: tracker.cache,
         vaultRoot: tracker.context.physicalPath,
-        allowedFolders: tracker.context.vfsConfig.allowedFolders,
+        allowed: tracker.context.vfsConfig.allowed,
+        blocked: tracker.context.vfsConfig.blocked,
         mode: tracker.context.mode,
       });
       if (wikilinkResult.ok) {
@@ -85,7 +95,7 @@ async function resolveNonAgent(
           value: { targetType: "file", resolvedPath: wikilinkResult.value.resolvedPath },
         };
       }
-      return { ok: true, value: { targetType: "file", resolvedPath: namePart } };
+      return wikilinkResult;
     }
   }
 
@@ -93,7 +103,8 @@ async function resolveNonAgent(
     cli: tracker.cli,
     cache: tracker.cache,
     vaultRoot: tracker.context.physicalPath,
-    allowedFolders: tracker.context.vfsConfig.allowedFolders,
+    allowed: tracker.context.vfsConfig.allowed,
+    blocked: tracker.context.vfsConfig.blocked,
     mode: tracker.context.mode,
   });
   if (!wikilinkResult.ok) return wikilinkResult;
@@ -142,15 +153,16 @@ export async function resolveMention(
   let targetType: "file" | "agent" | "skill";
   let resolvedPath: string;
 
-  const securityOptions = {
+  const securityOptions: PathSecurityOptions = {
     vaultRoot: tracker.context.physicalPath,
-    allowedFolders: tracker.context.vfsConfig.allowedFolders,
+    allowed: tracker.context.vfsConfig.allowed,
+    blocked: tracker.context.vfsConfig.blocked,
   };
 
-  if (tracker.context.vfsConfig.agentsDirs.length > 0) {
+  if (tracker.context.vfsConfig.agents.length > 0) {
     const agentResult = await resolveResource(
       namePart,
-      tracker.context.vfsConfig.agentsDirs,
+      tracker.context.vfsConfig.agents,
       securityOptions,
     );
     if (agentResult.ok) {

@@ -70,7 +70,7 @@ async function execCLI(args, options) {
 
 // ../core/dist/local-index-tracker.js
 import { readFile as fsReadFile } from "node:fs/promises";
-import path7 from "node:path";
+import path8 from "node:path";
 
 // ../core/dist/lru-cache.js
 var LRUCache = class {
@@ -119,10 +119,12 @@ var LRUCache = class {
 };
 
 // ../core/dist/vfs-config.js
+import path from "node:path";
 var DEFAULT_VFS_CONFIG = {
-  agentsDirs: [],
-  skillsDirs: [],
-  allowedFolders: []
+  agents: [],
+  skills: [],
+  allowed: [],
+  blocked: []
 };
 function isStringArray(value) {
   return Array.isArray(value) && value.every((v) => typeof v === "string");
@@ -138,7 +140,7 @@ function validateVFSConfig(raw) {
     };
   }
   const obj = raw;
-  const fields = ["agentsDirs", "skillsDirs", "allowedFolders"];
+  const fields = ["agents", "skills", "allowed", "blocked"];
   for (const field of fields) {
     if (field in obj && !isStringArray(obj[field])) {
       return {
@@ -147,22 +149,45 @@ function validateVFSConfig(raw) {
       };
     }
   }
+  const normalize = (s) => path.normalize(s).replace(/\/+$/, "");
+  const agents = (obj.agents ?? []).map(normalize);
+  const skills = (obj.skills ?? []).map(normalize);
+  const allowed = (obj.allowed ?? []).map(normalize);
+  const blocked = (obj.blocked ?? []).map(normalize);
+  for (const b of blocked) {
+    for (const a of allowed) {
+      if (b === a) {
+        return {
+          ok: false,
+          error: {
+            code: "PARSE_ERROR",
+            message: `"${b}" appears in both "allowed" and "blocked"`
+          }
+        };
+      }
+      if (a.startsWith(b + "/")) {
+        return {
+          ok: false,
+          error: {
+            code: "PARSE_ERROR",
+            message: `blocked entry "${b}" is a parent of allowed entry "${a}"`
+          }
+        };
+      }
+    }
+  }
   return {
     ok: true,
-    value: {
-      agentsDirs: obj.agentsDirs ?? [],
-      skillsDirs: obj.skillsDirs ?? [],
-      allowedFolders: obj.allowedFolders ?? []
-    }
+    value: { agents, skills, allowed, blocked }
   };
 }
 
 // ../core/dist/path-security.js
 import { realpath } from "node:fs/promises";
-import path from "node:path";
+import path2 from "node:path";
 function canonicalizePath(virtualPath, vaultRoot) {
-  const resolved = path.resolve(vaultRoot, virtualPath);
-  if (resolved !== vaultRoot && !resolved.startsWith(vaultRoot + path.sep)) {
+  const resolved = path2.resolve(vaultRoot, virtualPath);
+  if (resolved !== vaultRoot && !resolved.startsWith(vaultRoot + path2.sep)) {
     return {
       ok: false,
       error: { code: "PERMISSION_DENIED", message: "Path resolves outside vault root" }
@@ -170,16 +195,31 @@ function canonicalizePath(virtualPath, vaultRoot) {
   }
   return { ok: true, value: resolved };
 }
+function checkBlockedFolder(absolutePath, options) {
+  for (const folder of options.blocked) {
+    const blockedAbs = path2.resolve(options.vaultRoot, folder);
+    if (absolutePath === blockedAbs || absolutePath.startsWith(blockedAbs + path2.sep)) {
+      return {
+        ok: false,
+        error: { code: "PERMISSION_DENIED", message: "Path within blocked folders" }
+      };
+    }
+  }
+  return { ok: true, value: absolutePath };
+}
 function checkAllowedFolder(absolutePath, options) {
-  if (options.allowedFolders.length === 0) {
+  const blockedResult = checkBlockedFolder(absolutePath, options);
+  if (!blockedResult.ok)
+    return blockedResult;
+  if (options.allowed.length === 0) {
     return { ok: true, value: absolutePath };
   }
-  for (const folder of options.allowedFolders) {
-    const allowed = path.resolve(options.vaultRoot, folder);
-    if (absolutePath === allowed || absolutePath.startsWith(allowed + path.sep)) {
+  for (const folder of options.allowed) {
+    const allowed = path2.resolve(options.vaultRoot, folder);
+    if (absolutePath === allowed || absolutePath.startsWith(allowed + path2.sep)) {
       return { ok: true, value: absolutePath };
     }
-    if (allowed.startsWith(absolutePath + path.sep)) {
+    if (allowed.startsWith(absolutePath + path2.sep)) {
       return { ok: true, value: absolutePath };
     }
   }
@@ -188,10 +228,16 @@ function checkAllowedFolder(absolutePath, options) {
     error: { code: "PERMISSION_DENIED", message: "Path not within allowed folders" }
   };
 }
+function isAllowedPath(virtualPath, options) {
+  const canonical = canonicalizePath(virtualPath, options.vaultRoot);
+  if (!canonical.ok)
+    return false;
+  return checkAllowedFolder(canonical.value, options).ok;
+}
 async function checkSymlink(absolutePath, vaultRoot) {
   try {
     const real = await realpath(absolutePath);
-    if (real !== vaultRoot && !real.startsWith(vaultRoot + path.sep)) {
+    if (real !== vaultRoot && !real.startsWith(vaultRoot + path2.sep)) {
       return {
         ok: false,
         error: { code: "PERMISSION_DENIED", message: "Symlink resolves outside vault root" }
@@ -252,15 +298,18 @@ async function readVirtualFile(virtualPath, options) {
 }
 
 // ../core/dist/resolve-wikilink.js
-import path3 from "node:path";
+import path4 from "node:path";
 
 // ../core/dist/fs-enumeration.js
 import { readdir, stat } from "node:fs/promises";
-import path2 from "node:path";
+import path3 from "node:path";
 async function readDirectory(virtualPath, options) {
   const canonical = canonicalizePath(virtualPath, options.vaultRoot);
   if (!canonical.ok)
     return canonical;
+  const parentAllowed = checkAllowedFolder(canonical.value, options);
+  if (!parentAllowed.ok)
+    return parentAllowed;
   let entries;
   try {
     entries = await readdir(canonical.value, { withFileTypes: true });
@@ -287,7 +336,7 @@ async function readDirectory(virtualPath, options) {
   for (const entry of entries) {
     if (entry.name.startsWith("."))
       continue;
-    const childAbsolute = path2.join(canonical.value, entry.name);
+    const childAbsolute = path3.join(canonical.value, entry.name);
     const childAllowed = checkAllowedFolder(childAbsolute, options);
     if (!childAllowed.ok)
       continue;
@@ -297,10 +346,10 @@ async function readDirectory(virtualPath, options) {
   return { ok: true, value: tuples };
 }
 function hasDotSegment(relativePath) {
-  return relativePath.split(path2.sep).some((seg) => seg.startsWith("."));
+  return relativePath.split(path3.sep).some((seg) => seg.startsWith("."));
 }
 async function listMarkdownFiles(options) {
-  const searchDirs = options.allowedFolders.length > 0 ? options.allowedFolders.map((f) => path2.resolve(options.vaultRoot, f)) : [options.vaultRoot];
+  const searchDirs = options.allowed.length > 0 ? options.allowed.map((f) => path3.resolve(options.vaultRoot, f)) : [options.vaultRoot];
   const files = [];
   for (const dir of searchDirs) {
     let entries;
@@ -314,8 +363,16 @@ async function listMarkdownFiles(options) {
         continue;
       if (hasDotSegment(entry))
         continue;
-      files.push(path2.relative(options.vaultRoot, path2.join(dir, entry)));
+      files.push(path3.relative(options.vaultRoot, path3.join(dir, entry)));
     }
+  }
+  if (options.blocked.length > 0) {
+    const filtered = files.filter((f) => {
+      const abs = path3.resolve(options.vaultRoot, f);
+      return checkBlockedFolder(abs, options).ok;
+    });
+    filtered.sort();
+    return { ok: true, value: filtered };
   }
   files.sort();
   return { ok: true, value: files };
@@ -350,16 +407,16 @@ async function statVirtualFile(virtualPath, options) {
 }
 
 // ../core/dist/resolve-wikilink.js
+function securityOptions(options) {
+  return { vaultRoot: options.vaultRoot, allowed: options.allowed, blocked: options.blocked };
+}
 async function globFallback(normalizedName, options) {
   const target = normalizedName.toLowerCase();
-  const result = await listMarkdownFiles({
-    vaultRoot: options.vaultRoot,
-    allowedFolders: options.allowedFolders
-  });
+  const result = await listMarkdownFiles(securityOptions(options));
   if (!result.ok)
     return void 0;
   for (const filePath of result.value) {
-    if (path3.basename(filePath, ".md").toLowerCase() === target) {
+    if (path4.basename(filePath, ".md").toLowerCase() === target) {
       return filePath;
     }
   }
@@ -368,7 +425,7 @@ async function globFallback(normalizedName, options) {
 var CACHE_PREFIX = "wikilink::";
 function pickExactMatch(candidates, normalizedName) {
   const target = normalizedName.toLowerCase();
-  const exact = candidates.filter((f) => path3.basename(f, ".md").toLowerCase() === target);
+  const exact = candidates.filter((f) => path4.basename(f, ".md").toLowerCase() === target);
   if (exact.length === 0)
     return void 0;
   if (exact.length === 1)
@@ -394,6 +451,12 @@ async function resolveWikilink(name, options) {
       };
     }
     const directPath = normalizedName + ".md";
+    if (!isAllowedPath(directPath, securityOptions(options))) {
+      return {
+        ok: false,
+        error: { code: "PERMISSION_DENIED", message: "Path not within allowed folders" }
+      };
+    }
     return { ok: true, value: { resolvedPath: directPath, candidates: [] } };
   }
   const cacheKey = CACHE_PREFIX + normalizedName.toLowerCase();
@@ -425,17 +488,14 @@ async function resolveWikilink(name, options) {
 
 // ../core/dist/resolve-resource.js
 import { access } from "node:fs/promises";
-import path4 from "node:path";
+import path5 from "node:path";
 var SKILL_FILENAME = "SKILL.md";
-async function resolveSkillResource(name, dirs, securityOptions) {
+async function resolveSkillResource(name, dirs, securityOptions2) {
   const trimmed = name.trim();
   for (const dir of dirs) {
-    const vaultRelative = path4.join(dir, trimmed, SKILL_FILENAME);
-    const canonical = canonicalizePath(vaultRelative, securityOptions.vaultRoot);
+    const vaultRelative = path5.join(dir, trimmed, SKILL_FILENAME);
+    const canonical = canonicalizePath(vaultRelative, securityOptions2.vaultRoot);
     if (!canonical.ok)
-      continue;
-    const allowed = checkAllowedFolder(canonical.value, securityOptions);
-    if (!allowed.ok)
       continue;
     try {
       await access(canonical.value);
@@ -449,16 +509,13 @@ async function resolveSkillResource(name, dirs, securityOptions) {
     error: { code: "FILE_NOT_FOUND", message: `Skill not found: ${trimmed}` }
   };
 }
-async function resolveResource(name, dirs, securityOptions) {
+async function resolveResource(name, dirs, securityOptions2) {
   const trimmed = name.trim();
   const fileName = trimmed.toLowerCase().endsWith(".md") ? trimmed : `${trimmed}.md`;
   for (const dir of dirs) {
-    const vaultRelative = path4.join(dir, fileName);
-    const canonical = canonicalizePath(vaultRelative, securityOptions.vaultRoot);
+    const vaultRelative = path5.join(dir, fileName);
+    const canonical = canonicalizePath(vaultRelative, securityOptions2.vaultRoot);
     if (!canonical.ok)
-      continue;
-    const allowed = checkAllowedFolder(canonical.value, securityOptions);
-    if (!allowed.ok)
       continue;
     try {
       await access(canonical.value);
@@ -475,7 +532,7 @@ async function resolveResource(name, dirs, securityOptions) {
 
 // ../core/dist/resolve-mention.js
 import { access as access2 } from "node:fs/promises";
-import path5 from "node:path";
+import path6 from "node:path";
 
 // ../core/dist/uri.js
 var URI_SCHEME = "obs";
@@ -523,9 +580,9 @@ function sliceContent(markdown, heading) {
 function scrubWikilinks(markdown, vaultName) {
   return markdown.replace(WIKILINK_REGEX, (_match, target, display) => {
     const hashIndex = target.indexOf("#");
-    const path8 = hashIndex >= 0 ? target.slice(0, hashIndex) : target;
+    const path9 = hashIndex >= 0 ? target.slice(0, hashIndex) : target;
     const section = hashIndex >= 0 ? target.slice(hashIndex + 1) : void 0;
-    const uri = buildObsUri({ vaultName, path: path8, section });
+    const uri = buildObsUri({ vaultName, path: path9, section });
     return `[${display ?? target}](${uri})`;
   });
 }
@@ -569,25 +626,32 @@ async function readAndProcess(resolvedPath, section, tracker) {
     vaultName: tracker.context.name
   });
 }
-async function resolveNonAgent(namePart, tracker, securityOptions) {
-  if (tracker.context.vfsConfig.skillsDirs.length > 0) {
-    const skillResult = await resolveSkillResource(namePart, tracker.context.vfsConfig.skillsDirs, securityOptions);
+async function resolveNonAgent(namePart, tracker, securityOptions2) {
+  if (tracker.context.vfsConfig.skills.length > 0) {
+    const skillResult = await resolveSkillResource(namePart, tracker.context.vfsConfig.skills, securityOptions2);
     if (skillResult.ok) {
       return { ok: true, value: { targetType: "skill", resolvedPath: skillResult.value } };
     }
   }
   if (namePart.includes("/") || namePart.toLowerCase().endsWith(".md")) {
-    const absolutePath = path5.resolve(securityOptions.vaultRoot, namePart);
+    if (!isAllowedPath(namePart, securityOptions2)) {
+      return {
+        ok: false,
+        error: { code: "PERMISSION_DENIED", message: "Path not within allowed folders" }
+      };
+    }
+    const absolutePath = path6.resolve(securityOptions2.vaultRoot, namePart);
     try {
       await access2(absolutePath);
       return { ok: true, value: { targetType: "file", resolvedPath: namePart } };
     } catch {
-      const basename = path5.basename(namePart, ".md");
+      const basename = path6.basename(namePart, ".md");
       const wikilinkResult2 = await resolveWikilink(basename, {
         cli: tracker.cli,
         cache: tracker.cache,
         vaultRoot: tracker.context.physicalPath,
-        allowedFolders: tracker.context.vfsConfig.allowedFolders,
+        allowed: tracker.context.vfsConfig.allowed,
+        blocked: tracker.context.vfsConfig.blocked,
         mode: tracker.context.mode
       });
       if (wikilinkResult2.ok) {
@@ -596,14 +660,15 @@ async function resolveNonAgent(namePart, tracker, securityOptions) {
           value: { targetType: "file", resolvedPath: wikilinkResult2.value.resolvedPath }
         };
       }
-      return { ok: true, value: { targetType: "file", resolvedPath: namePart } };
+      return wikilinkResult2;
     }
   }
   const wikilinkResult = await resolveWikilink(namePart, {
     cli: tracker.cli,
     cache: tracker.cache,
     vaultRoot: tracker.context.physicalPath,
-    allowedFolders: tracker.context.vfsConfig.allowedFolders,
+    allowed: tracker.context.vfsConfig.allowed,
+    blocked: tracker.context.vfsConfig.blocked,
     mode: tracker.context.mode
   });
   if (!wikilinkResult.ok)
@@ -642,24 +707,25 @@ async function resolveMention(mention, tracker) {
   }
   let targetType;
   let resolvedPath;
-  const securityOptions = {
+  const securityOptions2 = {
     vaultRoot: tracker.context.physicalPath,
-    allowedFolders: tracker.context.vfsConfig.allowedFolders
+    allowed: tracker.context.vfsConfig.allowed,
+    blocked: tracker.context.vfsConfig.blocked
   };
-  if (tracker.context.vfsConfig.agentsDirs.length > 0) {
-    const agentResult = await resolveResource(namePart, tracker.context.vfsConfig.agentsDirs, securityOptions);
+  if (tracker.context.vfsConfig.agents.length > 0) {
+    const agentResult = await resolveResource(namePart, tracker.context.vfsConfig.agents, securityOptions2);
     if (agentResult.ok) {
       targetType = "agent";
       resolvedPath = agentResult.value;
     } else {
-      const resolved = await resolveNonAgent(namePart, tracker, securityOptions);
+      const resolved = await resolveNonAgent(namePart, tracker, securityOptions2);
       if (!resolved.ok)
         return resolved;
       targetType = resolved.value.targetType;
       resolvedPath = resolved.value.resolvedPath;
     }
   } else {
-    const resolved = await resolveNonAgent(namePart, tracker, securityOptions);
+    const resolved = await resolveNonAgent(namePart, tracker, securityOptions2);
     if (!resolved.ok)
       return resolved;
     targetType = resolved.value.targetType;
@@ -726,7 +792,7 @@ async function resolveSkillMention(mention, tracker) {
 
 // ../core/dist/file-watcher.js
 import { watch } from "node:fs";
-import path6 from "node:path";
+import path7 from "node:path";
 var DEFAULT_DEBOUNCE_MS = 200;
 var VaultFileWatcher = class {
   #vaultRoot;
@@ -777,7 +843,7 @@ var VaultFileWatcher = class {
   #handleEvent(eventType, filename) {
     if (filename === null)
       return;
-    const absolutePath = path6.join(this.#vaultRoot, filename);
+    const absolutePath = path7.join(this.#vaultRoot, filename);
     const existing = this.#pending.get(absolutePath);
     if (existing !== void 0)
       clearTimeout(existing);
@@ -843,9 +909,10 @@ var LocalIndexTracker = class _LocalIndexTracker {
   #watcher;
   constructor(context, cache, cli) {
     const frozenConfig = Object.freeze({
-      agentsDirs: Object.freeze([...context.vfsConfig.agentsDirs]),
-      skillsDirs: Object.freeze([...context.vfsConfig.skillsDirs]),
-      allowedFolders: Object.freeze([...context.vfsConfig.allowedFolders])
+      agents: Object.freeze([...context.vfsConfig.agents]),
+      skills: Object.freeze([...context.vfsConfig.skills]),
+      allowed: Object.freeze([...context.vfsConfig.allowed]),
+      blocked: Object.freeze([...context.vfsConfig.blocked])
     });
     this.context = Object.freeze({
       ...context,
@@ -855,7 +922,8 @@ var LocalIndexTracker = class _LocalIndexTracker {
     this.cli = cli;
     this.#securityOptions = {
       vaultRoot: context.physicalPath,
-      allowedFolders: frozenConfig.allowedFolders
+      allowed: frozenConfig.allowed,
+      blocked: frozenConfig.blocked
     };
     this.#watcher = null;
   }
@@ -882,7 +950,7 @@ var LocalIndexTracker = class _LocalIndexTracker {
     }
     const name = nameResult.value;
     let vfsConfig;
-    const configPath = path7.join(physicalPath, CONFIG_DIR, CONFIG_FILENAME);
+    const configPath = path8.join(physicalPath, CONFIG_DIR, CONFIG_FILENAME);
     try {
       const raw = await fsReadFile(configPath, "utf-8");
       let parsed;
@@ -900,7 +968,7 @@ var LocalIndexTracker = class _LocalIndexTracker {
       vfsConfig = configResult.value;
     } catch (err) {
       if (err.code === "ENOENT") {
-        vfsConfig = { agentsDirs: [], skillsDirs: [], allowedFolders: [] };
+        vfsConfig = { agents: [], skills: [], allowed: [], blocked: [] };
       } else {
         return {
           ok: false,
@@ -944,17 +1012,18 @@ var LocalIndexTracker = class _LocalIndexTracker {
       cli: this.cli,
       cache: this.cache,
       vaultRoot: this.context.physicalPath,
-      allowedFolders: this.context.vfsConfig.allowedFolders,
+      allowed: this.context.vfsConfig.allowed,
+      blocked: this.context.vfsConfig.blocked,
       mode: this.context.mode
     });
   }
-  /** Resolve an agent by name from configured agentsDirs. */
+  /** Resolve an agent by name from configured agents directories. */
   async resolveAgent(name) {
-    return resolveResource(name, this.context.vfsConfig.agentsDirs, this.#securityOptions);
+    return resolveResource(name, this.context.vfsConfig.agents, this.#securityOptions);
   }
-  /** Resolve a skill by name as a directory containing SKILL.md from configured skillsDirs. */
+  /** Resolve a skill by name as a directory containing SKILL.md. */
   async resolveSkill(name) {
-    return resolveSkillResource(name, this.context.vfsConfig.skillsDirs, this.#securityOptions);
+    return resolveSkillResource(name, this.context.vfsConfig.skills, this.#securityOptions);
   }
   /** Parse and resolve an `@obs:` mention to a full MentionResult. */
   async resolveMention(mention) {
@@ -972,12 +1041,12 @@ var LocalIndexTracker = class _LocalIndexTracker {
   async stat(virtualPath) {
     return statVirtualFile(virtualPath, this.#securityOptions);
   }
-  /** Enumerate all skills from configured skillsDirs with deduplication. */
+  /** Enumerate all skills from configured skills directories with deduplication. */
   async listSkills() {
-    const { skillsDirs } = this.context.vfsConfig;
+    const { skills } = this.context.vfsConfig;
     const seen = /* @__PURE__ */ new Set();
-    const skills = [];
-    for (const dir of skillsDirs) {
+    const result = [];
+    for (const dir of skills) {
       const entries = await this.readDirectory(dir);
       if (!entries.ok)
         continue;
@@ -985,22 +1054,22 @@ var LocalIndexTracker = class _LocalIndexTracker {
         if (type !== "directory" || seen.has(name) || !SAFE_RESOURCE_NAME_RE.test(name))
           continue;
         seen.add(name);
-        const skillPath = path7.join(dir, name, SKILL_FILENAME2);
+        const skillPath = path8.join(dir, name, SKILL_FILENAME2);
         const content = await this.readFile(skillPath);
         if (!content.ok)
           continue;
         const description = extractFrontmatterDescription(content.value) ?? `Obsidian vault skill: ${name}`;
-        skills.push({ name, description, vaultRelativePath: skillPath });
+        result.push({ name, description, vaultRelativePath: skillPath });
       }
     }
-    return { ok: true, value: skills };
+    return { ok: true, value: result };
   }
-  /** Enumerate all agents from configured agentsDirs with deduplication. */
+  /** Enumerate all agents from configured agents directories with deduplication. */
   async listAgents() {
-    const { agentsDirs } = this.context.vfsConfig;
+    const { agents } = this.context.vfsConfig;
     const seen = /* @__PURE__ */ new Set();
-    const agents = [];
-    for (const dir of agentsDirs) {
+    const result = [];
+    for (const dir of agents) {
       const entries = await this.readDirectory(dir);
       if (!entries.ok)
         continue;
@@ -1011,15 +1080,15 @@ var LocalIndexTracker = class _LocalIndexTracker {
         if (seen.has(name) || !SAFE_RESOURCE_NAME_RE.test(name))
           continue;
         seen.add(name);
-        const agentPath = path7.join(dir, fileName);
+        const agentPath = path8.join(dir, fileName);
         const content = await this.readFile(agentPath);
         if (!content.ok)
           continue;
         const description = extractFrontmatterDescription(content.value) ?? `Obsidian vault agent: ${name}`;
-        agents.push({ name, description, vaultRelativePath: agentPath });
+        result.push({ name, description, vaultRelativePath: agentPath });
       }
     }
-    return { ok: true, value: agents };
+    return { ok: true, value: result };
   }
   /** Start watching the vault for file changes. Returns a Disposable to stop. */
   startWatching(debounceMs) {

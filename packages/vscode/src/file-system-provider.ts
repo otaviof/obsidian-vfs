@@ -42,7 +42,8 @@ export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
     this.#tracker = tracker;
     this.#securityOptions = {
       vaultRoot: tracker.context.physicalPath,
-      allowedFolders: tracker.context.vfsConfig.allowedFolders,
+      allowed: tracker.context.vfsConfig.allowed,
+      blocked: tracker.context.vfsConfig.blocked,
     };
   }
 

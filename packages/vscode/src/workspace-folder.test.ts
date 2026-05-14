@@ -234,6 +234,60 @@ describe("addVaultWorkspaceFolder", () => {
     expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
   });
 
+  it("filters autoMount entries outside allowed folders", () => {
+    workspace.workspaceFolders = [
+      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
+    ];
+
+    const security = { vaultRoot: "/vault", allowed: ["Notes"], blocked: [] as string[] };
+    const result = addVaultWorkspaceFolder("/vault", ["Notes", "Private"], security);
+    expect(result).toEqual({ status: "added" });
+    expect(workspace.updateWorkspaceFolders).toHaveBeenCalledWith(1, 0, {
+      uri: expect.objectContaining({ scheme: "file", fsPath: "/vault/Notes" }) as unknown,
+      name: `${FOLDER_NAME_PREFIX}Notes`,
+    });
+  });
+
+  it("filters autoMount entries inside blocked folders", () => {
+    workspace.workspaceFolders = [
+      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
+    ];
+
+    const security = { vaultRoot: "/vault", allowed: [] as string[], blocked: ["Private"] };
+    const result = addVaultWorkspaceFolder("/vault", ["Notes", "Private"], security);
+    expect(result).toEqual({ status: "added" });
+    expect(workspace.updateWorkspaceFolders).toHaveBeenCalledWith(1, 0, {
+      uri: expect.objectContaining({ scheme: "file", fsPath: "/vault/Notes" }) as unknown,
+      name: `${FOLDER_NAME_PREFIX}Notes`,
+    });
+  });
+
+  it("returns skipped when all autoMount entries are blocked", () => {
+    workspace.workspaceFolders = [
+      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
+    ];
+
+    const security = { vaultRoot: "/vault", allowed: [] as string[], blocked: ["Private"] };
+    const result = addVaultWorkspaceFolder("/vault", ["Private"], security);
+    expect(result).toEqual({ status: "skipped", reason: "no mountable directories in autoMount" });
+    expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
+  });
+
+  it("mounts all entries when no security options provided", () => {
+    workspace.workspaceFolders = [
+      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
+    ];
+
+    const result = addVaultWorkspaceFolder("/vault", ["Notes", "Private"]);
+    expect(result).toEqual({ status: "added" });
+    expect(workspace.updateWorkspaceFolders).toHaveBeenCalledWith(
+      1,
+      0,
+      expect.objectContaining({ name: `${FOLDER_NAME_PREFIX}Notes` }) as unknown,
+      expect.objectContaining({ name: `${FOLDER_NAME_PREFIX}Private` }) as unknown,
+    );
+  });
+
   it("handles stat failure gracefully by excluding the entry", () => {
     workspace.workspaceFolders = [
       { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },

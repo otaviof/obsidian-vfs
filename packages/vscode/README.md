@@ -62,7 +62,8 @@ The `obs://` FileSystemProvider remains registered for internal operations (stat
 
 **Notes:**
 
-- The Explorer tree view and the workspace folders both appear in the sidebar. This duplication is an accepted trade-off — the tree view provides custom UI (welcome view, context menus), while the workspace folders enable Quick Open and cross-extension visibility.
+- `autoMount` entries outside `allowed` or inside `blocked` (from [`.obsidian/obsidian-vfs.json`](../../README.md#vault-configuration)) are silently skipped. However, content *within* a mounted workspace folder is not filtered — because these are native `file://` folders, VS Code browses them directly from disk. Use the **Explorer tree view** for security-enforced browsing; workspace folders are the search and Quick Open surface.
+- The Explorer tree view and the workspace folders both appear in the sidebar. This duplication is an accepted trade-off — the tree view provides custom UI (welcome view, context menus) with `allowed`/`blocked` enforcement, while the workspace folders enable Quick Open and cross-extension visibility.
 - The vault's `.git` repository is automatically added to `git.ignoredRepositories` (user-level setting) when workspace folders are mounted, preventing VS Code's Git extension from listing it in Source Control. The entry is removed when `obsidianVFS.workspace` is disabled.
 
 ## Related Tools

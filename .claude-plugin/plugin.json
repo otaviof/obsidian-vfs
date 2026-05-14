@@ -1,5 +1,5 @@
 {
   "name": "obsidian-vfs",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Resolve @obs: mentions, and /obs: Skills from your Obsidian vault into Claude"
 }
