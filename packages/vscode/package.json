@@ -2,7 +2,7 @@
   "name": "obsidian-vfs",
   "displayName": "Obsidian VFS",
   "description": "Browse, search, and edit your Obsidian vault directly in VSCode via a virtual file system (obs://)",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "publisher": "otaviof",
   "engines": {
