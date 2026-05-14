@@ -40,10 +40,18 @@ export class VaultTreeDataProvider
   readonly #onDidChangeTreeData = new vscode.EventEmitter<VaultTreeItem | undefined>();
   readonly onDidChangeTreeData = this.#onDidChangeTreeData.event;
   readonly #watcherDisposable: vscode.Disposable;
+  #enabled = true;
 
   constructor(tracker: LocalIndexTracker) {
     this.#tracker = tracker;
     this.#watcherDisposable = tracker.onDidChangeFile(() => this.refresh());
+  }
+
+  set enabled(value: boolean) {
+    if (this.#enabled !== value) {
+      this.#enabled = value;
+      this.refresh();
+    }
   }
 
   /** Fire a tree data change to refresh all nodes. */
@@ -56,6 +64,7 @@ export class VaultTreeDataProvider
   }
 
   async getChildren(element?: VaultTreeItem): Promise<VaultTreeItem[]> {
+    if (!this.#enabled) return [];
     if (element) {
       return this.#readChildren(element.vaultPath);
     }

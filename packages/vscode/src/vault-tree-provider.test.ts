@@ -218,6 +218,46 @@ describe("VaultTreeDataProvider", () => {
     provider.dispose();
   });
 
+  it("returns empty tree when disabled", async () => {
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+      get: vi.fn((_key: string, defaultValue: unknown) => {
+        if (_key === "autoMount") return ["10-projects"];
+        return defaultValue;
+      }),
+    } as never);
+
+    const tracker = mockTracker({
+      stat: vi.fn().mockResolvedValue({
+        ok: true,
+        value: { type: "directory", mtime: 0, ctime: 0, size: 0 },
+      }),
+    });
+    const provider = new VaultTreeDataProvider(tracker);
+
+    provider.enabled = false;
+    const children = await provider.getChildren();
+    expect(children).toEqual([]);
+
+    provider.dispose();
+  });
+
+  it("refreshes when enabled changes", () => {
+    const tracker = mockTracker();
+    const provider = new VaultTreeDataProvider(tracker);
+
+    const listener = vi.fn();
+    provider.onDidChangeTreeData(listener);
+
+    provider.enabled = false;
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    listener.mockClear();
+    provider.enabled = false;
+    expect(listener).not.toHaveBeenCalled();
+
+    provider.dispose();
+  });
+
   it("getTreeItem returns the element itself", () => {
     const tracker = mockTracker();
     const provider = new VaultTreeDataProvider(tracker);

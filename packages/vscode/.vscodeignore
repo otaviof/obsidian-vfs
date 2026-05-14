@@ -2,5 +2,6 @@
 !dist/extension.js
 !dist/extension.js.map
 !package.json
-!obsidian-vfs.png
+!resources/obsidian-vfs.png
+!resources/obsidian-vfs.svg
 !README.md

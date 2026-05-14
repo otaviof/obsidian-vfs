@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="packages/vscode/obsidian-vfs.png" alt="Obsidian VFS" width="200" />
+  <img src="packages/vscode/resources/obsidian-vfs.png" alt="Obsidian VFS" width="200" />
   <br>
   <br>
   <a href="https://www.npmjs.com/package/@obsidian-vfs/core"><img src="https://img.shields.io/npm/v/@obsidian-vfs/core?label=%40obsidian-vfs%2Fcore" alt="@obsidian-vfs/core"></a>

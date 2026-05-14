@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/otaviof/obsidian-vfs/refs/heads/main/packages/vscode/obsidian-vfs.png" alt="Obsidian VFS" width="200" />
+  <img src="https://raw.githubusercontent.com/otaviof/obsidian-vfs/refs/heads/main/packages/vscode/resources/obsidian-vfs.png" alt="Obsidian VFS" width="200" />
   <br>
 </p>
 

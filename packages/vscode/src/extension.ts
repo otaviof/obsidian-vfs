@@ -56,7 +56,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     cfg.get<string>("treeViewTitle", "") || `${FOLDER_NAME_PREFIX}${tracker.context.name}`;
   context.subscriptions.push(treeView);
 
-  await vscode.commands.executeCommand("setContext", "obsidianVFS.active", true);
+  context.subscriptions.push(
+    treeView.onDidChangeVisibility((e) => {
+      if (e.visible) {
+        treeProvider.refresh();
+      }
+    }),
+  );
 
   registerCommands(context, tracker, treeProvider, outputChannel);
 
@@ -74,7 +80,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     ),
   );
 
-  await vscode.commands.executeCommand("setContext", "obsidianVFS.explorerEnabled", config.explorer);
+  treeProvider.enabled = config.explorer;
   if (config.statusBar) {
     statusBar.show();
   }
@@ -94,11 +100,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.workspace.onDidChangeConfiguration((e) => {
       const updated = readConfig();
       if (e.affectsConfiguration("obsidianVFS.explorer")) {
-        void vscode.commands.executeCommand(
-          "setContext",
-          "obsidianVFS.explorerEnabled",
-          updated.explorer,
-        );
+        treeProvider.enabled = updated.explorer;
       }
       if (e.affectsConfiguration("obsidianVFS.statusBar")) {
         if (updated.statusBar) {

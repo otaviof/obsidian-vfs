@@ -117,7 +117,10 @@ export function createVscodeMock(
       mock.StatusBarAlignment = { Left: 1, Right: 2 };
     }
     if (parts.treeView) {
-      const treeView = { dispose: vi.fn() };
+      const treeView = {
+        dispose: vi.fn(),
+        onDidChangeVisibility: vi.fn(() => ({ dispose: vi.fn() })),
+      };
       (mock.window as Record<string, unknown>).createTreeView = vi.fn(() => treeView);
     }
   }

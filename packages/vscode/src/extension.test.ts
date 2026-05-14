@@ -166,11 +166,6 @@ describe("activate", () => {
       title: string;
     };
     expect(treeView.title).toBe(`${FOLDER_NAME_PREFIX}MyVault`);
-    expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
-      "setContext",
-      "obsidianVFS.active",
-      true,
-    );
     expect(registerCommands).toHaveBeenCalledWith(
       ctx,
       fakeTracker,
@@ -373,7 +368,45 @@ describe("activate", () => {
     expect(statusBarInstance.show).toHaveBeenCalled();
   });
 
-  it("does not set explorerEnabled context when explorer is false", async () => {
+  it("refreshes tree provider when view becomes visible", async () => {
+    const fakeTracker = {
+      context: {
+        name: "MyVault",
+        physicalPath: "/vault",
+        mode: "full",
+        vfsConfig: { agents: [], skills: [], allowed: [], blocked: [] },
+      },
+    } as unknown as LocalIndexTracker;
+
+    mockBootstrap.mockResolvedValueOnce({
+      ok: true,
+      value: { tracker: fakeTracker, initMs: 42 },
+    });
+
+    await activate(fakeContext() as never);
+
+    const treeView = vi.mocked(vscode.window.createTreeView).mock.results[0].value as {
+      onDidChangeVisibility: ReturnType<typeof vi.fn>;
+    };
+    expect(treeView.onDidChangeVisibility).toHaveBeenCalledWith(expect.any(Function));
+
+    const treeProviderInstance = vi.mocked(VaultTreeDataProvider).mock.results[0].value as {
+      refresh: ReturnType<typeof vi.fn>;
+    };
+
+    const visibilityCallback = treeView.onDidChangeVisibility.mock.calls[0][0] as (e: {
+      visible: boolean;
+    }) => void;
+
+    visibilityCallback({ visible: true });
+    expect(treeProviderInstance.refresh).toHaveBeenCalled();
+
+    treeProviderInstance.refresh.mockClear();
+    visibilityCallback({ visible: false });
+    expect(treeProviderInstance.refresh).not.toHaveBeenCalled();
+  });
+
+  it("disables tree provider when explorer is false", async () => {
     const fakeTracker = {
       context: {
         name: "MyVault",
@@ -398,12 +431,13 @@ describe("activate", () => {
 
     await activate(fakeContext() as never);
 
-    const executeCommand = vi.mocked(vscode.commands.executeCommand);
-    expect(executeCommand).toHaveBeenCalledWith("setContext", "obsidianVFS.active", true);
-    expect(executeCommand).toHaveBeenCalledWith("setContext", "obsidianVFS.explorerEnabled", false);
+    const treeProviderInstance = vi.mocked(VaultTreeDataProvider).mock.results[0].value as {
+      enabled: boolean;
+    };
+    expect(treeProviderInstance.enabled).toBe(false);
   });
 
-  it("sets explorerEnabled context when explorer is true", async () => {
+  it("keeps tree provider enabled when explorer is true", async () => {
     const fakeTracker = {
       context: {
         name: "MyVault",
@@ -428,9 +462,10 @@ describe("activate", () => {
 
     await activate(fakeContext() as never);
 
-    const executeCommand = vi.mocked(vscode.commands.executeCommand);
-    expect(executeCommand).toHaveBeenCalledWith("setContext", "obsidianVFS.active", true);
-    expect(executeCommand).toHaveBeenCalledWith("setContext", "obsidianVFS.explorerEnabled", true);
+    const treeProviderInstance = vi.mocked(VaultTreeDataProvider).mock.results[0].value as {
+      enabled: boolean;
+    };
+    expect(treeProviderInstance.enabled).toBe(true);
   });
 });
 
@@ -460,7 +495,7 @@ describe("configuration change listener", () => {
     expect(vscode.workspace.onDidChangeConfiguration).toHaveBeenCalled();
   });
 
-  it("updates explorerEnabled context when explorer config changes to true", async () => {
+  it("enables tree provider when explorer config changes to true", async () => {
     const fakeTracker = {
       context: {
         name: "MyVault",
@@ -498,11 +533,13 @@ describe("configuration change listener", () => {
 
     configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.explorer" });
 
-    const executeCommand = vi.mocked(vscode.commands.executeCommand);
-    expect(executeCommand).toHaveBeenCalledWith("setContext", "obsidianVFS.explorerEnabled", true);
+    const treeProviderInstance = vi.mocked(VaultTreeDataProvider).mock.results[0].value as {
+      enabled: boolean;
+    };
+    expect(treeProviderInstance.enabled).toBe(true);
   });
 
-  it("updates explorerEnabled context when explorer config changes to false", async () => {
+  it("disables tree provider when explorer config changes to false", async () => {
     const fakeTracker = {
       context: {
         name: "MyVault",
@@ -538,8 +575,10 @@ describe("configuration change listener", () => {
 
     configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.explorer" });
 
-    const executeCommand = vi.mocked(vscode.commands.executeCommand);
-    expect(executeCommand).toHaveBeenCalledWith("setContext", "obsidianVFS.explorerEnabled", false);
+    const treeProviderInstance = vi.mocked(VaultTreeDataProvider).mock.results[0].value as {
+      enabled: boolean;
+    };
+    expect(treeProviderInstance.enabled).toBe(false);
   });
 
   it("shows status bar when statusBar config changes to true", async () => {
