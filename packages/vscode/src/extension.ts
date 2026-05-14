@@ -1,7 +1,5 @@
 import * as vscode from "vscode";
 
-import type { PathSecurityOptions } from "@obsidian-vfs/core";
-
 import { bootstrapFromConfig, readConfig } from "./bootstrap.js";
 import { SCHEME } from "./uri-adapter.js";
 import { registerCommands } from "./commands.js";
@@ -13,6 +11,7 @@ import {
   FOLDER_NAME_PREFIX,
   addVaultWorkspaceFolder,
   excludeVaultFromGitDetection,
+  hasVaultWorkspaceFolder,
   includeVaultInGitDetection,
   removeVaultWorkspaceFolders,
 } from "./workspace-folder.js";
@@ -34,7 +33,9 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     `Obsidian VFS: vault "${tracker.context.name}" loaded in ${initMs.toFixed(0)}ms`,
   );
 
-  const provider = new ObsidianFileSystemProvider(tracker);
+  const config = readConfig();
+
+  const provider = new ObsidianFileSystemProvider(tracker, config.autoMount);
   context.subscriptions.push(provider);
 
   context.subscriptions.push(
@@ -73,23 +74,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     ),
   );
 
-  const config = readConfig();
-
   await vscode.commands.executeCommand("setContext", "obsidianVFS.explorerEnabled", config.explorer);
   if (config.statusBar) {
     statusBar.show();
   }
-  const securityOptions: PathSecurityOptions = {
-    vaultRoot: tracker.context.physicalPath,
-    allowed: tracker.context.vfsConfig.allowed,
-    blocked: tracker.context.vfsConfig.blocked,
-  };
 
   if (config.workspace) {
     const wfResult = addVaultWorkspaceFolder(
       tracker.context.physicalPath,
-      config.autoMount,
-      securityOptions,
+      tracker.context.name,
+      config.autoMount.length,
     );
     const detail = "reason" in wfResult ? ` — ${wfResult.reason}` : "";
     outputChannel.appendLine(`Workspace folder: ${wfResult.status}${detail}`);
@@ -113,16 +107,31 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           statusBar.hide();
         }
       }
-      if (
-        e.affectsConfiguration("obsidianVFS.workspace") ||
-        e.affectsConfiguration("obsidianVFS.autoMount")
-      ) {
+      if (e.affectsConfiguration("obsidianVFS.autoMount")) {
+        provider.setAutoMount(updated.autoMount);
+      }
+      if (e.affectsConfiguration("obsidianVFS.workspace")) {
         removeVaultWorkspaceFolders(tracker.context.physicalPath);
         if (updated.workspace) {
-          addVaultWorkspaceFolder(tracker.context.physicalPath, updated.autoMount, securityOptions);
+          addVaultWorkspaceFolder(
+            tracker.context.physicalPath,
+            tracker.context.name,
+            updated.autoMount.length,
+          );
           void excludeVaultFromGitDetection(tracker.context.physicalPath);
         } else {
           void includeVaultInGitDetection(tracker.context.physicalPath);
+        }
+      } else if (e.affectsConfiguration("obsidianVFS.autoMount") && updated.workspace) {
+        if (updated.autoMount.length === 0) {
+          removeVaultWorkspaceFolders(tracker.context.physicalPath);
+        } else if (!hasVaultWorkspaceFolder(tracker.context.physicalPath)) {
+          addVaultWorkspaceFolder(
+            tracker.context.physicalPath,
+            tracker.context.name,
+            updated.autoMount.length,
+          );
+          void excludeVaultFromGitDetection(tracker.context.physicalPath);
         }
       }
     }),

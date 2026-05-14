@@ -127,7 +127,7 @@
         "obsidianVFS.workspace": {
           "type": "boolean",
           "default": true,
-          "description": "Add the vault as a workspace folder for Explorer browsing. Requires at least one local folder open."
+          "description": "Add the vault as a single obs:// workspace folder for Explorer browsing. Mounted entries appear as children under the vault root. Requires at least one local folder open."
         }
       }
     }

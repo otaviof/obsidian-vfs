@@ -4,13 +4,6 @@ import { createVscodeMock } from "./test-mocks.js";
 
 vi.mock("vscode", () => createVscodeMock({ workspace: true, uri: true }));
 
-vi.mock("node:fs", () => ({
-  default: {
-    statSync: vi.fn(() => ({ isDirectory: () => true })),
-  },
-}));
-
-import fs from "node:fs";
 import * as vscode from "vscode";
 
 import { SCHEME } from "./uri-adapter.js";
@@ -51,15 +44,15 @@ describe("hasVaultWorkspaceFolder", () => {
     expect(hasVaultWorkspaceFolder("/vault")).toBe(false);
   });
 
-  it("returns true when an obs:// folder exists (backward compat)", () => {
+  it("returns true when an obs:// folder exists", () => {
     workspace.workspaceFolders = [
       { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
-      { uri: { scheme: SCHEME }, name: `${FOLDER_NAME_PREFIX}Notes`, index: 1 },
+      { uri: { scheme: SCHEME }, name: `${FOLDER_NAME_PREFIX}MyVault`, index: 1 },
     ];
     expect(hasVaultWorkspaceFolder("/vault")).toBe(true);
   });
 
-  it("returns true when a managed file:// folder exists", () => {
+  it("returns true when a managed file:// folder exists (backward compat)", () => {
     workspace.workspaceFolders = [
       { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
       {
@@ -106,7 +99,6 @@ describe("addVaultWorkspaceFolder", () => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
     workspace.workspaceFolders = undefined;
-    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => true } as never);
   });
 
   it("returns skipped when autoMount is empty", () => {
@@ -114,23 +106,23 @@ describe("addVaultWorkspaceFolder", () => {
       { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
     ];
 
-    const result = addVaultWorkspaceFolder("/vault", []);
-    expect(result).toEqual({ status: "skipped", reason: "no autoMount folders configured" });
+    const result = addVaultWorkspaceFolder("/vault", "MyVault", 0);
+    expect(result).toEqual({ status: "skipped", reason: "no autoMount entries configured" });
     expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
   });
 
-  it("returns already-present when obs:// folder exists (backward compat)", () => {
+  it("returns already-present when obs:// folder exists", () => {
     workspace.workspaceFolders = [
       { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
-      { uri: { scheme: SCHEME }, name: `${FOLDER_NAME_PREFIX}Notes`, index: 1 },
+      { uri: { scheme: SCHEME }, name: `${FOLDER_NAME_PREFIX}MyVault`, index: 1 },
     ];
 
-    const result = addVaultWorkspaceFolder("/vault", ["Notes"]);
+    const result = addVaultWorkspaceFolder("/vault", "MyVault", 1);
     expect(result).toEqual({ status: "already-present" });
     expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
   });
 
-  it("returns already-present when managed file:// folder exists", () => {
+  it("returns already-present when managed file:// folder exists (backward compat)", () => {
     workspace.workspaceFolders = [
       { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
       {
@@ -140,7 +132,7 @@ describe("addVaultWorkspaceFolder", () => {
       },
     ];
 
-    const result = addVaultWorkspaceFolder("/vault", ["Notes"]);
+    const result = addVaultWorkspaceFolder("/vault", "MyVault", 1);
     expect(result).toEqual({ status: "already-present" });
     expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
   });
@@ -148,7 +140,7 @@ describe("addVaultWorkspaceFolder", () => {
   it("returns skipped when no workspace folders exist", () => {
     workspace.workspaceFolders = undefined;
 
-    const result = addVaultWorkspaceFolder("/vault", ["Notes"]);
+    const result = addVaultWorkspaceFolder("/vault", "MyVault", 1);
     expect(result).toEqual({ status: "skipped", reason: "no local workspace folder open" });
     expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
   });
@@ -156,30 +148,22 @@ describe("addVaultWorkspaceFolder", () => {
   it("returns skipped when only non-file:// folders exist", () => {
     workspace.workspaceFolders = [{ uri: { scheme: "untitled" }, name: "untitled", index: 0 }];
 
-    const result = addVaultWorkspaceFolder("/vault", ["Notes"]);
+    const result = addVaultWorkspaceFolder("/vault", "MyVault", 1);
     expect(result).toEqual({ status: "skipped", reason: "no local workspace folder open" });
     expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
   });
 
-  it("adds one workspace folder per autoMount entry", () => {
+  it("adds a single obs:// workspace folder", () => {
     workspace.workspaceFolders = [
       { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
     ];
 
-    const result = addVaultWorkspaceFolder("/vault", ["Notes", "Projects"]);
+    const result = addVaultWorkspaceFolder("/vault", "MyVault", 1);
     expect(result).toEqual({ status: "added" });
-    expect(workspace.updateWorkspaceFolders).toHaveBeenCalledWith(
-      1,
-      0,
-      {
-        uri: expect.objectContaining({ scheme: "file", fsPath: "/vault/Notes" }) as unknown,
-        name: `${FOLDER_NAME_PREFIX}Notes`,
-      },
-      {
-        uri: expect.objectContaining({ scheme: "file", fsPath: "/vault/Projects" }) as unknown,
-        name: `${FOLDER_NAME_PREFIX}Projects`,
-      },
-    );
+    expect(workspace.updateWorkspaceFolders).toHaveBeenCalledWith(1, 0, {
+      uri: expect.objectContaining({ scheme: SCHEME, authority: "MyVault", path: "/" }) as unknown,
+      name: `${FOLDER_NAME_PREFIX}MyVault`,
+    });
   });
 
   it("appends at correct index when multiple file:// folders exist", () => {
@@ -188,117 +172,19 @@ describe("addVaultWorkspaceFolder", () => {
       { uri: { scheme: "file", fsPath: "/projects/bar" }, name: "bar", index: 1 },
     ];
 
-    const result = addVaultWorkspaceFolder("/vault", ["Notes"]);
+    const result = addVaultWorkspaceFolder("/vault", "MyVault", 1);
     expect(result).toEqual({ status: "added" });
     expect(workspace.updateWorkspaceFolders).toHaveBeenCalledWith(2, 0, {
-      uri: expect.objectContaining({ scheme: "file", fsPath: "/vault/Notes" }) as unknown,
-      name: `${FOLDER_NAME_PREFIX}Notes`,
+      uri: expect.objectContaining({ scheme: SCHEME, authority: "MyVault", path: "/" }) as unknown,
+      name: `${FOLDER_NAME_PREFIX}MyVault`,
     });
   });
 
   it("returns skipped when workspace folders is empty array", () => {
     workspace.workspaceFolders = [];
 
-    const result = addVaultWorkspaceFolder("/vault", ["Notes"]);
+    const result = addVaultWorkspaceFolder("/vault", "MyVault", 1);
     expect(result).toEqual({ status: "skipped", reason: "no local workspace folder open" });
-    expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
-  });
-
-  it("filters out file entries from workspace folders", () => {
-    workspace.workspaceFolders = [
-      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
-    ];
-
-    vi.mocked(fs.statSync).mockImplementation((p) => {
-      if (String(p).endsWith("Notes")) return { isDirectory: () => true } as never;
-      return { isDirectory: () => false } as never;
-    });
-
-    const result = addVaultWorkspaceFolder("/vault", ["Notes", "docs/readme.md"]);
-    expect(result).toEqual({ status: "added" });
-    expect(workspace.updateWorkspaceFolders).toHaveBeenCalledWith(1, 0, {
-      uri: expect.objectContaining({ scheme: "file", fsPath: "/vault/Notes" }) as unknown,
-      name: `${FOLDER_NAME_PREFIX}Notes`,
-    });
-  });
-
-  it("returns skipped when all autoMount entries are files", () => {
-    workspace.workspaceFolders = [
-      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
-    ];
-
-    vi.mocked(fs.statSync).mockReturnValue({ isDirectory: () => false } as never);
-
-    const result = addVaultWorkspaceFolder("/vault", ["docs/readme.md"]);
-    expect(result).toEqual({ status: "skipped", reason: "no mountable directories in autoMount" });
-    expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
-  });
-
-  it("filters autoMount entries outside allowed folders", () => {
-    workspace.workspaceFolders = [
-      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
-    ];
-
-    const security = { vaultRoot: "/vault", allowed: ["Notes"], blocked: [] as string[] };
-    const result = addVaultWorkspaceFolder("/vault", ["Notes", "Private"], security);
-    expect(result).toEqual({ status: "added" });
-    expect(workspace.updateWorkspaceFolders).toHaveBeenCalledWith(1, 0, {
-      uri: expect.objectContaining({ scheme: "file", fsPath: "/vault/Notes" }) as unknown,
-      name: `${FOLDER_NAME_PREFIX}Notes`,
-    });
-  });
-
-  it("filters autoMount entries inside blocked folders", () => {
-    workspace.workspaceFolders = [
-      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
-    ];
-
-    const security = { vaultRoot: "/vault", allowed: [] as string[], blocked: ["Private"] };
-    const result = addVaultWorkspaceFolder("/vault", ["Notes", "Private"], security);
-    expect(result).toEqual({ status: "added" });
-    expect(workspace.updateWorkspaceFolders).toHaveBeenCalledWith(1, 0, {
-      uri: expect.objectContaining({ scheme: "file", fsPath: "/vault/Notes" }) as unknown,
-      name: `${FOLDER_NAME_PREFIX}Notes`,
-    });
-  });
-
-  it("returns skipped when all autoMount entries are blocked", () => {
-    workspace.workspaceFolders = [
-      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
-    ];
-
-    const security = { vaultRoot: "/vault", allowed: [] as string[], blocked: ["Private"] };
-    const result = addVaultWorkspaceFolder("/vault", ["Private"], security);
-    expect(result).toEqual({ status: "skipped", reason: "no mountable directories in autoMount" });
-    expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
-  });
-
-  it("mounts all entries when no security options provided", () => {
-    workspace.workspaceFolders = [
-      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
-    ];
-
-    const result = addVaultWorkspaceFolder("/vault", ["Notes", "Private"]);
-    expect(result).toEqual({ status: "added" });
-    expect(workspace.updateWorkspaceFolders).toHaveBeenCalledWith(
-      1,
-      0,
-      expect.objectContaining({ name: `${FOLDER_NAME_PREFIX}Notes` }) as unknown,
-      expect.objectContaining({ name: `${FOLDER_NAME_PREFIX}Private` }) as unknown,
-    );
-  });
-
-  it("handles stat failure gracefully by excluding the entry", () => {
-    workspace.workspaceFolders = [
-      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
-    ];
-
-    vi.mocked(fs.statSync).mockImplementation(() => {
-      throw new Error("ENOENT");
-    });
-
-    const result = addVaultWorkspaceFolder("/vault", ["missing-folder"]);
-    expect(result).toEqual({ status: "skipped", reason: "no mountable directories in autoMount" });
     expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
   });
 });
@@ -316,30 +202,17 @@ describe("removeVaultWorkspaceFolders", () => {
     expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
   });
 
-  it("removes obs:// folders (backward compat)", () => {
+  it("removes obs:// folder", () => {
     workspace.workspaceFolders = [
       { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
-      { uri: { scheme: SCHEME }, name: `${FOLDER_NAME_PREFIX}Notes`, index: 1 },
+      { uri: { scheme: SCHEME }, name: `${FOLDER_NAME_PREFIX}MyVault`, index: 1 },
     ];
 
     removeVaultWorkspaceFolders("/vault");
     expect(workspace.updateWorkspaceFolders).toHaveBeenCalledWith(1, 1);
   });
 
-  it("removes multiple obs:// folders (backward compat)", () => {
-    workspace.workspaceFolders = [
-      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
-      { uri: { scheme: SCHEME }, name: `${FOLDER_NAME_PREFIX}Notes`, index: 1 },
-      { uri: { scheme: SCHEME }, name: `${FOLDER_NAME_PREFIX}Projects`, index: 2 },
-    ];
-
-    removeVaultWorkspaceFolders("/vault");
-    expect(workspace.updateWorkspaceFolders).toHaveBeenCalledTimes(2);
-    expect(workspace.updateWorkspaceFolders).toHaveBeenNthCalledWith(1, 2, 1);
-    expect(workspace.updateWorkspaceFolders).toHaveBeenNthCalledWith(2, 1, 1);
-  });
-
-  it("removes managed file:// folders", () => {
+  it("removes managed file:// folders (backward compat)", () => {
     workspace.workspaceFolders = [
       { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
       {
@@ -351,6 +224,23 @@ describe("removeVaultWorkspaceFolders", () => {
 
     removeVaultWorkspaceFolders("/vault");
     expect(workspace.updateWorkspaceFolders).toHaveBeenCalledWith(1, 1);
+  });
+
+  it("removes multiple managed folders (backward compat)", () => {
+    workspace.workspaceFolders = [
+      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
+      { uri: { scheme: SCHEME }, name: `${FOLDER_NAME_PREFIX}MyVault`, index: 1 },
+      {
+        uri: { scheme: "file", fsPath: "/vault/Notes" },
+        name: `${FOLDER_NAME_PREFIX}Notes`,
+        index: 2,
+      },
+    ];
+
+    removeVaultWorkspaceFolders("/vault");
+    expect(workspace.updateWorkspaceFolders).toHaveBeenCalledTimes(2);
+    expect(workspace.updateWorkspaceFolders).toHaveBeenNthCalledWith(1, 2, 1);
+    expect(workspace.updateWorkspaceFolders).toHaveBeenNthCalledWith(2, 1, 1);
   });
 
   it("does not remove unmanaged file:// folders", () => {

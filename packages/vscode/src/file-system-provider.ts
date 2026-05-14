@@ -34,17 +34,41 @@ function mapChangeType(type: FileChangeType): vscode.FileChangeType {
 export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
   readonly #tracker: LocalIndexTracker;
   readonly #securityOptions: PathSecurityOptions;
+  #autoMount: ReadonlySet<string>;
 
   readonly #onDidChangeFile = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
   readonly onDidChangeFile = this.#onDidChangeFile.event;
 
-  constructor(tracker: LocalIndexTracker) {
+  constructor(tracker: LocalIndexTracker, autoMount: readonly string[] = []) {
     this.#tracker = tracker;
     this.#securityOptions = {
       vaultRoot: tracker.context.physicalPath,
       allowed: tracker.context.vfsConfig.allowed,
       blocked: tracker.context.vfsConfig.blocked,
     };
+    this.#autoMount = new Set(autoMount.map((e) => e.split("/")[0]));
+  }
+
+  setAutoMount(entries: readonly string[]): void {
+    const updated = new Set(entries.map((e) => e.split("/")[0]));
+    const vaultName = this.#tracker.context.name;
+    const previous = this.#autoMount;
+    this.#autoMount = updated;
+
+    const events: vscode.FileChangeEvent[] = [];
+    for (const entry of updated) {
+      if (!previous.has(entry)) {
+        events.push({ type: vscode.FileChangeType.Created, uri: toVscodeUri(entry, vaultName) });
+      }
+    }
+    for (const entry of previous) {
+      if (!updated.has(entry)) {
+        events.push({ type: vscode.FileChangeType.Deleted, uri: toVscodeUri(entry, vaultName) });
+      }
+    }
+    if (events.length > 0) {
+      this.#onDidChangeFile.fire(events);
+    }
   }
 
   async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
@@ -70,7 +94,14 @@ export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
     const vaultPath = toVaultPath(uri);
     const result = await this.#tracker.readDirectory(vaultPath);
     if (!result.ok) throwVFSError(result, uri);
-    return result.value.map(([name, type]) => [name, mapFileType(type)]);
+    const entries: [string, vscode.FileType][] = result.value.map(([name, type]) => [
+      name,
+      mapFileType(type),
+    ]);
+    if (vaultPath === "" && this.#autoMount.size > 0) {
+      return entries.filter(([name]) => this.#autoMount.has(name));
+    }
+    return entries;
   }
 
   async writeFile(
@@ -101,12 +132,10 @@ export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
     await mkdir(pathResult.value, { recursive: true });
   }
 
-  /** Required interface method. Workspace folders use `file://` URIs so the native FS handles these. */
   delete(): Promise<void> {
     throw vscode.FileSystemError.NoPermissions(`Not supported on ${SCHEME}:// scheme`);
   }
 
-  /** Required interface method. Workspace folders use `file://` URIs so the native FS handles these. */
   rename(): Promise<void> {
     throw vscode.FileSystemError.NoPermissions(`Not supported on ${SCHEME}:// scheme`);
   }

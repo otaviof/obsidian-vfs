@@ -1,11 +1,10 @@
-import fs from "node:fs";
 import path from "node:path";
 
 import * as vscode from "vscode";
 
-import { canonicalizePath, type PathSecurityOptions, isAllowedPath } from "@obsidian-vfs/core";
+import { canonicalizePath } from "@obsidian-vfs/core";
 
-import { SCHEME, toFileUri } from "./uri-adapter.js";
+import { SCHEME } from "./uri-adapter.js";
 
 /** Result of attempting to add the vault as a workspace folder. */
 export type AddWorkspaceFolderResult =
@@ -69,18 +68,16 @@ export function includeVaultInGitDetection(physicalPath: string): Thenable<void>
 }
 
 /**
- * Add autoMount directories as individual workspace folders for Explorer browsing.
- * File entries are filtered out since workspace folders must be directories.
- * Entries outside allowed folders or inside blocked folders are skipped.
+ * Add the vault as a single `obs://` workspace folder.
  * Appends at the end to avoid extension host restart.
  */
 export function addVaultWorkspaceFolder(
   physicalPath: string,
-  autoMount: readonly string[],
-  security?: PathSecurityOptions,
+  vaultName: string,
+  autoMountCount: number,
 ): AddWorkspaceFolderResult {
-  if (autoMount.length === 0) {
-    return { status: "skipped", reason: "no autoMount folders configured" };
+  if (autoMountCount === 0) {
+    return { status: "skipped", reason: "no autoMount entries configured" };
   }
 
   if (hasVaultWorkspaceFolder(physicalPath)) {
@@ -92,23 +89,10 @@ export function addVaultWorkspaceFolder(
     return { status: "skipped", reason: "no local workspace folder open" };
   }
 
-  const directories = autoMount.filter((entry) => {
-    if (security && !isAllowedPath(entry, security)) return false;
-    try {
-      return fs.statSync(path.join(physicalPath, entry)).isDirectory();
-    } catch {
-      return false;
-    }
+  vscode.workspace.updateWorkspaceFolders(folders.length, 0, {
+    uri: vscode.Uri.from({ scheme: SCHEME, authority: vaultName, path: "/" }),
+    name: `${FOLDER_NAME_PREFIX}${vaultName}`,
   });
-  if (directories.length === 0) {
-    return { status: "skipped", reason: "no mountable directories in autoMount" };
-  }
-
-  const newFolders = directories.map((folder) => ({
-    uri: toFileUri(folder, physicalPath),
-    name: `${FOLDER_NAME_PREFIX}${folder}`,
-  }));
-  vscode.workspace.updateWorkspaceFolders(folders.length, 0, ...newFolders);
 
   return { status: "added" };
 }

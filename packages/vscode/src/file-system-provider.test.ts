@@ -147,6 +147,172 @@ describe("ObsidianFileSystemProvider", () => {
         "FileNotFound",
       );
     });
+
+    it("filters root entries by autoMount when set", async () => {
+      const tracker = mockTracker({
+        readDirectory: vi.fn().mockResolvedValue({
+          ok: true,
+          value: [
+            ["Notes", "directory"],
+            ["Private", "directory"],
+            ["Projects", "directory"],
+          ],
+        }),
+      });
+      const provider = new ObsidianFileSystemProvider(tracker, ["Notes", "Projects"]);
+      const entries = await provider.readDirectory(fakeUri("/") as never);
+
+      expect(entries).toEqual([
+        ["Notes", DIRECTORY],
+        ["Projects", DIRECTORY],
+      ]);
+    });
+
+    it("does not filter non-root entries by autoMount", async () => {
+      const tracker = mockTracker({
+        readDirectory: vi.fn().mockResolvedValue({
+          ok: true,
+          value: [
+            ["plan.md", "file"],
+            ["archive", "directory"],
+          ],
+        }),
+      });
+      const provider = new ObsidianFileSystemProvider(tracker, ["Notes"]);
+      const entries = await provider.readDirectory(fakeUri("/Notes") as never);
+
+      expect(entries).toEqual([
+        ["plan.md", FILE],
+        ["archive", DIRECTORY],
+      ]);
+    });
+
+    it("returns all root entries when autoMount is empty", async () => {
+      const tracker = mockTracker({
+        readDirectory: vi.fn().mockResolvedValue({
+          ok: true,
+          value: [
+            ["Notes", "directory"],
+            ["Private", "directory"],
+          ],
+        }),
+      });
+      const provider = new ObsidianFileSystemProvider(tracker);
+      const entries = await provider.readDirectory(fakeUri("/") as never);
+
+      expect(entries).toEqual([
+        ["Notes", DIRECTORY],
+        ["Private", DIRECTORY],
+      ]);
+    });
+
+    it("extracts first path segment for file-level autoMount entries", async () => {
+      const tracker = mockTracker({
+        readDirectory: vi.fn().mockResolvedValue({
+          ok: true,
+          value: [
+            ["docs", "directory"],
+            ["Notes", "directory"],
+            ["other", "directory"],
+          ],
+        }),
+      });
+      const provider = new ObsidianFileSystemProvider(tracker, ["Notes", "docs/readme.md"]);
+      const entries = await provider.readDirectory(fakeUri("/") as never);
+
+      expect(entries).toEqual([
+        ["docs", DIRECTORY],
+        ["Notes", DIRECTORY],
+      ]);
+    });
+  });
+
+  describe("setAutoMount", () => {
+    it("updates root filtering on subsequent readDirectory calls", async () => {
+      const tracker = mockTracker({
+        readDirectory: vi.fn().mockResolvedValue({
+          ok: true,
+          value: [
+            ["Notes", "directory"],
+            ["Projects", "directory"],
+            ["Private", "directory"],
+          ],
+        }),
+      });
+      const provider = new ObsidianFileSystemProvider(tracker, ["Notes"]);
+
+      provider.setAutoMount(["Notes", "Projects"]);
+
+      const entries = await provider.readDirectory(fakeUri("/") as never);
+      expect(entries).toEqual([
+        ["Notes", DIRECTORY],
+        ["Projects", DIRECTORY],
+      ]);
+    });
+
+    it("fires Created event for added entries", () => {
+      const tracker = mockTracker();
+      const provider = new ObsidianFileSystemProvider(tracker, ["Notes"]);
+
+      const fired: unknown[] = [];
+      provider.onDidChangeFile((events) => fired.push(...events));
+
+      provider.setAutoMount(["Notes", "Projects"]);
+
+      expect(fired).toHaveLength(1);
+      const event = fired[0] as { type: number; uri: { path: string } };
+      expect(event.type).toBe(CREATED);
+      expect(event.uri.path).toBe("/Projects");
+    });
+
+    it("fires Deleted event for removed entries", () => {
+      const tracker = mockTracker();
+      const provider = new ObsidianFileSystemProvider(tracker, ["Notes", "Projects"]);
+
+      const fired: unknown[] = [];
+      provider.onDidChangeFile((events) => fired.push(...events));
+
+      provider.setAutoMount(["Notes"]);
+
+      expect(fired).toHaveLength(1);
+      const event = fired[0] as { type: number; uri: { path: string } };
+      expect(event.type).toBe(DELETED);
+      expect(event.uri.path).toBe("/Projects");
+    });
+
+    it("fires both Created and Deleted events on replacement", () => {
+      const tracker = mockTracker();
+      const provider = new ObsidianFileSystemProvider(tracker, ["Notes"]);
+
+      const fired: unknown[] = [];
+      provider.onDidChangeFile((events) => fired.push(...events));
+
+      provider.setAutoMount(["Projects"]);
+
+      expect(fired).toHaveLength(2);
+      const events = fired as { type: number; uri: { path: string } }[];
+      expect(events).toContainEqual(
+        expect.objectContaining({
+          type: CREATED,
+          uri: expect.objectContaining({ path: "/Projects" }),
+        }),
+      );
+      expect(events).toContainEqual(
+        expect.objectContaining({ type: DELETED, uri: expect.objectContaining({ path: "/Notes" }) }),
+      );
+    });
+
+    it("does not fire events when autoMount set is unchanged", () => {
+      const tracker = mockTracker();
+      const provider = new ObsidianFileSystemProvider(tracker, ["Notes", "Projects"]);
+
+      const fired: unknown[] = [];
+      provider.onDidChangeFile((events) => fired.push(...events));
+
+      provider.setAutoMount(["Projects", "Notes"]);
+
+      expect(fired).toHaveLength(0);
+    });
   });
 
   describe("writeFile", () => {
