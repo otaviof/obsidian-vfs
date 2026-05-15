@@ -1,3 +1,4 @@
+import { readdir } from "node:fs/promises";
 import path from "node:path";
 
 import * as vscode from "vscode";
@@ -68,18 +69,13 @@ export function includeVaultInGitDetection(physicalPath: string): Thenable<void>
 }
 
 /**
- * Add the vault as a single `obs://` workspace folder.
+ * Add the vault as a single `file://` workspace folder at the vault root.
  * Appends at the end to avoid extension host restart.
  */
 export function addVaultWorkspaceFolder(
   physicalPath: string,
   vaultName: string,
-  autoMountCount: number,
 ): AddWorkspaceFolderResult {
-  if (autoMountCount === 0) {
-    return { status: "skipped", reason: "no autoMount entries configured" };
-  }
-
   if (hasVaultWorkspaceFolder(physicalPath)) {
     return { status: "already-present" };
   }
@@ -90,9 +86,78 @@ export function addVaultWorkspaceFolder(
   }
 
   vscode.workspace.updateWorkspaceFolders(folders.length, 0, {
-    uri: vscode.Uri.from({ scheme: SCHEME, authority: vaultName, path: "/" }),
+    uri: vscode.Uri.file(physicalPath),
     name: `${FOLDER_NAME_PREFIX}${vaultName}`,
   });
 
   return { status: "added" };
+}
+
+/**
+ * Scan the vault root and update `files.exclude` to hide non-autoMount entries
+ * and blocked paths. Preserves user-set patterns. Returns managed pattern keys.
+ */
+export async function syncFilesExclude(
+  physicalPath: string,
+  autoMount: readonly string[],
+  blocked: readonly string[],
+  previouslyManaged: readonly string[],
+): Promise<string[]> {
+  let entries: string[];
+  try {
+    entries = await readdir(physicalPath);
+  } catch {
+    return [...previouslyManaged];
+  }
+  const autoMountRoots = new Set(autoMount.map((p) => p.split("/")[0]));
+
+  const toExclude: string[] = [];
+
+  for (const entry of entries) {
+    if (!autoMountRoots.has(entry)) toExclude.push(entry);
+  }
+
+  for (const b of blocked) {
+    if (!toExclude.includes(b)) toExclude.push(b);
+  }
+
+  const managed = new Set(toExclude);
+
+  const filesConfig = vscode.workspace.getConfiguration("files");
+  const current = filesConfig.get<Record<string, boolean>>("exclude", {});
+  const updated = { ...current };
+
+  for (const key of previouslyManaged) {
+    if (!managed.has(key)) {
+      delete updated[key];
+    }
+  }
+
+  for (const entry of toExclude) {
+    updated[entry] = true;
+  }
+
+  await filesConfig.update("exclude", updated, vscode.ConfigurationTarget.Workspace);
+
+  return toExclude;
+}
+
+/** Remove all extension-managed `files.exclude` patterns from workspace settings. */
+export async function clearManagedExcludes(previouslyManaged: readonly string[]): Promise<void> {
+  if (previouslyManaged.length === 0) return;
+
+  const filesConfig = vscode.workspace.getConfiguration("files");
+  const current = filesConfig.get<Record<string, boolean>>("exclude", {});
+  const updated = { ...current };
+
+  for (const key of previouslyManaged) {
+    delete updated[key];
+  }
+
+  const hasKeys = Object.keys(updated).length > 0;
+  await filesConfig.update(
+    "exclude",
+    hasKeys ? updated : undefined,
+    vscode.ConfigurationTarget.Workspace,
+  );
 }

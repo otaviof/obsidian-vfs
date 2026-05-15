@@ -233,8 +233,24 @@ export function fakeUri(
 }
 
 /** Build a minimal `vscode.ExtensionContext` for testing. */
-export function fakeContext(): { subscriptions: { dispose: () => void }[] } {
-  return { subscriptions: [] };
+export function fakeContext(): {
+  subscriptions: { dispose: () => void }[];
+  workspaceState: {
+    get: (key: string, fallback?: unknown) => unknown;
+    update: (key: string, value: unknown) => Promise<void>;
+  };
+} {
+  const store = new Map<string, unknown>();
+  return {
+    subscriptions: [],
+    workspaceState: {
+      get: (key: string, fallback?: unknown) => store.get(key) ?? fallback,
+      update: (key: string, value: unknown) => {
+        store.set(key, value);
+        return Promise.resolve();
+      },
+    },
+  };
 }
 
 /** Default tracker context for provider tests. */

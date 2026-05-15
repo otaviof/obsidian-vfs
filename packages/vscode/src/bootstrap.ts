@@ -2,11 +2,12 @@ import * as vscode from "vscode";
 import { DEFAULT_TIMEOUT_MS, bootstrapTracker, resolveCliPath } from "@obsidian-vfs/core";
 import type { BootstrapResult, VFSResult } from "@obsidian-vfs/core";
 
+import { CONFIG_SECTION } from "./types.js";
 import type { ExtensionConfig } from "./types.js";
 
 /** Read extension configuration from VSCode settings. */
 export function readConfig(): ExtensionConfig {
-  const cfg = vscode.workspace.getConfiguration("obsidianVFS");
+  const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
   return {
     cliPath: resolveCliPath({ userPath: cfg.get<string>("cliPath", "") }),
     timeoutMs: cfg.get<number>("timeoutMs", DEFAULT_TIMEOUT_MS),

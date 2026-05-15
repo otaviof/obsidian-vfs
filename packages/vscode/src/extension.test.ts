@@ -71,6 +71,8 @@ vi.mock("./workspace-folder.js", async (importOriginal) => {
     hasVaultWorkspaceFolder: vi.fn(),
     excludeVaultFromGitDetection: vi.fn().mockResolvedValue(undefined),
     includeVaultInGitDetection: vi.fn().mockResolvedValue(undefined),
+    syncFilesExclude: vi.fn().mockResolvedValue([]),
+    clearManagedExcludes: vi.fn().mockResolvedValue(undefined),
   };
 });
 
@@ -80,6 +82,7 @@ import type { LocalIndexTracker } from "@obsidian-vfs/core";
 import { bootstrapFromConfig, readConfig } from "./bootstrap.js";
 import { registerCommands } from "./commands.js";
 import { activate, deactivate } from "./extension.js";
+import { CONFIG_KEY } from "./types.js";
 import { SCHEME } from "./uri-adapter.js";
 import { FOLDER_NAME_PREFIX } from "./workspace-folder.js";
 import { ObsidianFileSystemProvider } from "./file-system-provider.js";
@@ -89,10 +92,12 @@ import { VaultTreeDragAndDropController } from "./tree-drag-drop.js";
 import { WikilinkDocumentLinkProvider } from "./wikilink-provider.js";
 import {
   addVaultWorkspaceFolder,
+  clearManagedExcludes,
   excludeVaultFromGitDetection,
   hasVaultWorkspaceFolder,
   includeVaultInGitDetection,
   removeVaultWorkspaceFolders,
+  syncFilesExclude,
 } from "./workspace-folder.js";
 
 const mockBootstrap = vi.mocked(bootstrapFromConfig);
@@ -102,6 +107,8 @@ const mockRemoveWF = vi.mocked(removeVaultWorkspaceFolders);
 const mockHasWF = vi.mocked(hasVaultWorkspaceFolder);
 const mockExcludeGit = vi.mocked(excludeVaultFromGitDetection);
 const mockIncludeGit = vi.mocked(includeVaultInGitDetection);
+const mockSyncExclude = vi.mocked(syncFilesExclude);
+const mockClearExclude = vi.mocked(clearManagedExcludes);
 
 describe("activate", () => {
   beforeEach(() => {
@@ -192,7 +199,7 @@ describe("activate", () => {
     );
   });
 
-  it("adds workspace folder when workspace is true", async () => {
+  it("adds workspace folder and syncs excludes when workspace is true with autoMount", async () => {
     const fakeTracker = {
       context: {
         name: "MyVault",
@@ -214,11 +221,15 @@ describe("activate", () => {
       statusBar: true,
       workspace: true,
     });
+    mockSyncExclude.mockResolvedValueOnce([".obsidian", ".trash"]);
 
-    await activate(fakeContext() as never);
+    const ctx = fakeContext();
+    await activate(ctx as never);
 
-    expect(mockAddWF).toHaveBeenCalledWith("/vault", "MyVault", 1);
+    expect(mockAddWF).toHaveBeenCalledWith("/vault", "MyVault");
     expect(mockExcludeGit).toHaveBeenCalledWith("/vault");
+    expect(mockSyncExclude).toHaveBeenCalledWith("/vault", ["Notes"], [], []);
+    expect(ctx.workspaceState.get("managedFilesExclude")).toEqual([".obsidian", ".trash"]);
   });
 
   it("skips workspace folder when workspace is false", async () => {
@@ -247,6 +258,36 @@ describe("activate", () => {
     await activate(fakeContext() as never);
 
     expect(mockAddWF).not.toHaveBeenCalled();
+    expect(mockSyncExclude).not.toHaveBeenCalled();
+  });
+
+  it("skips workspace folder when autoMount is empty", async () => {
+    const fakeTracker = {
+      context: {
+        name: "MyVault",
+        physicalPath: "/vault",
+        mode: "full",
+        vfsConfig: { agents: [], skills: [], allowed: [], blocked: [] },
+      },
+    } as unknown as LocalIndexTracker;
+
+    mockBootstrap.mockResolvedValueOnce({
+      ok: true,
+      value: { tracker: fakeTracker, initMs: 42 },
+    });
+    mockReadConfig.mockReturnValueOnce({
+      cliPath: "obsidian",
+      timeoutMs: 10_000,
+      autoMount: [],
+      explorer: true,
+      statusBar: true,
+      workspace: true,
+    });
+
+    await activate(fakeContext() as never);
+
+    expect(mockAddWF).not.toHaveBeenCalled();
+    expect(mockSyncExclude).not.toHaveBeenCalled();
   });
 
   it("logs workspace folder result when workspace is true and added", async () => {
@@ -540,7 +581,7 @@ describe("configuration change listener", () => {
       workspace: false,
     });
 
-    configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.explorer" });
+    configChangeListener!({ affectsConfiguration: (key) => key === CONFIG_KEY.explorer });
 
     const treeProviderInstance = vi.mocked(VaultTreeDataProvider).mock.results[0].value as {
       enabled: boolean;
@@ -582,7 +623,7 @@ describe("configuration change listener", () => {
       workspace: false,
     });
 
-    configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.explorer" });
+    configChangeListener!({ affectsConfiguration: (key) => key === CONFIG_KEY.explorer });
 
     const treeProviderInstance = vi.mocked(VaultTreeDataProvider).mock.results[0].value as {
       enabled: boolean;
@@ -624,7 +665,7 @@ describe("configuration change listener", () => {
       workspace: false,
     });
 
-    configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.statusBar" });
+    configChangeListener!({ affectsConfiguration: (key) => key === CONFIG_KEY.statusBar });
 
     const statusBarInstance = vi.mocked(StatusBarManager).mock.results[0].value as {
       show: ReturnType<typeof vi.fn>;
@@ -667,7 +708,7 @@ describe("configuration change listener", () => {
       workspace: false,
     });
 
-    configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.statusBar" });
+    configChangeListener!({ affectsConfiguration: (key) => key === CONFIG_KEY.statusBar });
 
     const statusBarInstance = vi.mocked(StatusBarManager).mock.results[0].value as {
       show: ReturnType<typeof vi.fn>;
@@ -676,7 +717,7 @@ describe("configuration change listener", () => {
     expect(statusBarInstance.hide).toHaveBeenCalled();
   });
 
-  it("adds workspace folder when workspace config changes to true", async () => {
+  it("adds workspace folder and syncs excludes when workspace config changes to true", async () => {
     const fakeTracker = {
       context: {
         name: "MyVault",
@@ -712,15 +753,18 @@ describe("configuration change listener", () => {
       workspace: true,
     });
     mockAddWF.mockReturnValueOnce({ status: "added" });
+    mockSyncExclude.mockResolvedValueOnce([".obsidian"]);
 
-    configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.workspace" });
+    configChangeListener!({ affectsConfiguration: (key) => key === CONFIG_KEY.workspace });
+    await new Promise((r) => setTimeout(r, 0));
 
     expect(mockRemoveWF).toHaveBeenCalledWith("/vault");
-    expect(mockAddWF).toHaveBeenCalledWith("/vault", "MyVault", 1);
+    expect(mockAddWF).toHaveBeenCalledWith("/vault", "MyVault");
     expect(mockExcludeGit).toHaveBeenCalledWith("/vault");
+    expect(mockSyncExclude).toHaveBeenCalledWith("/vault", ["Notes"], [], []);
   });
 
-  it("removes workspace folders when workspace config changes to false", async () => {
+  it("clears excludes and removes workspace folders when workspace config changes to false", async () => {
     const fakeTracker = {
       context: {
         name: "MyVault",
@@ -756,14 +800,16 @@ describe("configuration change listener", () => {
       workspace: false,
     });
 
-    configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.workspace" });
+    configChangeListener!({ affectsConfiguration: (key) => key === CONFIG_KEY.workspace });
+    await new Promise((r) => setTimeout(r, 0));
 
     expect(mockRemoveWF).toHaveBeenCalledWith("/vault");
     expect(mockAddWF).not.toHaveBeenCalled();
+    expect(mockClearExclude).toHaveBeenCalledWith([]);
     expect(mockIncludeGit).toHaveBeenCalledWith("/vault");
   });
 
-  it("updates provider without removing workspace folder when autoMount changes", async () => {
+  it("syncs excludes when autoMount changes without workspace toggle", async () => {
     const fakeTracker = {
       context: {
         name: "MyVault",
@@ -803,12 +849,15 @@ describe("configuration change listener", () => {
       statusBar: true,
       workspace: true,
     });
+    mockSyncExclude.mockResolvedValueOnce([".obsidian"]);
 
-    configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.autoMount" });
+    configChangeListener!({ affectsConfiguration: (key) => key === CONFIG_KEY.autoMount });
+    await new Promise((r) => setTimeout(r, 0));
 
     expect(providerInstance.setAutoMount).toHaveBeenCalledWith(["Notes", "Projects"]);
     expect(mockRemoveWF).not.toHaveBeenCalled();
     expect(mockAddWF).not.toHaveBeenCalled();
+    expect(mockSyncExclude).toHaveBeenCalledWith("/vault", ["Notes", "Projects"], [], []);
   });
 
   it("adds workspace folder when autoMount goes from empty to non-empty", async () => {
@@ -840,6 +889,7 @@ describe("configuration change listener", () => {
 
     mockHasWF.mockReturnValueOnce(false);
     mockAddWF.mockReturnValueOnce({ status: "added" });
+    mockSyncExclude.mockResolvedValueOnce([".obsidian"]);
     mockReadConfig.mockReturnValueOnce({
       cliPath: "obsidian",
       timeoutMs: 10_000,
@@ -849,14 +899,16 @@ describe("configuration change listener", () => {
       workspace: true,
     });
 
-    configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.autoMount" });
+    configChangeListener!({ affectsConfiguration: (key) => key === CONFIG_KEY.autoMount });
+    await new Promise((r) => setTimeout(r, 0));
 
-    expect(mockAddWF).toHaveBeenCalledWith("/vault", "MyVault", 1);
+    expect(mockAddWF).toHaveBeenCalledWith("/vault", "MyVault");
     expect(mockExcludeGit).toHaveBeenCalledWith("/vault");
+    expect(mockSyncExclude).toHaveBeenCalledWith("/vault", ["Notes"], [], []);
     expect(mockRemoveWF).not.toHaveBeenCalled();
   });
 
-  it("removes workspace folder when autoMount becomes empty", async () => {
+  it("removes workspace folder and clears excludes when autoMount becomes empty", async () => {
     const fakeTracker = {
       context: {
         name: "MyVault",
@@ -892,9 +944,11 @@ describe("configuration change listener", () => {
       workspace: true,
     });
 
-    configChangeListener!({ affectsConfiguration: (key) => key === "obsidianVFS.autoMount" });
+    configChangeListener!({ affectsConfiguration: (key) => key === CONFIG_KEY.autoMount });
+    await new Promise((r) => setTimeout(r, 0));
 
     expect(mockRemoveWF).toHaveBeenCalledWith("/vault");
+    expect(mockClearExclude).toHaveBeenCalledWith([]);
     expect(mockAddWF).not.toHaveBeenCalled();
   });
 });

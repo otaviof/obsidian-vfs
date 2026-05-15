@@ -46,25 +46,38 @@ Configure via **Settings UI** or `settings.json`:
 | `obsidianVFS.autoMount` | `string[]` | `[]` | Vault-relative paths (folders or notes) to display in the Explorer tree view on activation |
 | `obsidianVFS.explorer` | `boolean` | `true` | Show the Obsidian VFS tree view in the Explorer sidebar |
 | `obsidianVFS.statusBar` | `boolean` | `true` | Show vault name and mode in the status bar |
-| `obsidianVFS.workspace` | `boolean` | `true` | Add the vault as a workspace folder for Explorer browsing (see below) |
+| `obsidianVFS.workspace` | `boolean` | `true` | Add the vault as a workspace folder for Quick Open and Search (see below) |
 
 All three toggle settings (`explorer`, `statusBar`, `workspace`) take effect immediately — no reload required.
 
 ### Workspace Folder
 
-When `obsidianVFS.workspace` is enabled, the extension adds a single **obs://\<vault\>** workspace folder using the `obs://` virtual file system. Mounted `autoMount` entries appear as children under this root — the Explorer shows one vault entry instead of one per folder. VS Code's **Search** (`Ctrl+Shift+F`) and **Quick Open** (`Cmd+P`) work across mounted content through the `FileSystemProvider`.
+When `obsidianVFS.workspace` is enabled and at least one `autoMount` entry is configured, the extension adds a single `file://` workspace folder at the vault root (named **obs://\<vault\>** in the sidebar). VS Code's **Quick Open** (`Cmd+P`) and **Search** (`Ctrl+Shift+F`) discover vault files through this folder.
 
-All file operations — stat, read, write, directory listing, and file watching — go through the `obs://` provider, which enforces `allowed`/`blocked` security rules from [`.obsidian/obsidian-vfs.json`](../../README.md#vault-configuration) at every level.
+Non-autoMount vault content (`.obsidian/`, `.trash/`, and any directories not in `autoMount`) is hidden from Explorer and Quick Open via `files.exclude` patterns managed by the extension. Your own `files.exclude` patterns are never modified or removed.
 
 **Requirements:**
 
 - At least one local folder must be open — the vault workspace folder is appended to the list to avoid triggering an extension host restart.
+- At least one `autoMount` entry must be configured — the workspace folder is not added when `autoMount` is empty.
+
+**How it works:**
+
+- The extension scans the vault root and adds `files.exclude` patterns for entries not in `autoMount`. Patterns are written to workspace settings (`ConfigurationTarget.Workspace`) and tracked internally for cleanup.
+- When `autoMount` entries change, patterns are re-synced automatically — stale patterns are removed and new ones added.
+- When `obsidianVFS.workspace` is disabled, all managed patterns are removed and the workspace folder is deleted.
+- The vault's `.git` repository is automatically added to `git.ignoredRepositories` (user-level setting) when the workspace folder is mounted, preventing VS Code's Git extension from listing it in Source Control. The entry is removed when `obsidianVFS.workspace` is disabled.
+
+**Known limitations:**
+
+- **Pattern scope:** `files.exclude` patterns apply to all workspace folders. If a non-autoMount vault directory shares a name with a directory in your project (e.g., both have a `docs/` folder), the project directory will also be hidden. Fix: add the vault directory to `autoMount`, or rename it in your vault.
+- **Not a security boundary:** `files.exclude` hides content from Explorer and Quick Open but does not enforce access restrictions. The `obs://` FileSystemProvider's path security (`allowed`/`blocked` lists in `.obsidian-vfs.json`) applies to TreeView, wikilink, and drag-and-drop operations.
+- **Title bar:** Adding the vault as a workspace folder creates a multi-root workspace. VS Code may show "UNTITLED (WORKSPACE)" in the title bar.
 
 **Notes:**
 
-- The Explorer tree view and the workspace folder both appear in the sidebar. The tree view provides custom UI (welcome view, context menus), while the workspace folder enables Quick Open and cross-extension visibility. The tree view uses `file://` URIs for opening files, which enables native features like Git integration.
-- `autoMount` entries outside `allowed` or inside `blocked` are filtered from the workspace folder root listing. The core security layer remains as defense-in-depth for navigation into subdirectories.
-- The vault's `.git` repository is automatically added to `git.ignoredRepositories` (user-level setting) when the workspace folder is mounted, preventing VS Code's Git extension from listing it in Source Control. The entry is removed when `obsidianVFS.workspace` is disabled.
+- The Explorer tree view and the workspace folder both appear in the sidebar. The tree view provides custom UI (welcome view, context menus, drag-and-drop), while the workspace folder enables Quick Open and full-text search.
+- The `obs://` FileSystemProvider remains registered for the TreeView sidebar, wikilink navigation, and drag-and-drop — it does not back a workspace folder.
 
 ## Related Tools
 

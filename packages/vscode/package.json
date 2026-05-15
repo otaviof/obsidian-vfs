@@ -2,7 +2,7 @@
   "name": "obsidian-vfs",
   "displayName": "Obsidian VFS",
   "description": "Browse, search, and edit your Obsidian vault directly in VSCode via a virtual file system (obs://)",
-  "version": "0.2.3",
+  "version": "0.3.0",
   "private": true,
   "publisher": "otaviof",
   "engines": {
@@ -127,7 +127,7 @@
         "obsidianVFS.workspace": {
           "type": "boolean",
           "default": true,
-          "description": "Add the vault as a single obs:// workspace folder for Explorer browsing. Mounted entries appear as children under the vault root. Requires at least one local folder open."
+          "description": "Add the vault as a file:// workspace folder for Quick Open (Cmd+P) and Search (Ctrl+Shift+F). Non-autoMount content is hidden via files.exclude patterns managed by the extension. Requires at least one local folder open and at least one autoMount entry."
         }
       }
     }
