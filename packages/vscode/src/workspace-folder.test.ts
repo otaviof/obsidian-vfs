@@ -2,12 +2,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { createVscodeMock } from "./test-mocks.js";
 
-vi.mock("vscode", () => createVscodeMock({ workspace: true, uri: true, configurationTarget: true }));
+vi.mock("vscode", () =>
+  createVscodeMock({ workspace: true, uri: true, configurationTarget: true, commands: true }),
+);
+
+vi.mock("node:fs", () => ({
+  default: {
+    existsSync: vi.fn(),
+    readFileSync: vi.fn(),
+    writeFileSync: vi.fn(),
+  },
+}));
 
 vi.mock("node:fs/promises", () => ({
   readdir: vi.fn(),
 }));
 
+import fs from "node:fs";
 import { readdir } from "node:fs/promises";
 import * as vscode from "vscode";
 
@@ -16,7 +27,9 @@ import {
   FOLDER_NAME_PREFIX,
   addVaultWorkspaceFolder,
   clearManagedExcludes,
+  generateWorkspaceFile,
   hasVaultWorkspaceFolder,
+  openWorkspaceFile,
   removeVaultWorkspaceFolders,
   syncFilesExclude,
 } from "./workspace-folder.js";
@@ -499,5 +512,154 @@ describe("clearManagedExcludes", () => {
       { node_modules: true, ".git": true },
       vscode.ConfigurationTarget.Workspace,
     );
+  });
+});
+
+describe("generateWorkspaceFile", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+    workspace.workspaceFolders = undefined;
+  });
+
+  it("creates workspace file with correct name and file:// vault entry", () => {
+    workspace.workspaceFolders = [
+      { uri: { scheme: "file", fsPath: "/path/to/my-project" }, name: "my-project", index: 0 },
+    ];
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      throw new Error("ENOENT");
+    });
+
+    const result = generateWorkspaceFile("/vault", "MyVault");
+
+    expect(result.status).toBe("created");
+    expect(result.fileUri.fsPath).toBe("/path/to/my-project/my-project.code-workspace");
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      "/path/to/my-project/my-project.code-workspace",
+      expect.any(String),
+    );
+    const written = JSON.parse(vi.mocked(fs.writeFileSync).mock.calls[0][1] as string) as Record<
+      string,
+      unknown
+    >;
+    expect(written).toEqual({
+      folders: [{ path: "." }, { path: "/vault", name: `${FOLDER_NAME_PREFIX}MyVault` }],
+    });
+  });
+
+  it("carries .vscode/settings.json into the workspace file", () => {
+    workspace.workspaceFolders = [
+      { uri: { scheme: "file", fsPath: "/path/to/my-project" }, name: "my-project", index: 0 },
+    ];
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+    vi.mocked(fs.readFileSync).mockReturnValue(
+      JSON.stringify({ "editor.fontSize": 14, "files.autoSave": "onFocusChange" }),
+    );
+
+    generateWorkspaceFile("/vault", "MyVault");
+
+    expect(fs.readFileSync).toHaveBeenCalledWith(
+      "/path/to/my-project/.vscode/settings.json",
+      "utf-8",
+    );
+    const written = JSON.parse(vi.mocked(fs.writeFileSync).mock.calls[0][1] as string) as Record<
+      string,
+      unknown
+    >;
+    expect(written).toEqual({
+      folders: [{ path: "." }, { path: "/vault", name: `${FOLDER_NAME_PREFIX}MyVault` }],
+      settings: { "editor.fontSize": 14, "files.autoSave": "onFocusChange" },
+    });
+  });
+
+  it("returns already-exists when file exists", () => {
+    workspace.workspaceFolders = [
+      { uri: { scheme: "file", fsPath: "/path/to/my-project" }, name: "my-project", index: 0 },
+    ];
+    vi.mocked(fs.existsSync).mockReturnValue(true);
+
+    const result = generateWorkspaceFile("/vault", "MyVault");
+
+    expect(result.status).toBe("already-exists");
+    expect(fs.writeFileSync).not.toHaveBeenCalled();
+  });
+
+  it("handles multiple local folders", () => {
+    workspace.workspaceFolders = [
+      { uri: { scheme: "file", fsPath: "/path/to/my-project" }, name: "my-project", index: 0 },
+      {
+        uri: { scheme: "file", fsPath: "/path/to/my-project/packages/lib" },
+        name: "lib",
+        index: 1,
+      },
+    ];
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      throw new Error("ENOENT");
+    });
+
+    const result = generateWorkspaceFile("/vault", "MyVault");
+
+    expect(result.status).toBe("created");
+    const written = JSON.parse(vi.mocked(fs.writeFileSync).mock.calls[0][1] as string) as Record<
+      string,
+      unknown
+    >;
+    expect(written).toEqual({
+      folders: [
+        { path: "." },
+        { path: "packages/lib" },
+        { path: "/vault", name: `${FOLDER_NAME_PREFIX}MyVault` },
+      ],
+    });
+  });
+
+  it("uses absolute path for folders outside project root", () => {
+    workspace.workspaceFolders = [
+      { uri: { scheme: "file", fsPath: "/path/to/my-project" }, name: "my-project", index: 0 },
+      { uri: { scheme: "file", fsPath: "/other/location" }, name: "other", index: 1 },
+    ];
+    vi.mocked(fs.existsSync).mockReturnValue(false);
+    vi.mocked(fs.readFileSync).mockImplementation(() => {
+      throw new Error("ENOENT");
+    });
+
+    generateWorkspaceFile("/vault", "MyVault");
+
+    const written = JSON.parse(vi.mocked(fs.writeFileSync).mock.calls[0][1] as string) as Record<
+      string,
+      unknown
+    >;
+    expect(written).toEqual({
+      folders: [
+        { path: "." },
+        { path: "/other/location" },
+        { path: "/vault", name: `${FOLDER_NAME_PREFIX}MyVault` },
+      ],
+    });
+  });
+
+  it("throws when no local folder open", () => {
+    workspace.workspaceFolders = [];
+
+    expect(() => generateWorkspaceFile("/vault", "MyVault")).toThrow(
+      "No local workspace folder open",
+    );
+  });
+});
+
+describe("openWorkspaceFile", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+  });
+
+  it("calls vscode.openFolder with the file URI", async () => {
+    const fileUri = vscode.Uri.file("/project/project.code-workspace");
+
+    await openWorkspaceFile(fileUri);
+
+    expect(vscode.commands.executeCommand).toHaveBeenCalledWith("vscode.openFolder", fileUri);
   });
 });

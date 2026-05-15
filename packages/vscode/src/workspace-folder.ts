@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 
@@ -140,6 +141,69 @@ export async function syncFilesExclude(
   await filesConfig.update("exclude", updated, vscode.ConfigurationTarget.Workspace);
 
   return toExclude;
+}
+
+/** Result of attempting to generate a `.code-workspace` file. */
+export interface GenerateWorkspaceFileResult {
+  readonly status: "created" | "already-exists";
+  readonly fileUri: vscode.Uri;
+}
+
+/** Generate a `.code-workspace` file named after the project root. */
+export function generateWorkspaceFile(
+  physicalPath: string,
+  vaultName: string,
+): GenerateWorkspaceFileResult {
+  const folders = vscode.workspace.workspaceFolders ?? [];
+  const localFolders = folders.filter((f) => f.uri.scheme === "file");
+  if (localFolders.length === 0) {
+    throw new Error("No local workspace folder open");
+  }
+
+  const projectRoot = localFolders[0].uri.fsPath;
+  const projectName = path.basename(projectRoot);
+  const filePath = path.join(projectRoot, `${projectName}.code-workspace`);
+  const fileUri = vscode.Uri.file(filePath);
+
+  if (fs.existsSync(filePath)) {
+    return { status: "already-exists", fileUri };
+  }
+
+  const localEntries = localFolders.map((f, i) => {
+    if (i === 0) return { path: "." };
+    const rel = path.relative(projectRoot, f.uri.fsPath);
+    return rel.startsWith("..") ? { path: f.uri.fsPath } : { path: rel };
+  });
+
+  let settings: Record<string, unknown> | undefined;
+  const settingsPath = path.join(projectRoot, ".vscode", "settings.json");
+  try {
+    const raw = fs.readFileSync(settingsPath, "utf-8");
+    settings = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    // No .vscode/settings.json or invalid JSON — start with empty settings
+  }
+
+  const content: Record<string, unknown> = {
+    folders: [
+      ...localEntries,
+      {
+        path: physicalPath,
+        name: `${FOLDER_NAME_PREFIX}${vaultName}`,
+      },
+    ],
+  };
+  if (settings && Object.keys(settings).length > 0) {
+    content.settings = settings;
+  }
+
+  fs.writeFileSync(filePath, JSON.stringify(content, null, 2) + "\n");
+  return { status: "created", fileUri };
+}
+
+/** Open a `.code-workspace` file, triggering a window reload. */
+export async function openWorkspaceFile(fileUri: vscode.Uri): Promise<void> {
+  await vscode.commands.executeCommand("vscode.openFolder", fileUri);
 }
 
 /** Remove all extension-managed `files.exclude` patterns from workspace settings. */

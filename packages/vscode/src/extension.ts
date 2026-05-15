@@ -1,3 +1,5 @@
+import path from "node:path";
+
 import * as vscode from "vscode";
 
 import { bootstrapFromConfig, readConfig } from "./bootstrap.js";
@@ -14,8 +16,10 @@ import {
   addVaultWorkspaceFolder,
   clearManagedExcludes,
   excludeVaultFromGitDetection,
+  generateWorkspaceFile,
   hasVaultWorkspaceFolder,
   includeVaultInGitDetection,
+  openWorkspaceFile,
   removeVaultWorkspaceFolders,
   syncFilesExclude,
 } from "./workspace-folder.js";
@@ -120,7 +124,48 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     });
   };
 
-  if (config.workspace && config.autoMount.length > 0) {
+  const alreadySaved = vscode.workspace.workspaceFile?.scheme === "file";
+
+  if (config.workspaceFile && alreadySaved && config.autoMount.length > 0) {
+    await excludeVaultFromGitDetection(tracker.context.physicalPath);
+    managedExcludes = await syncFilesExclude(
+      tracker.context.physicalPath,
+      config.autoMount,
+      blocked,
+      managedExcludes,
+    );
+    await context.workspaceState.update(managedExcludesKey, managedExcludes);
+  } else if (config.workspaceFile && !alreadySaved && config.autoMount.length > 0) {
+    try {
+      await excludeVaultFromGitDetection(tracker.context.physicalPath);
+      managedExcludes = await syncFilesExclude(
+        tracker.context.physicalPath,
+        config.autoMount,
+        blocked,
+        managedExcludes,
+      );
+      await context.workspaceState.update(managedExcludesKey, managedExcludes);
+
+      const wfResult = generateWorkspaceFile(tracker.context.physicalPath, tracker.context.name);
+      outputChannel.appendLine(`Workspace file: ${wfResult.status} — ${wfResult.fileUri.fsPath}`);
+
+      const action = await vscode.window.showInformationMessage(
+        `Workspace file ${wfResult.status === "created" ? "created" : "found"}: ${path.basename(wfResult.fileUri.fsPath)}. Open it? This will reload the window.`,
+        "Open",
+        "Not Now",
+      );
+      if (action === "Open") {
+        await openWorkspaceFile(wfResult.fileUri);
+        return;
+      }
+      const addResult = addVaultWorkspaceFolder(tracker.context.physicalPath, tracker.context.name);
+      const detail = "reason" in addResult ? ` — ${addResult.reason}` : "";
+      outputChannel.appendLine(`Workspace folder: ${addResult.status}${detail}`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      outputChannel.appendLine(`Workspace file: skipped — ${msg}`);
+    }
+  } else if (config.workspace && config.autoMount.length > 0) {
     const wfResult = addVaultWorkspaceFolder(tracker.context.physicalPath, tracker.context.name);
     const detail = "reason" in wfResult ? ` — ${wfResult.reason}` : "";
     outputChannel.appendLine(`Workspace folder: ${wfResult.status}${detail}`);
@@ -150,7 +195,35 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       if (e.affectsConfiguration(CONFIG_KEY.autoMount)) {
         provider.setAutoMount(updated.autoMount);
       }
-      if (e.affectsConfiguration(CONFIG_KEY.workspace)) {
+      if (e.affectsConfiguration(CONFIG_KEY.workspaceFile)) {
+        const wfAlreadySaved = vscode.workspace.workspaceFile?.scheme === "file";
+        if (updated.workspaceFile && !wfAlreadySaved && updated.autoMount.length > 0) {
+          try {
+            const wfResult = generateWorkspaceFile(
+              tracker.context.physicalPath,
+              tracker.context.name,
+            );
+            outputChannel.appendLine(
+              `Workspace file: ${wfResult.status} — ${wfResult.fileUri.fsPath}`,
+            );
+            void vscode.window
+              .showInformationMessage(
+                `Workspace file ${wfResult.status === "created" ? "created" : "found"}: ${path.basename(wfResult.fileUri.fsPath)}. Open it? This will reload the window.`,
+                "Open",
+                "Not Now",
+              )
+              .then((action) => {
+                if (action === "Open") {
+                  void openWorkspaceFile(wfResult.fileUri);
+                }
+              });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            outputChannel.appendLine(`Workspace file: skipped — ${msg}`);
+          }
+        }
+      }
+      if (e.affectsConfiguration(CONFIG_KEY.workspace) && !updated.workspaceFile) {
         removeVaultWorkspaceFolders(tracker.context.physicalPath);
         if (updated.workspace && updated.autoMount.length > 0) {
           addVaultWorkspaceFolder(tracker.context.physicalPath, tracker.context.name);
@@ -160,7 +233,10 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
           runClear();
           void includeVaultInGitDetection(tracker.context.physicalPath);
         }
-      } else if (e.affectsConfiguration(CONFIG_KEY.autoMount) && updated.workspace) {
+      } else if (
+        e.affectsConfiguration(CONFIG_KEY.autoMount) &&
+        (updated.workspace || updated.workspaceFile)
+      ) {
         if (updated.autoMount.length === 0) {
           removeVaultWorkspaceFolders(tracker.context.physicalPath);
           runClear();

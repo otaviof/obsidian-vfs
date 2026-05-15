@@ -19,6 +19,7 @@ Browse, search, and edit your [Obsidian](https://obsidian.md) vault directly in 
 - **Auto-mount** configured folders on startup
 - **Status bar** showing vault name and connection mode (`full` / `degraded`)
 - **Workspace folder**, vault browsable in Explorer with Quick Open (`Cmd+P`) and Search (`Ctrl+Shift+F`) support
+- **Workspace file**, generate a named `.code-workspace` to avoid the "Untitled Workspace" label
 - **File watching**, changes in the vault are reflected in real time
 
 ## Commands
@@ -47,6 +48,7 @@ Configure via **Settings UI** or `settings.json`:
 | `obsidianVFS.explorer` | `boolean` | `true` | Show the Obsidian VFS tree view in the Explorer sidebar |
 | `obsidianVFS.statusBar` | `boolean` | `true` | Show vault name and mode in the status bar |
 | `obsidianVFS.workspace` | `boolean` | `true` | Add the vault as a workspace folder for Quick Open and Search (see below) |
+| `obsidianVFS.workspaceFile` | `boolean` | `false` | Generate a `.code-workspace` file named after the project folder. Eliminates the "Untitled (Workspace)" label. The file contains a `file://` vault folder entry; `files.exclude` patterns are written to its `settings` section. Opening the file triggers a one-time window reload. |
 
 All three toggle settings (`explorer`, `statusBar`, `workspace`) take effect immediately — no reload required.
 
@@ -78,6 +80,35 @@ Non-autoMount vault content (`.obsidian/`, `.trash/`, and any directories not in
 
 - The Explorer tree view and the workspace folder both appear in the sidebar. The tree view provides custom UI (welcome view, context menus, drag-and-drop), while the workspace folder enables Quick Open and full-text search.
 - The `obs://` FileSystemProvider remains registered for the TreeView sidebar, wikilink navigation, and drag-and-drop — it does not back a workspace folder.
+
+### Workspace File (avoiding "Untitled Workspace")
+
+When `obsidianVFS.workspace` adds the vault folder dynamically, VS Code transitions to a multi-root workspace. Because no `.code-workspace` file is involved, the title bar shows **"UNTITLED (WORKSPACE)"** — this is standard VS Code behavior for unsaved multi-root workspaces.
+
+Enable `obsidianVFS.workspaceFile` to fix this. The extension generates a `<project-name>.code-workspace` file in your project root (e.g., `my-app.code-workspace`) and prompts you to open it.
+
+**What happens when you enable it:**
+
+1. The extension creates `<project-name>.code-workspace` in your project root containing the local folder(s) and the `file://` vault folder entry (named `obs://<VaultName>`).
+2. A notification asks: _"Open workspace file? This will reload the window."_
+3. If you click **Open**, the window reloads once. After that, the title bar shows the project name and the vault is part of the saved workspace.
+4. On subsequent activations, the extension detects you're already in a saved workspace and skips the prompt. `files.exclude` patterns are written to the `.code-workspace` file's `settings` section (via `ConfigurationTarget.Workspace`) instead of `.vscode/settings.json`.
+5. If you click **Not Now**, the extension falls back to adding the vault dynamically via `updateWorkspaceFolders` (with `files.exclude` patterns in `.vscode/settings.json`). You can open the generated workspace file later.
+
+**UX trade-offs:**
+
+- **One-time window reload** — opening the workspace file causes VS Code to reload the window. This only happens once; after that the workspace file is saved and reloads are not needed.
+- **File on disk** — a `.code-workspace` file is created in your project root. You can commit it to version control (so teammates get the same workspace layout) or add it to `.gitignore`.
+- **No overwrite** — if a `.code-workspace` file already exists (e.g., from a previous run or your own), the extension will not overwrite it. It offers to open the existing file instead.
+- **`files.exclude` containment** — with a `.code-workspace` file, `files.exclude` patterns are scoped to the workspace file rather than `.vscode/settings.json`. This reduces the risk of pattern collisions with project directories (see Known limitations above).
+
+**When to use each setting:**
+
+| Goal | Setting |
+|------|---------|
+| Browse vault in Explorer, Quick Open, Search (accept "Untitled Workspace" label) | `workspace: true` |
+| Same as above, but with a proper project name in the title bar | `workspace: true` + `workspaceFile: true` |
+| Browse vault only via the sidebar tree view (no workspace folder at all) | `workspace: false` |
 
 ## Related Tools
 

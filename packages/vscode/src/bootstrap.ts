@@ -15,6 +15,7 @@ export function readConfig(): ExtensionConfig {
     explorer: cfg.get<boolean>("explorer", true),
     statusBar: cfg.get<boolean>("statusBar", true),
     workspace: cfg.get<boolean>("workspace", true),
+    workspaceFile: cfg.get<boolean>("workspaceFile", false),
   };
 }
 
