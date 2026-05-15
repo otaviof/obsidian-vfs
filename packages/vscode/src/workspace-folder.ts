@@ -112,10 +112,23 @@ export async function syncFilesExclude(
   }
   const autoMountRoots = new Set(autoMount.map((p) => p.split("/")[0]));
 
+  const projectFolders = (vscode.workspace.workspaceFolders ?? []).filter(
+    (f) => f.uri.scheme === "file" && f.uri.fsPath !== physicalPath,
+  );
+  const projectEntries = new Set<string>();
+  for (const folder of projectFolders) {
+    try {
+      const dirEntries = await readdir(folder.uri.fsPath);
+      for (const e of dirEntries) projectEntries.add(e);
+    } catch {
+      // Folder may not be readable
+    }
+  }
+
   const toExclude: string[] = [];
 
   for (const entry of entries) {
-    if (!autoMountRoots.has(entry)) toExclude.push(entry);
+    if (!autoMountRoots.has(entry) && !projectEntries.has(entry)) toExclude.push(entry);
   }
 
   for (const b of blocked) {
@@ -131,6 +144,12 @@ export async function syncFilesExclude(
   for (const key of previouslyManaged) {
     if (!managed.has(key)) {
       delete updated[key];
+    }
+  }
+
+  for (const entry of entries) {
+    if (projectEntries.has(entry) && entry in updated) {
+      delete updated[entry];
     }
   }
 
@@ -179,7 +198,9 @@ export function generateWorkspaceFile(
   const settingsPath = path.join(projectRoot, ".vscode", "settings.json");
   try {
     const raw = fs.readFileSync(settingsPath, "utf-8");
-    settings = JSON.parse(raw) as Record<string, unknown>;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    delete parsed["files.exclude"];
+    if (Object.keys(parsed).length > 0) settings = parsed;
   } catch {
     // No .vscode/settings.json or invalid JSON — start with empty settings
   }
@@ -193,7 +214,7 @@ export function generateWorkspaceFile(
       },
     ],
   };
-  if (settings && Object.keys(settings).length > 0) {
+  if (settings) {
     content.settings = settings;
   }
 

@@ -437,6 +437,97 @@ describe("syncFilesExclude", () => {
     expect(result).toEqual([]);
   });
 
+  it("skips vault entries that collide with project folder entries", async () => {
+    workspace.workspaceFolders = [
+      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
+      {
+        uri: { scheme: "file", fsPath: "/vault" },
+        name: `${FOLDER_NAME_PREFIX}MyVault`,
+        index: 1,
+      },
+    ];
+    // First readdir: vault root
+    vi.mocked(readdir).mockResolvedValueOnce([
+      "Notes",
+      ".obsidian",
+      ".git",
+      "docs",
+    ] as unknown as Awaited<ReturnType<typeof readdir>>);
+    // Second readdir: project root
+    vi.mocked(readdir).mockResolvedValueOnce([
+      ".git",
+      ".vscode",
+      "docs",
+      "src",
+    ] as unknown as Awaited<ReturnType<typeof readdir>>);
+
+    const result = await syncFilesExclude("/vault", ["Notes"], [], []);
+
+    expect(result).toContain(".obsidian");
+    expect(result).not.toContain(".git");
+    expect(result).not.toContain("docs");
+    expect(result).not.toContain("Notes");
+  });
+
+  it("still excludes blocked paths even if root collides with project", async () => {
+    workspace.workspaceFolders = [
+      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
+      {
+        uri: { scheme: "file", fsPath: "/vault" },
+        name: `${FOLDER_NAME_PREFIX}MyVault`,
+        index: 1,
+      },
+    ];
+    vi.mocked(readdir).mockResolvedValueOnce(["20-areas", "docs"] as unknown as Awaited<
+      ReturnType<typeof readdir>
+    >);
+    vi.mocked(readdir).mockResolvedValueOnce(["docs"] as unknown as Awaited<
+      ReturnType<typeof readdir>
+    >);
+
+    const result = await syncFilesExclude("/vault", ["20-areas"], ["20-areas/career"], []);
+
+    expect(result).toContain("20-areas/career");
+    expect(result).not.toContain("docs");
+  });
+
+  it("removes stale colliding patterns already in files.exclude", async () => {
+    workspace.workspaceFolders = [
+      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
+      {
+        uri: { scheme: "file", fsPath: "/vault" },
+        name: `${FOLDER_NAME_PREFIX}MyVault`,
+        index: 1,
+      },
+    ];
+    vi.mocked(readdir).mockResolvedValueOnce([
+      "Notes",
+      ".obsidian",
+      ".git",
+      ".vscode",
+    ] as unknown as Awaited<ReturnType<typeof readdir>>);
+    vi.mocked(readdir).mockResolvedValueOnce([".git", ".vscode", "src"] as unknown as Awaited<
+      ReturnType<typeof readdir>
+    >);
+    mockGet.mockImplementation((_key: string, _defaultValue: unknown) => ({
+      ".obsidian": true,
+      ".git": true,
+      ".vscode": true,
+      "**/.git": true,
+    }));
+
+    const result = await syncFilesExclude("/vault", ["Notes"], [], []);
+
+    expect(result).toContain(".obsidian");
+    expect(result).not.toContain(".git");
+    expect(result).not.toContain(".vscode");
+    const updatedArg = mockUpdate.mock.calls[0][1] as Record<string, boolean>;
+    expect(updatedArg).toHaveProperty(".obsidian");
+    expect(updatedArg).not.toHaveProperty(".git");
+    expect(updatedArg).not.toHaveProperty(".vscode");
+    expect(updatedArg).toHaveProperty("**/.git");
+  });
+
   it("returns previouslyManaged when readdir fails", async () => {
     vi.mocked(readdir).mockRejectedValueOnce(new Error("EACCES: permission denied"));
 
