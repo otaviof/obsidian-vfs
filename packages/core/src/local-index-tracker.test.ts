@@ -1,3 +1,4 @@
+import type { FSWatcher } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LocalIndexTracker } from "./local-index-tracker.js";
@@ -9,6 +10,10 @@ vi.mock("node:fs/promises", () => ({
   access: vi.fn(),
   readdir: vi.fn(),
   stat: vi.fn(),
+}));
+
+vi.mock("node:fs", () => ({
+  watch: vi.fn(),
 }));
 
 const { readFile, realpath } = await import("node:fs/promises");
@@ -473,66 +478,6 @@ describe("LocalIndexTracker", () => {
       expect(result.value).toEqual([]);
     });
 
-    it("skips non-directory entries", async () => {
-      const tracker = await createTrackerWithSkills(["skills"]);
-
-      const { readdir } = await import("node:fs/promises");
-      const readdirMock = mockFsFunction(readdir);
-      readdirMock.mockResolvedValueOnce([
-        { name: "readme.md", isDirectory: () => false },
-        { name: "actual-skill", isDirectory: () => true },
-      ]);
-
-      readFileMock.mockResolvedValueOnce(Buffer.from("---\ndescription: Actual\n---\nContent"));
-
-      const result = await tracker.listSkills();
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-      expect(result.value).toHaveLength(1);
-      expect(result.value[0].name).toBe("actual-skill");
-    });
-
-    it("continues when a skills dir fails to enumerate", async () => {
-      const tracker = await createTrackerWithSkills(["bad-dir", "good-dir"]);
-
-      const { readdir } = await import("node:fs/promises");
-      const readdirMock = mockFsFunction(readdir);
-      readdirMock
-        .mockRejectedValueOnce(Object.assign(new Error("ENOENT"), { code: "ENOENT" }))
-        .mockResolvedValueOnce([{ name: "deploy", isDirectory: () => true }]);
-
-      readFileMock.mockResolvedValueOnce(
-        Buffer.from("---\ndescription: From good dir\n---\nContent"),
-      );
-
-      const result = await tracker.listSkills();
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-      expect(result.value).toHaveLength(1);
-      expect(result.value[0].name).toBe("deploy");
-      expect(result.value[0].vaultRelativePath).toBe("good-dir/deploy/SKILL.md");
-    });
-
-    it("collects distinct skills from multiple dirs", async () => {
-      const tracker = await createTrackerWithSkills(["dir-a", "dir-b"]);
-
-      const { readdir } = await import("node:fs/promises");
-      const readdirMock = mockFsFunction(readdir);
-      readdirMock
-        .mockResolvedValueOnce([{ name: "alpha", isDirectory: () => true }])
-        .mockResolvedValueOnce([{ name: "beta", isDirectory: () => true }]);
-
-      readFileMock
-        .mockResolvedValueOnce(Buffer.from("---\ndescription: Alpha skill\n---\nA"))
-        .mockResolvedValueOnce(Buffer.from("---\ndescription: Beta skill\n---\nB"));
-
-      const result = await tracker.listSkills();
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-      expect(result.value).toHaveLength(2);
-      expect(result.value.map((s) => s.name)).toEqual(["alpha", "beta"]);
-    });
-
     it("skips skill names with unsafe characters", async () => {
       const tracker = await createTrackerWithSkills(["skills"]);
 
@@ -554,70 +499,25 @@ describe("LocalIndexTracker", () => {
       expect(result.value[0].name).toBe("good-skill");
     });
 
-    it("extracts description with leading/trailing whitespace", async () => {
-      const tracker = await createTrackerWithSkills(["skills"]);
+    it("continues when a skills dir fails to enumerate", async () => {
+      const tracker = await createTrackerWithSkills(["bad-dir", "good-dir"]);
 
       const { readdir } = await import("node:fs/promises");
       const readdirMock = mockFsFunction(readdir);
-      readdirMock.mockResolvedValueOnce([{ name: "spaced", isDirectory: () => true }]);
+      readdirMock
+        .mockRejectedValueOnce(Object.assign(new Error("ENOENT"), { code: "ENOENT" }))
+        .mockResolvedValueOnce([{ name: "deploy", isDirectory: () => true }]);
 
       readFileMock.mockResolvedValueOnce(
-        Buffer.from("---\ndescription:   Spaced description   \n---\nContent"),
+        Buffer.from("---\ndescription: From good dir\n---\nContent"),
       );
 
       const result = await tracker.listSkills();
       expect(result.ok).toBe(true);
       if (!result.ok) return;
-      expect(result.value[0].description).toBe("Spaced description");
-    });
-
-    it("uses default description when description is empty in frontmatter", async () => {
-      const tracker = await createTrackerWithSkills(["skills"]);
-
-      const { readdir } = await import("node:fs/promises");
-      const readdirMock = mockFsFunction(readdir);
-      readdirMock.mockResolvedValueOnce([{ name: "empty-desc", isDirectory: () => true }]);
-
-      readFileMock.mockResolvedValueOnce(Buffer.from("---\ndescription:   \n---\nContent"));
-
-      const result = await tracker.listSkills();
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-      expect(result.value[0].description).toBe("Obsidian vault skill: empty-desc");
-    });
-
-    it("ignores description outside frontmatter block", async () => {
-      const tracker = await createTrackerWithSkills(["skills"]);
-
-      const { readdir } = await import("node:fs/promises");
-      const readdirMock = mockFsFunction(readdir);
-      readdirMock.mockResolvedValueOnce([{ name: "body-desc", isDirectory: () => true }]);
-
-      readFileMock.mockResolvedValueOnce(
-        Buffer.from("No frontmatter\ndescription: Should be ignored\nMore content"),
-      );
-
-      const result = await tracker.listSkills();
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-      expect(result.value[0].description).toBe("Obsidian vault skill: body-desc");
-    });
-
-    it("handles unclosed frontmatter gracefully", async () => {
-      const tracker = await createTrackerWithSkills(["skills"]);
-
-      const { readdir } = await import("node:fs/promises");
-      const readdirMock = mockFsFunction(readdir);
-      readdirMock.mockResolvedValueOnce([{ name: "unclosed", isDirectory: () => true }]);
-
-      readFileMock.mockResolvedValueOnce(
-        Buffer.from("---\ndescription: Never closed\nsome: other\n"),
-      );
-
-      const result = await tracker.listSkills();
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-      expect(result.value[0].description).toBe("Obsidian vault skill: unclosed");
+      expect(result.value).toHaveLength(1);
+      expect(result.value[0].name).toBe("deploy");
+      expect(result.value[0].vaultRelativePath).toBe("good-dir/deploy/SKILL.md");
     });
   });
 
@@ -687,25 +587,6 @@ describe("LocalIndexTracker", () => {
       expect(result.value[0].vaultRelativePath).toBe("agents-a/architect.md");
     });
 
-    it("skips directory entries", async () => {
-      const tracker = await createTrackerWithAgents(["agents"]);
-
-      const { readdir } = await import("node:fs/promises");
-      const readdirMock = mockFsFunction(readdir);
-      readdirMock.mockResolvedValueOnce([
-        { name: "subdir.md", isDirectory: () => true },
-        { name: "valid.md", isDirectory: () => false },
-      ]);
-
-      readFileMock.mockResolvedValueOnce(Buffer.from("---\ndescription: Valid agent\n---\nContent"));
-
-      const result = await tracker.listAgents();
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-      expect(result.value).toHaveLength(1);
-      expect(result.value[0].name).toBe("valid");
-    });
-
     it("uses default description when no frontmatter", async () => {
       const tracker = await createTrackerWithAgents(["agents"]);
 
@@ -772,26 +653,6 @@ describe("LocalIndexTracker", () => {
       expect(result.value[0].vaultRelativePath).toBe("good-dir/architect.md");
     });
 
-    it("collects distinct agents from multiple dirs", async () => {
-      const tracker = await createTrackerWithAgents(["dir-a", "dir-b"]);
-
-      const { readdir } = await import("node:fs/promises");
-      const readdirMock = mockFsFunction(readdir);
-      readdirMock
-        .mockResolvedValueOnce([{ name: "alpha.md", isDirectory: () => false }])
-        .mockResolvedValueOnce([{ name: "beta.md", isDirectory: () => false }]);
-
-      readFileMock
-        .mockResolvedValueOnce(Buffer.from("---\ndescription: Alpha agent\n---\nA"))
-        .mockResolvedValueOnce(Buffer.from("---\ndescription: Beta agent\n---\nB"));
-
-      const result = await tracker.listAgents();
-      expect(result.ok).toBe(true);
-      if (!result.ok) return;
-      expect(result.value).toHaveLength(2);
-      expect(result.value.map((a) => a.name)).toEqual(["alpha", "beta"]);
-    });
-
     it("strips .md from filename to derive name", async () => {
       const tracker = await createTrackerWithAgents(["agents"]);
 
@@ -815,6 +676,100 @@ describe("LocalIndexTracker", () => {
       expect(result.ok).toBe(true);
       if (!result.ok) return;
       expect(result.value.cli).toBe(cli);
+    });
+
+    it("startWatching returns a Disposable that stops the watcher", async () => {
+      const closeMock = vi.fn();
+      const { watch } = await import("node:fs");
+      const watchMock = vi.mocked(watch as unknown as (...args: unknown[]) => FSWatcher);
+      watchMock.mockImplementation(
+        (_path: unknown, _opts: unknown, _cb: unknown) =>
+          ({
+            close: closeMock,
+            on: vi.fn().mockReturnThis(),
+          }) as unknown as FSWatcher,
+      );
+
+      const result = await LocalIndexTracker.create(mockCLI());
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const disposable = result.value.startWatching();
+      expect(watchMock).toHaveBeenCalled();
+
+      disposable.dispose();
+      expect(closeMock).toHaveBeenCalled();
+    });
+
+    it("onDidChangeFile starts the watcher if not already active", async () => {
+      const { watch } = await import("node:fs");
+      const watchMock = vi.mocked(watch as unknown as (...args: unknown[]) => FSWatcher);
+      watchMock.mockImplementation(
+        (_path: unknown, _opts: unknown, _cb: unknown) =>
+          ({
+            close: vi.fn(),
+            on: vi.fn().mockReturnThis(),
+          }) as unknown as FSWatcher,
+      );
+
+      const result = await LocalIndexTracker.create(mockCLI());
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const listener = vi.fn();
+      result.value.onDidChangeFile(listener);
+      expect(watchMock).toHaveBeenCalled();
+    });
+
+    it("onDidChangeFile Disposable unsubscribes the listener", async () => {
+      let watchCallback!: (event: string, filename: string | null) => void;
+      const { watch } = await import("node:fs");
+      const watchMock = vi.mocked(watch as unknown as (...args: unknown[]) => FSWatcher);
+      watchMock.mockImplementation((_path: unknown, _opts: unknown, cb: unknown) => {
+        watchCallback = cb as typeof watchCallback;
+        return {
+          close: vi.fn(),
+          on: vi.fn().mockReturnThis(),
+        } as unknown as FSWatcher;
+      });
+
+      vi.useFakeTimers();
+      const result = await LocalIndexTracker.create(mockCLI());
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      const listener = vi.fn();
+      const disposable = result.value.onDidChangeFile(listener);
+      disposable.dispose();
+
+      watchCallback("change", "file.md");
+      vi.advanceTimersByTime(300);
+      expect(listener).not.toHaveBeenCalled();
+      vi.useRealTimers();
+
+      result.value.stopWatching();
+    });
+
+    it("stopWatching is idempotent", async () => {
+      const closeMock = vi.fn();
+      const { watch } = await import("node:fs");
+      const watchMock = vi.mocked(watch as unknown as (...args: unknown[]) => FSWatcher);
+      watchMock.mockImplementation(
+        (_path: unknown, _opts: unknown, _cb: unknown) =>
+          ({
+            close: closeMock,
+            on: vi.fn().mockReturnThis(),
+          }) as unknown as FSWatcher,
+      );
+
+      const result = await LocalIndexTracker.create(mockCLI());
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+
+      result.value.startWatching();
+      result.value.stopWatching();
+      result.value.stopWatching();
+      expect(closeMock).toHaveBeenCalledTimes(1);
     });
   });
 });

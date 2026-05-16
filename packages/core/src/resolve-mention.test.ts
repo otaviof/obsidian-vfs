@@ -1,13 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LocalIndexTracker } from "./local-index-tracker.js";
+import type { LocalIndexTracker } from "./local-index-tracker.js";
+import { isAllowedPath } from "./path-security.js";
 import {
   normalizeMention,
   parseSection,
   resolveMention,
   resolveSkillMention,
 } from "./resolve-mention.js";
-import { mockCLI, mockFsFunction } from "./test-helpers.js";
+import { mockCLI } from "./test-helpers.js";
 
 vi.mock("node:fs/promises", () => ({
   readFile: vi.fn(),
@@ -17,33 +18,65 @@ vi.mock("node:fs/promises", () => ({
 }));
 
 const { readFile, realpath, access, readdir } = await import("node:fs/promises");
-const readFileMock = mockFsFunction(readFile);
-const realpathMock = mockFsFunction(realpath);
-const accessMock = mockFsFunction(access);
-const readdirMock = mockFsFunction(readdir);
+const readFileMock = vi.mocked(readFile as (...args: unknown[]) => Promise<unknown>);
+const realpathMock = vi.mocked(realpath as unknown as (...args: unknown[]) => Promise<unknown>);
+const accessMock = vi.mocked(access as unknown as (...args: unknown[]) => Promise<unknown>);
+const readdirMock = vi.mocked(readdir as unknown as (...args: unknown[]) => Promise<unknown>);
 
-async function createTracker(
-  configOverrides: Record<string, unknown> = {},
-  cliOverrides: Parameters<typeof mockCLI>[0] = {},
-): Promise<LocalIndexTracker> {
-  const config = {
-    agents: [],
-    skills: [],
-    allowed: [],
-    blocked: [],
-    ...configOverrides,
-  };
+interface TrackerStubOptions {
+  agents?: string[];
+  skills?: string[];
+  allowed?: readonly string[];
+  blocked?: readonly string[];
+  cliOverrides?: Parameters<typeof mockCLI>[0];
+}
 
-  readFileMock.mockImplementation((...args: unknown[]) => {
-    if (args[1] === "utf-8") {
-      return Promise.resolve(JSON.stringify(config));
-    }
-    return Promise.resolve(Buffer.from("file content"));
-  });
-
-  const result = await LocalIndexTracker.create(mockCLI(cliOverrides));
-  if (!result.ok) throw new Error("Failed to create tracker: " + result.error.message);
-  return result.value;
+function stubTracker(opts: TrackerStubOptions = {}): LocalIndexTracker {
+  const { agents = [], skills = [], allowed = [], blocked = [], cliOverrides = {} } = opts;
+  const cli = mockCLI(cliOverrides);
+  return {
+    context: {
+      physicalPath: "/vault",
+      name: "TestVault",
+      vfsConfig: { agents, skills, allowed, blocked },
+      mode: "full" as const,
+    },
+    cli,
+    cache: { get: () => undefined, set: vi.fn(), delete: vi.fn() },
+    readFile: vi.fn(async (p: string) => {
+      const secOpts = { vaultRoot: "/vault", allowed, blocked };
+      if (!isAllowedPath(p, secOpts)) {
+        return { ok: false, error: { code: "PERMISSION_DENIED", message: "Not allowed" } };
+      }
+      const abs = p.startsWith("/") ? p : `/vault/${p}`;
+      try {
+        const buf = await readFileMock(abs);
+        return { ok: true as const, value: new TextDecoder().decode(buf as BufferSource) };
+      } catch (err) {
+        const errno = (err as NodeJS.ErrnoException).code;
+        if (errno === "ENOENT") {
+          return { ok: false, error: { code: "FILE_NOT_FOUND", message: (err as Error).message } };
+        }
+        return { ok: false, error: { code: "IO_ERROR", message: (err as Error).message } };
+      }
+    }),
+    resolveSkill: vi.fn(async (name: string) => {
+      if (skills.length === 0) {
+        return { ok: false, error: { code: "FILE_NOT_FOUND", message: "No skills dirs" } };
+      }
+      const skillPath = `${skills[0]}/${name}/SKILL.md`;
+      const abs = `/vault/${skillPath}`;
+      try {
+        await accessMock(abs);
+        return { ok: true as const, value: skillPath };
+      } catch {
+        return {
+          ok: false,
+          error: { code: "FILE_NOT_FOUND", message: `Skill not found: ${name}` },
+        };
+      }
+    }),
+  } as unknown as LocalIndexTracker;
 }
 
 describe("resolveMention", () => {
@@ -54,22 +87,20 @@ describe("resolveMention", () => {
   });
 
   it("returns INVALID_URI on missing prefix", async () => {
-    const tracker = await createTracker();
-    const result = await resolveMention("obs:something", tracker);
+    const result = await resolveMention("obs:something", stubTracker());
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("INVALID_URI");
   });
 
   it("returns INVALID_URI on empty reference", async () => {
-    const tracker = await createTracker();
-    const result = await resolveMention("@obs:", tracker);
+    const result = await resolveMention("@obs:", stubTracker());
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("INVALID_URI");
   });
 
   it("resolves agent mention", async () => {
     accessMock.mockResolvedValueOnce(undefined);
-    const tracker = await createTracker({ agents: ["agents"] });
+    const tracker = stubTracker({ agents: ["agents"] });
 
     readFileMock.mockResolvedValueOnce(Buffer.from("agent content"));
 
@@ -82,7 +113,7 @@ describe("resolveMention", () => {
   });
 
   it("resolves file path mention with slash", async () => {
-    const tracker = await createTracker();
+    const tracker = stubTracker();
 
     readFileMock.mockResolvedValueOnce(Buffer.from("note content"));
 
@@ -95,12 +126,11 @@ describe("resolveMention", () => {
   });
 
   it("resolves wikilink mention", async () => {
-    const tracker = await createTracker(
-      {},
-      {
+    const tracker = stubTracker({
+      cliOverrides: {
         search: vi.fn().mockResolvedValue({ ok: true, value: ["notes/Project Plan.md"] }),
       },
-    );
+    });
 
     readFileMock.mockResolvedValueOnce(Buffer.from("plan content"));
 
@@ -113,7 +143,7 @@ describe("resolveMention", () => {
   });
 
   it("extracts section from mention", async () => {
-    const tracker = await createTracker();
+    const tracker = stubTracker();
 
     readFileMock.mockResolvedValueOnce(
       Buffer.from("# Top\nIntro\n## Design\nDesign content\n## Other"),
@@ -129,7 +159,7 @@ describe("resolveMention", () => {
   });
 
   it("treats empty section as undefined", async () => {
-    const tracker = await createTracker();
+    const tracker = stubTracker();
 
     readFileMock.mockResolvedValueOnce(Buffer.from("content"));
 
@@ -141,7 +171,7 @@ describe("resolveMention", () => {
   });
 
   it("scrubs wikilinks in output content", async () => {
-    const tracker = await createTracker();
+    const tracker = stubTracker();
 
     readFileMock.mockResolvedValueOnce(Buffer.from("See [[Other Note]]"));
 
@@ -155,7 +185,7 @@ describe("resolveMention", () => {
   });
 
   it("propagates readFile error", async () => {
-    const tracker = await createTracker();
+    const tracker = stubTracker();
 
     const enoent = new Error("ENOENT") as NodeJS.ErrnoException;
     enoent.code = "ENOENT";
@@ -167,7 +197,7 @@ describe("resolveMention", () => {
   });
 
   it("propagates section-not-found error", async () => {
-    const tracker = await createTracker();
+    const tracker = stubTracker();
 
     readFileMock.mockResolvedValueOnce(Buffer.from("## Other\nContent"));
 
@@ -180,7 +210,7 @@ describe("resolveMention", () => {
   });
 
   it("includes vaultName in result", async () => {
-    const tracker = await createTracker();
+    const tracker = stubTracker();
     readFileMock.mockResolvedValueOnce(Buffer.from("content"));
     const result = await resolveMention("@obs:notes/plan.md", tracker);
     expect(result.ok).toBe(true);
@@ -189,7 +219,7 @@ describe("resolveMention", () => {
 
   it("resolves skill mention", async () => {
     accessMock.mockResolvedValueOnce(undefined);
-    const tracker = await createTracker({ skills: ["skills"] });
+    const tracker = stubTracker({ skills: ["skills"] });
 
     readFileMock.mockResolvedValueOnce(Buffer.from("skill content"));
 
@@ -202,14 +232,13 @@ describe("resolveMention", () => {
   });
 
   it("returns INVALID_URI for @obs:#section (empty path)", async () => {
-    const tracker = await createTracker();
-    const result = await resolveMention("@obs:#Heading", tracker);
+    const result = await resolveMention("@obs:#Heading", stubTracker());
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("INVALID_URI");
   });
 
   it("resolves .md suffix mention as file path", async () => {
-    const tracker = await createTracker();
+    const tracker = stubTracker();
     readFileMock.mockResolvedValueOnce(Buffer.from("content"));
     const result = await resolveMention("@obs:myfile.md", tracker);
     expect(result.ok).toBe(true);
@@ -224,10 +253,11 @@ describe("resolveMention", () => {
     enoent.code = "ENOENT";
     accessMock.mockRejectedValueOnce(enoent);
 
-    const tracker = await createTracker(
-      {},
-      { search: vi.fn().mockResolvedValue({ ok: true, value: ["other/missing.md"] }) },
-    );
+    const tracker = stubTracker({
+      cliOverrides: {
+        search: vi.fn().mockResolvedValue({ ok: true, value: ["other/missing.md"] }),
+      },
+    });
 
     readFileMock.mockResolvedValueOnce(Buffer.from("found via wikilink"));
 
@@ -244,10 +274,11 @@ describe("resolveMention", () => {
     enoent.code = "ENOENT";
     accessMock.mockRejectedValueOnce(enoent);
 
-    const tracker = await createTracker(
-      {},
-      { search: vi.fn().mockResolvedValue({ ok: true, value: ["docs/myfile.md"] }) },
-    );
+    const tracker = stubTracker({
+      cliOverrides: {
+        search: vi.fn().mockResolvedValue({ ok: true, value: ["docs/myfile.md"] }),
+      },
+    });
 
     readFileMock.mockResolvedValueOnce(Buffer.from("found via wikilink"));
 
@@ -264,7 +295,7 @@ describe("resolveMention", () => {
     enoent.code = "ENOENT";
     accessMock.mockRejectedValueOnce(enoent);
 
-    const tracker = await createTracker();
+    const tracker = stubTracker();
 
     readFileMock.mockRejectedValueOnce(enoent);
 
@@ -274,7 +305,7 @@ describe("resolveMention", () => {
   });
 
   it("rejects path outside allowed folders", async () => {
-    const tracker = await createTracker({ allowed: ["notes"] });
+    const tracker = stubTracker({ allowed: ["notes"] });
 
     const result = await resolveMention("@obs:private/secret.md", tracker);
     expect(result.ok).toBe(false);
@@ -282,7 +313,7 @@ describe("resolveMention", () => {
   });
 
   it("rejects path inside blocked folders", async () => {
-    const tracker = await createTracker({ blocked: ["notes/draft"] });
+    const tracker = stubTracker({ blocked: ["notes/draft"] });
 
     const result = await resolveMention("@obs:notes/draft/wip.md", tracker);
     expect(result.ok).toBe(false);
@@ -291,7 +322,7 @@ describe("resolveMention", () => {
 
   it("rejects skill mention when skill folder is outside allowed", async () => {
     accessMock.mockResolvedValueOnce(undefined);
-    const tracker = await createTracker({
+    const tracker = stubTracker({
       skills: ["skills"],
       allowed: ["notes"],
     });
@@ -331,22 +362,20 @@ describe("resolveSkillMention", () => {
   });
 
   it("returns INVALID_URI on missing /obs: prefix", async () => {
-    const tracker = await createTracker({ skills: ["skills"] });
-    const result = await resolveSkillMention("@obs:obsidian", tracker);
+    const result = await resolveSkillMention("@obs:obsidian", stubTracker({ skills: ["skills"] }));
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("INVALID_URI");
   });
 
   it("returns INVALID_URI on empty reference", async () => {
-    const tracker = await createTracker({ skills: ["skills"] });
-    const result = await resolveSkillMention("/obs:", tracker);
+    const result = await resolveSkillMention("/obs:", stubTracker({ skills: ["skills"] }));
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("INVALID_URI");
   });
 
   it("resolves /obs:obsidian as skill", async () => {
     accessMock.mockResolvedValueOnce(undefined);
-    const tracker = await createTracker({ skills: ["skills"] });
+    const tracker = stubTracker({ skills: ["skills"] });
 
     readFileMock.mockResolvedValueOnce(Buffer.from("skill content"));
 
@@ -361,7 +390,7 @@ describe("resolveSkillMention", () => {
 
   it("extracts section from /obs: mention", async () => {
     accessMock.mockResolvedValueOnce(undefined);
-    const tracker = await createTracker({ skills: ["skills"] });
+    const tracker = stubTracker({ skills: ["skills"] });
 
     readFileMock.mockResolvedValueOnce(
       Buffer.from("# Overview\nIntro\n## Usage\nHow to use\n## Other"),
@@ -381,7 +410,7 @@ describe("resolveSkillMention", () => {
     enoent.code = "ENOENT";
     accessMock.mockRejectedValueOnce(enoent);
 
-    const tracker = await createTracker({ skills: ["skills"] });
+    const tracker = stubTracker({ skills: ["skills"] });
 
     const result = await resolveSkillMention("/obs:missing", tracker);
     expect(result.ok).toBe(false);
@@ -391,8 +420,7 @@ describe("resolveSkillMention", () => {
   });
 
   it("returns INVALID_URI for /obs:#section (empty path)", async () => {
-    const tracker = await createTracker({ skills: ["skills"] });
-    const result = await resolveSkillMention("/obs:#Heading", tracker);
+    const result = await resolveSkillMention("/obs:#Heading", stubTracker({ skills: ["skills"] }));
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("INVALID_URI");
   });

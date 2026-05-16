@@ -20,20 +20,157 @@ describe("ObsidianCLIImpl", () => {
     });
   });
 
-  describe("vaultPath", () => {
-    it("builds correct args and parses single value", async () => {
-      execCLIMock.mockResolvedValue({
-        ok: true,
-        value: { stdout: "/vault/path", stderr: "" },
-      });
+  describe("method dispatch", () => {
+    it.each([
+      {
+        label: "vaultPath",
+        call: (c: ObsidianCLIImpl) => c.vaultPath(),
+        stdout: "/vault/path",
+        expectedArgs: ["vault", "info=path"],
+        expectedResult: { ok: true, value: "/vault/path" },
+      },
+      {
+        label: "vaultName",
+        call: (c: ObsidianCLIImpl) => c.vaultName(),
+        stdout: "MyVault",
+        expectedArgs: ["vault", "info=name"],
+        expectedResult: { ok: true, value: "MyVault" },
+      },
+      {
+        label: "dailyPath",
+        call: (c: ObsidianCLIImpl) => c.dailyPath(),
+        stdout: "/vault/daily/2026-05-01.md",
+        expectedArgs: ["daily", "info=path"],
+        expectedResult: { ok: true, value: "/vault/daily/2026-05-01.md" },
+      },
+      {
+        label: "propertyRead",
+        call: (c: ObsidianCLIImpl) => c.propertyRead("note.md", "title"),
+        stdout: "property-value",
+        expectedArgs: ["property-read", "note.md", "title"],
+        expectedResult: { ok: true, value: "property-value" },
+      },
+      {
+        label: "files (no folder)",
+        call: (c: ObsidianCLIImpl) => c.files(),
+        stdout: "a.md\nb.md",
+        expectedArgs: ["files"],
+        expectedResult: { ok: true, value: ["a.md", "b.md"] },
+      },
+      {
+        label: "files (with folder)",
+        call: (c: ObsidianCLIImpl) => c.files("folder"),
+        stdout: "c.md",
+        expectedArgs: ["files", "folder"],
+        expectedResult: { ok: true, value: ["c.md"] },
+      },
+      {
+        label: "folders (no parent)",
+        call: (c: ObsidianCLIImpl) => c.folders(),
+        stdout: "folder1\nfolder2",
+        expectedArgs: ["folders"],
+        expectedResult: { ok: true, value: ["folder1", "folder2"] },
+      },
+      {
+        label: "folders (with parent)",
+        call: (c: ObsidianCLIImpl) => c.folders("parent"),
+        stdout: "subfolder",
+        expectedArgs: ["folders", "parent"],
+        expectedResult: { ok: true, value: ["subfolder"] },
+      },
+      {
+        label: "links",
+        call: (c: ObsidianCLIImpl) => c.links("source.md"),
+        stdout: "link1.md\nlink2.md",
+        expectedArgs: ["links", "source.md"],
+        expectedResult: { ok: true, value: ["link1.md", "link2.md"] },
+      },
+      {
+        label: "tags (no opts)",
+        call: (c: ObsidianCLIImpl) => c.tags(),
+        stdout: "#tag1\n#tag2",
+        expectedArgs: ["tags"],
+        expectedResult: { ok: true, value: ["#tag1", "#tag2"] },
+      },
+      {
+        label: "tags (sort=count)",
+        call: (c: ObsidianCLIImpl) => c.tags({ sort: "count" }),
+        stdout: "#tag1\n#tag2",
+        expectedArgs: ["tags", "sort=count"],
+        expectedResult: { ok: true, value: ["#tag1", "#tag2"] },
+      },
+      {
+        label: "search (no opts)",
+        call: (c: ObsidianCLIImpl) => c.search("query"),
+        stdout: JSON.stringify([{ file: "note.md", matches: [] }]),
+        expectedArgs: ["search", "query=query", "format=json"],
+        expectedResult: { ok: true, value: ["note.md"] },
+      },
+      {
+        label: "search (with opts)",
+        call: (c: ObsidianCLIImpl) =>
+          c.search("query", { path: "folder", limit: 10, contextLength: 5 }),
+        stdout: JSON.stringify([{ file: "note.md", matches: [] }]),
+        expectedArgs: [
+          "search",
+          "query=query",
+          "format=json",
+          "path=folder",
+          "limit=10",
+          "context-length=5",
+        ],
+        expectedResult: { ok: true, value: ["note.md"] },
+      },
+      {
+        label: "searchContext",
+        call: (c: ObsidianCLIImpl) => c.searchContext("query"),
+        stdout: JSON.stringify([{ file: "note.md", matches: [{ line: 1, text: "hello" }] }]),
+        expectedArgs: ["search", "query=query", "format=json"],
+        expectedResult: {
+          ok: true,
+          value: [{ file: "note.md", matches: [{ line: 1, text: "hello" }] }],
+        },
+      },
+      {
+        label: "searchContext (with opts)",
+        call: (c: ObsidianCLIImpl) =>
+          c.searchContext("query", { path: "notes", limit: 5, contextLength: 3 }),
+        stdout: JSON.stringify([]),
+        expectedArgs: [
+          "search",
+          "query=query",
+          "format=json",
+          "path=notes",
+          "limit=5",
+          "context-length=3",
+        ],
+        expectedResult: { ok: true, value: [] },
+      },
+      {
+        label: "backlinks",
+        call: (c: ObsidianCLIImpl) => c.backlinks("target.md"),
+        stdout: JSON.stringify([{ file: "note1.md" }, { file: "note2.md" }]),
+        expectedArgs: ["backlinks", "target.md"],
+        expectedResult: { ok: true, value: [{ file: "note1.md" }, { file: "note2.md" }] },
+      },
+    ])(
+      "$label: builds correct args and parses output",
+      async ({ call, stdout, expectedArgs, expectedResult }) => {
+        execCLIMock.mockResolvedValue({
+          ok: true,
+          value: { stdout, stderr: "" },
+        });
 
-      const result = await cli.vaultPath();
+        const result = await call(cli);
 
-      expect(execCLIMock).toHaveBeenCalledWith(["vault", "info=path"], expect.any(Object));
-      expect(result).toEqual({ ok: true, value: "/vault/path" });
-    });
+        expect(execCLIMock).toHaveBeenCalledWith(expectedArgs, expect.any(Object));
+        expect(result).toEqual(expectedResult);
+      },
+    );
+  });
 
-    it("propagates CLI errors", async () => {
+  describe("error propagation", () => {
+    it("propagates CLI errors from vaultPath", async () => {
       execCLIMock.mockResolvedValue({
         ok: false,
         error: { code: "CLI_UNAVAILABLE", message: "not found" },
@@ -45,224 +182,6 @@ describe("ObsidianCLIImpl", () => {
         ok: false,
         error: { code: "CLI_UNAVAILABLE", message: "not found" },
       });
-    });
-  });
-
-  describe("vaultName", () => {
-    it("builds correct args and parses single value", async () => {
-      execCLIMock.mockResolvedValue({
-        ok: true,
-        value: { stdout: "MyVault", stderr: "" },
-      });
-
-      const result = await cli.vaultName();
-
-      expect(execCLIMock).toHaveBeenCalledWith(["vault", "info=name"], expect.any(Object));
-      expect(result).toEqual({ ok: true, value: "MyVault" });
-    });
-  });
-
-  describe("search", () => {
-    it("builds args without opts", async () => {
-      execCLIMock.mockResolvedValue({
-        ok: true,
-        value: {
-          stdout: JSON.stringify([{ file: "note.md", matches: [] }]),
-          stderr: "",
-        },
-      });
-
-      const result = await cli.search("query");
-
-      expect(execCLIMock).toHaveBeenCalledWith(
-        ["search", "query=query", "format=json"],
-        expect.any(Object),
-      );
-      expect(result).toEqual({ ok: true, value: ["note.md"] });
-    });
-
-    it("builds args with path, limit, and contextLength", async () => {
-      execCLIMock.mockResolvedValue({
-        ok: true,
-        value: {
-          stdout: JSON.stringify([{ file: "note.md", matches: [] }]),
-          stderr: "",
-        },
-      });
-
-      await cli.search("query", { path: "folder", limit: 10, contextLength: 5 });
-
-      expect(execCLIMock).toHaveBeenCalledWith(
-        ["search", "query=query", "format=json", "path=folder", "limit=10", "context-length=5"],
-        expect.any(Object),
-      );
-    });
-  });
-
-  describe("searchContext", () => {
-    it("builds args and parses SearchMatch[]", async () => {
-      const matches = [{ file: "note.md", matches: [{ line: 1, text: "hello" }] }];
-      execCLIMock.mockResolvedValue({
-        ok: true,
-        value: { stdout: JSON.stringify(matches), stderr: "" },
-      });
-
-      const result = await cli.searchContext("query");
-
-      expect(execCLIMock).toHaveBeenCalledWith(
-        ["search", "query=query", "format=json"],
-        expect.any(Object),
-      );
-      expect(result).toEqual({ ok: true, value: matches });
-    });
-
-    it("builds args with opts", async () => {
-      execCLIMock.mockResolvedValue({
-        ok: true,
-        value: { stdout: JSON.stringify([]), stderr: "" },
-      });
-
-      await cli.searchContext("query", { path: "notes", limit: 5, contextLength: 3 });
-
-      expect(execCLIMock).toHaveBeenCalledWith(
-        ["search", "query=query", "format=json", "path=notes", "limit=5", "context-length=3"],
-        expect.any(Object),
-      );
-    });
-  });
-
-  describe("files", () => {
-    it("builds args without folder", async () => {
-      execCLIMock.mockResolvedValue({
-        ok: true,
-        value: { stdout: "a.md\nb.md", stderr: "" },
-      });
-
-      const result = await cli.files();
-
-      expect(execCLIMock).toHaveBeenCalledWith(["files"], expect.any(Object));
-      expect(result).toEqual({ ok: true, value: ["a.md", "b.md"] });
-    });
-
-    it("builds args with folder", async () => {
-      execCLIMock.mockResolvedValue({
-        ok: true,
-        value: { stdout: "c.md", stderr: "" },
-      });
-
-      await cli.files("folder");
-
-      expect(execCLIMock).toHaveBeenCalledWith(["files", "folder"], expect.any(Object));
-    });
-  });
-
-  describe("folders", () => {
-    it("builds args without parent folder", async () => {
-      execCLIMock.mockResolvedValue({
-        ok: true,
-        value: { stdout: "folder1\nfolder2", stderr: "" },
-      });
-
-      const result = await cli.folders();
-
-      expect(execCLIMock).toHaveBeenCalledWith(["folders"], expect.any(Object));
-      expect(result).toEqual({ ok: true, value: ["folder1", "folder2"] });
-    });
-
-    it("builds args with parent folder", async () => {
-      execCLIMock.mockResolvedValue({
-        ok: true,
-        value: { stdout: "subfolder", stderr: "" },
-      });
-
-      await cli.folders("parent");
-
-      expect(execCLIMock).toHaveBeenCalledWith(["folders", "parent"], expect.any(Object));
-    });
-  });
-
-  describe("backlinks", () => {
-    it("builds args and parses BacklinkEntry[]", async () => {
-      const backlinks = [{ file: "note1.md" }, { file: "note2.md" }];
-      execCLIMock.mockResolvedValue({
-        ok: true,
-        value: { stdout: JSON.stringify(backlinks), stderr: "" },
-      });
-
-      const result = await cli.backlinks("target.md");
-
-      expect(execCLIMock).toHaveBeenCalledWith(["backlinks", "target.md"], expect.any(Object));
-      expect(result).toEqual({ ok: true, value: backlinks });
-    });
-  });
-
-  describe("links", () => {
-    it("builds args and parses line list", async () => {
-      execCLIMock.mockResolvedValue({
-        ok: true,
-        value: { stdout: "link1.md\nlink2.md", stderr: "" },
-      });
-
-      const result = await cli.links("source.md");
-
-      expect(execCLIMock).toHaveBeenCalledWith(["links", "source.md"], expect.any(Object));
-      expect(result).toEqual({ ok: true, value: ["link1.md", "link2.md"] });
-    });
-  });
-
-  describe("dailyPath", () => {
-    it("builds args and parses single value", async () => {
-      execCLIMock.mockResolvedValue({
-        ok: true,
-        value: { stdout: "/vault/daily/2026-05-01.md", stderr: "" },
-      });
-
-      const result = await cli.dailyPath();
-
-      expect(execCLIMock).toHaveBeenCalledWith(["daily", "info=path"], expect.any(Object));
-      expect(result).toEqual({ ok: true, value: "/vault/daily/2026-05-01.md" });
-    });
-  });
-
-  describe("tags", () => {
-    it("builds args without opts", async () => {
-      execCLIMock.mockResolvedValue({
-        ok: true,
-        value: { stdout: "#tag1\n#tag2", stderr: "" },
-      });
-
-      const result = await cli.tags();
-
-      expect(execCLIMock).toHaveBeenCalledWith(["tags"], expect.any(Object));
-      expect(result).toEqual({ ok: true, value: ["#tag1", "#tag2"] });
-    });
-
-    it("builds args with sort option", async () => {
-      execCLIMock.mockResolvedValue({
-        ok: true,
-        value: { stdout: "#tag1\n#tag2", stderr: "" },
-      });
-
-      await cli.tags({ sort: "count" });
-
-      expect(execCLIMock).toHaveBeenCalledWith(["tags", "sort=count"], expect.any(Object));
-    });
-  });
-
-  describe("propertyRead", () => {
-    it("builds args and parses single value", async () => {
-      execCLIMock.mockResolvedValue({
-        ok: true,
-        value: { stdout: "property-value", stderr: "" },
-      });
-
-      const result = await cli.propertyRead("note.md", "title");
-
-      expect(execCLIMock).toHaveBeenCalledWith(
-        ["property-read", "note.md", "title"],
-        expect.any(Object),
-      );
-      expect(result).toEqual({ ok: true, value: "property-value" });
     });
   });
 
@@ -332,7 +251,6 @@ describe("ObsidianCLIImpl", () => {
       });
 
       const queued = cli.vaultPath();
-      // Flush microtask queue so the enqueued operation starts and blocks on the gate.
       await Promise.resolve();
       const available = await cli.isAvailable();
 
