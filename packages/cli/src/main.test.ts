@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("./formatters.js", () => ({
   formatUsageError: vi.fn((msg: string) => `USAGE: ${msg}`),
@@ -7,10 +7,51 @@ vi.mock("./formatters.js", () => ({
   writeStderr: vi.fn(),
 }));
 
-import { writeStderr } from "./formatters.js";
-import { parseGlobalArgs } from "./main.js";
+vi.mock("./cmd-inspect.js", () => ({ run: vi.fn().mockResolvedValue(0) }));
+vi.mock("./cmd-resolve.js", () => ({ run: vi.fn().mockResolvedValue(0) }));
+vi.mock("./cmd-list-skills.js", () => ({ run: vi.fn().mockResolvedValue(0) }));
+vi.mock("./cmd-list-agents.js", () => ({ run: vi.fn().mockResolvedValue(0) }));
+vi.mock("./cmd-provision-skills.js", () => ({ run: vi.fn().mockResolvedValue(0) }));
+vi.mock("./cmd-provision-agents.js", () => ({ run: vi.fn().mockResolvedValue(0) }));
+
+import { writeStderr, writeStdout } from "./formatters.js";
+import { run as runInspect } from "./cmd-inspect.js";
+import { run as runResolve } from "./cmd-resolve.js";
+import { run as runListSkills } from "./cmd-list-skills.js";
+import { run as runListAgents } from "./cmd-list-agents.js";
+import { run as runProvisionSkills } from "./cmd-provision-skills.js";
+import { run as runProvisionAgents } from "./cmd-provision-agents.js";
+import {
+  buildInspectArgs,
+  buildListResourcesArgs,
+  buildProvisionArgs,
+  buildResolveArgs,
+  dispatch,
+  parseGlobalArgs,
+} from "./main.js";
+import type { CLIOptions } from "./types.js";
 
 const mockWriteStderr = vi.mocked(writeStderr);
+const mockWriteStdout = vi.mocked(writeStdout);
+
+function makeCLIOptions(overrides: Partial<CLIOptions> = {}): CLIOptions {
+  return {
+    command: "help",
+    json: false,
+    verbose: false,
+    full: false,
+    body: false,
+    description: false,
+    dryRun: false,
+    include: [],
+    exclude: [],
+    pin: false,
+    user: false,
+    set: [],
+    unset: [],
+    ...overrides,
+  };
+}
 
 describe("parseGlobalArgs", () => {
   it("parses inspect command", () => {
@@ -120,11 +161,26 @@ describe("parseGlobalArgs", () => {
     }
   });
 
-  it("--body defaults to false", () => {
+  it("defaults all flags correctly", () => {
     const result = parseGlobalArgs(["inspect", "mention"]);
     expect(result.ok).toBe(true);
     if (result.ok) {
-      expect(result.options.body).toBe(false);
+      expect(result.options).toEqual(
+        expect.objectContaining({
+          json: false,
+          verbose: false,
+          full: false,
+          body: false,
+          description: false,
+          dryRun: false,
+          pin: false,
+          user: false,
+          include: [],
+          exclude: [],
+          set: [],
+          unset: [],
+        }),
+      );
     }
   });
 
@@ -133,14 +189,6 @@ describe("parseGlobalArgs", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.options.dryRun).toBe(true);
-    }
-  });
-
-  it("--dry-run defaults to false", () => {
-    const result = parseGlobalArgs(["provision-skills"]);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.options.dryRun).toBe(false);
     }
   });
 
@@ -197,22 +245,6 @@ describe("parseGlobalArgs", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.options.exclude).toEqual(["draft-*"]);
-    }
-  });
-
-  it("--include defaults to empty array", () => {
-    const result = parseGlobalArgs(["provision-skills"]);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.options.include).toEqual([]);
-    }
-  });
-
-  it("--exclude defaults to empty array", () => {
-    const result = parseGlobalArgs(["provision-skills"]);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.options.exclude).toEqual([]);
     }
   });
 
@@ -273,14 +305,6 @@ describe("parseGlobalArgs", () => {
     }
   });
 
-  it("--description defaults to false", () => {
-    const result = parseGlobalArgs(["list-skills"]);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.options.description).toBe(false);
-    }
-  });
-
   it("--description works with list-agents", () => {
     const result = parseGlobalArgs(["list-agents", "--description"]);
     expect(result.ok).toBe(true);
@@ -298,14 +322,6 @@ describe("parseGlobalArgs", () => {
     }
   });
 
-  it("--pin defaults to false", () => {
-    const result = parseGlobalArgs(["provision-skills"]);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.options.pin).toBe(false);
-    }
-  });
-
   it("--pin works with provision-agents", () => {
     const result = parseGlobalArgs(["provision-agents", "--pin"]);
     expect(result.ok).toBe(true);
@@ -320,14 +336,6 @@ describe("parseGlobalArgs", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.options.user).toBe(true);
-    }
-  });
-
-  it("--user defaults to false", () => {
-    const result = parseGlobalArgs(["provision-agents"]);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.options.user).toBe(false);
     }
   });
 
@@ -372,20 +380,163 @@ describe("parseGlobalArgs", () => {
       expect(result.options.unset).toEqual(["argument-hint"]);
     }
   });
+});
 
-  it("--set defaults to empty array", () => {
-    const result = parseGlobalArgs(["provision-skills"]);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.options.set).toEqual([]);
-    }
+describe("dispatch", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
   });
 
-  it("--unset defaults to empty array", () => {
-    const result = parseGlobalArgs(["provision-skills"]);
-    expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.options.unset).toEqual([]);
-    }
+  it("help writes help text and returns EXIT_SUCCESS", async () => {
+    const code = await dispatch(makeCLIOptions({ command: "help" }), []);
+
+    expect(code).toBe(0);
+    expect(mockWriteStdout).toHaveBeenCalledWith("HELP");
+  });
+
+  it("inspect dispatches to runInspect with correct args", async () => {
+    const opts = makeCLIOptions({ command: "inspect", json: true, verbose: true, full: true });
+    await dispatch(opts, ["my-mention"]);
+
+    expect(vi.mocked(runInspect)).toHaveBeenCalledWith({
+      mention: "my-mention",
+      json: true,
+      verbose: true,
+      full: true,
+      body: false,
+    });
+  });
+
+  it("inspect without positional returns EXIT_USAGE", async () => {
+    const code = await dispatch(makeCLIOptions({ command: "inspect" }), []);
+
+    expect(code).toBe(2);
+    expect(mockWriteStderr).toHaveBeenCalled();
+  });
+
+  it("resolve dispatches to runResolve with correct args", async () => {
+    const opts = makeCLIOptions({ command: "resolve", json: true });
+    await dispatch(opts, ["my-wikilink"]);
+
+    expect(vi.mocked(runResolve)).toHaveBeenCalledWith({
+      wikilink: "my-wikilink",
+      json: true,
+      verbose: false,
+    });
+  });
+
+  it("resolve without positional returns EXIT_USAGE", async () => {
+    const code = await dispatch(makeCLIOptions({ command: "resolve" }), []);
+
+    expect(code).toBe(2);
+  });
+
+  it("list-skills dispatches to runListSkills", async () => {
+    const opts = makeCLIOptions({ command: "list-skills", description: true });
+    await dispatch(opts, []);
+
+    expect(vi.mocked(runListSkills)).toHaveBeenCalledWith({
+      json: false,
+      verbose: false,
+      description: true,
+    });
+  });
+
+  it("list-agents dispatches to runListAgents", async () => {
+    const opts = makeCLIOptions({ command: "list-agents", json: true });
+    await dispatch(opts, []);
+
+    expect(vi.mocked(runListAgents)).toHaveBeenCalledWith({
+      json: true,
+      verbose: false,
+      description: false,
+    });
+  });
+
+  it("provision-skills dispatches to runProvisionSkills", async () => {
+    const opts = makeCLIOptions({ command: "provision-skills", dryRun: true, pin: true });
+    await dispatch(opts, []);
+
+    expect(vi.mocked(runProvisionSkills)).toHaveBeenCalledWith(
+      expect.objectContaining({ dryRun: true, pin: true }),
+    );
+  });
+
+  it("provision-agents dispatches to runProvisionAgents", async () => {
+    const opts = makeCLIOptions({ command: "provision-agents", user: true });
+    await dispatch(opts, []);
+
+    expect(vi.mocked(runProvisionAgents)).toHaveBeenCalledWith(
+      expect.objectContaining({ user: true }),
+    );
+  });
+});
+
+describe("buildInspectArgs", () => {
+  it("returns null and writes usage error when no positional", () => {
+    const opts = makeCLIOptions({ command: "inspect" });
+    expect(buildInspectArgs(opts, [])).toBeNull();
+    expect(mockWriteStderr).toHaveBeenCalled();
+  });
+
+  it("builds args from options and positional", () => {
+    const opts = makeCLIOptions({ command: "inspect", json: true, body: true });
+    expect(buildInspectArgs(opts, ["mention"])).toEqual({
+      mention: "mention",
+      json: true,
+      verbose: false,
+      full: false,
+      body: true,
+    });
+  });
+});
+
+describe("buildResolveArgs", () => {
+  it("returns null when no positional", () => {
+    const opts = makeCLIOptions({ command: "resolve" });
+    expect(buildResolveArgs(opts, [])).toBeNull();
+  });
+
+  it("builds args from options and positional", () => {
+    const opts = makeCLIOptions({ command: "resolve", verbose: true });
+    expect(buildResolveArgs(opts, ["link"])).toEqual({
+      wikilink: "link",
+      json: false,
+      verbose: true,
+    });
+  });
+});
+
+describe("buildListResourcesArgs", () => {
+  it("extracts json, verbose, description from options", () => {
+    const opts = makeCLIOptions({ description: true, json: true });
+    expect(buildListResourcesArgs(opts)).toEqual({
+      json: true,
+      verbose: false,
+      description: true,
+    });
+  });
+});
+
+describe("buildProvisionArgs", () => {
+  it("extracts all provision-relevant fields from options", () => {
+    const opts = makeCLIOptions({
+      dryRun: true,
+      pin: true,
+      user: true,
+      include: ["a"],
+      set: ["model=opus"],
+    });
+    expect(buildProvisionArgs(opts)).toEqual({
+      dryRun: true,
+      json: false,
+      verbose: false,
+      include: ["a"],
+      exclude: [],
+      pin: true,
+      user: true,
+      set: ["model=opus"],
+      unset: [],
+    });
   });
 });

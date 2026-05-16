@@ -1,9 +1,24 @@
 import type { DiscoveredResource, LocalIndexTracker, VFSResult } from "@obsidian-vfs/core";
-import type { Mock } from "vitest";
+import type { Mock, MockInstance } from "vitest";
 import { vi } from "vitest";
 import { makeLocalIndexTrackerWith } from "@obsidian-vfs/core/testing";
 
 export { makeLocalIndexTrackerWith, makeDiscoveredResource } from "@obsidian-vfs/core/testing";
+
+/** Configure a mockReadFile to return JSON content for a settings file path suffix. */
+export function mockSettingsFile(
+  mockReadFile: MockInstance<(...args: unknown[]) => Promise<unknown>>,
+  settingsSuffix: string,
+  content: Record<string, unknown>,
+): void {
+  mockReadFile.mockImplementation((...args: unknown[]) => {
+    const pathArg = String(args[0]);
+    if (pathArg.endsWith(settingsSuffix)) {
+      return Promise.resolve(JSON.stringify(content));
+    }
+    return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+  });
+}
 
 /** Default CLI option values shared across all command test factories. */
 export const CLI_DEFAULTS = {

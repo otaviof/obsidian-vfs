@@ -10,6 +10,7 @@ import {
   FORMAT_VERBOSE_TIMING_STUB,
   makeDiscoveredResource,
   makeListSkillsTracker,
+  mockSettingsFile,
 } from "./test-helpers.js";
 
 vi.mock("node:fs/promises", () => ({
@@ -136,14 +137,7 @@ describe("cmd-provision-skills", () => {
   it("adds per-skill permissions for new skills", async () => {
     const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
-
-    mockReadFile.mockImplementation((...args: unknown[]) => {
-      const pathArg = String(args[0]);
-      if (pathArg.endsWith("settings.local.json")) {
-        return Promise.resolve(JSON.stringify({ permissions: { allow: [] } }));
-      }
-      return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
-    });
+    mockSettingsFile(mockReadFile, "settings.local.json", { permissions: { allow: [] } });
 
     await run(makeArgs());
 
@@ -589,14 +583,7 @@ describe("cmd-provision-skills", () => {
   it("--user syncs permissions to ~/.claude/settings.json", async () => {
     const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
-
-    mockReadFile.mockImplementation((...args: unknown[]) => {
-      const pathArg = String(args[0]);
-      if (pathArg.endsWith("settings.json")) {
-        return Promise.resolve(JSON.stringify({ permissions: { allow: [] } }));
-      }
-      return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
-    });
+    mockSettingsFile(mockReadFile, "settings.json", { permissions: { allow: [] } });
 
     await run(makeArgs({ user: true }));
 
@@ -691,14 +678,7 @@ describe("cmd-provision-skills", () => {
   it("pin: false adds unpinned permission rule", async () => {
     const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
-
-    mockReadFile.mockImplementation((...args: unknown[]) => {
-      const pathArg = String(args[0]);
-      if (pathArg.endsWith("settings.local.json")) {
-        return Promise.resolve(JSON.stringify({ permissions: { allow: [] } }));
-      }
-      return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
-    });
+    mockSettingsFile(mockReadFile, "settings.local.json", { permissions: { allow: [] } });
 
     await run(makeArgs({ pin: false }));
 
@@ -715,14 +695,7 @@ describe("cmd-provision-skills", () => {
   it("pin: true adds pinned permission rule", async () => {
     const tracker = makeListSkillsTracker({ ok: true, value: [makeDiscoveredResource()] });
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
-
-    mockReadFile.mockImplementation((...args: unknown[]) => {
-      const pathArg = String(args[0]);
-      if (pathArg.endsWith("settings.local.json")) {
-        return Promise.resolve(JSON.stringify({ permissions: { allow: [] } }));
-      }
-      return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
-    });
+    mockSettingsFile(mockReadFile, "settings.local.json", { permissions: { allow: [] } });
 
     await run(makeArgs({ pin: true }));
 

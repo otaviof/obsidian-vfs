@@ -122,7 +122,10 @@ export function parseGlobalArgs(
 }
 
 /** Build InspectArgs from parsed options and positionals. */
-function buildInspectArgs(options: CLIOptions, positionals: readonly string[]): InspectArgs | null {
+export function buildInspectArgs(
+  options: CLIOptions,
+  positionals: readonly string[],
+): InspectArgs | null {
   if (positionals.length === 0) {
     writeStderr(formatUsageError("Missing required argument: <mention>"));
     return null;
@@ -137,7 +140,10 @@ function buildInspectArgs(options: CLIOptions, positionals: readonly string[]): 
 }
 
 /** Build ResolveArgs from parsed options and positionals. */
-function buildResolveArgs(options: CLIOptions, positionals: readonly string[]): ResolveArgs | null {
+export function buildResolveArgs(
+  options: CLIOptions,
+  positionals: readonly string[],
+): ResolveArgs | null {
   if (positionals.length === 0) {
     writeStderr(formatUsageError("Missing required argument: <wikilink>"));
     return null;
@@ -150,7 +156,7 @@ function buildResolveArgs(options: CLIOptions, positionals: readonly string[]): 
 }
 
 /** Build ListResourcesArgs from parsed options. */
-function buildListResourcesArgs(options: CLIOptions): ListResourcesArgs {
+export function buildListResourcesArgs(options: CLIOptions): ListResourcesArgs {
   return {
     json: options.json,
     verbose: options.verbose,
@@ -159,7 +165,7 @@ function buildListResourcesArgs(options: CLIOptions): ListResourcesArgs {
 }
 
 /** Build ProvisionArgs from parsed options. */
-function buildProvisionArgs(options: CLIOptions): ProvisionArgs {
+export function buildProvisionArgs(options: CLIOptions): ProvisionArgs {
   return {
     dryRun: options.dryRun,
     json: options.json,
@@ -174,7 +180,10 @@ function buildProvisionArgs(options: CLIOptions): ProvisionArgs {
 }
 
 /** Dispatch parsed options to the appropriate command handler. */
-async function dispatch(options: CLIOptions, positionals: readonly string[]): Promise<number> {
+export async function dispatch(
+  options: CLIOptions,
+  positionals: readonly string[],
+): Promise<number> {
   switch (options.command) {
     case "help":
       writeStdout(formatHelp());

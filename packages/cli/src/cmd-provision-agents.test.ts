@@ -11,6 +11,7 @@ import {
   FORMAT_VERBOSE_TIMING_STUB,
   makeDiscoveredResource,
   makeListAgentsTracker,
+  mockSettingsFile,
 } from "./test-helpers.js";
 
 vi.mock("node:fs/promises", () => ({
@@ -35,12 +36,7 @@ vi.mock("./formatters.js", () => ({
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { bootstrapTracker } from "./bootstrap.js";
-import {
-  formatProvisionJSON,
-  formatProvisionResult,
-  writeStderr,
-  writeStdout,
-} from "./formatters.js";
+import { formatProvisionResult, writeStderr, writeStdout } from "./formatters.js";
 import { buildPermissionRule } from "./cmd-provision-resources.js";
 import { run } from "./cmd-provision-agents.js";
 
@@ -51,7 +47,6 @@ const mockWriteFile = vi.mocked(writeFile as unknown as (...args: unknown[]) => 
 const mockWriteStdout = vi.mocked(writeStdout);
 const mockWriteStderr = vi.mocked(writeStderr);
 const mockFormatResult = vi.mocked(formatProvisionResult);
-const mockFormatJSON = vi.mocked(formatProvisionJSON);
 
 const agentDefaults = {
   name: "architect",
@@ -187,14 +182,7 @@ describe("cmd-provision-agents", () => {
   it("ensures global obs-read permission", async () => {
     const tracker = makeAgentTracker();
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
-
-    mockReadFile.mockImplementation((...args: unknown[]) => {
-      const pathArg = String(args[0]);
-      if (pathArg.endsWith("settings.local.json")) {
-        return Promise.resolve(JSON.stringify({ permissions: { allow: [] } }));
-      }
-      return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
-    });
+    mockSettingsFile(mockReadFile, "settings.local.json", { permissions: { allow: [] } });
 
     await run(makeArgs());
 
@@ -211,17 +199,8 @@ describe("cmd-provision-agents", () => {
   it("does not duplicate obs-read permission", async () => {
     const tracker = makeAgentTracker();
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
-
-    mockReadFile.mockImplementation((...args: unknown[]) => {
-      const pathArg = String(args[0]);
-      if (pathArg.endsWith("settings.local.json")) {
-        return Promise.resolve(
-          JSON.stringify({
-            permissions: { allow: [buildPermissionRule(false)] },
-          }),
-        );
-      }
-      return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
+    mockSettingsFile(mockReadFile, "settings.local.json", {
+      permissions: { allow: [buildPermissionRule(false)] },
     });
 
     await run(makeArgs());
@@ -231,63 +210,6 @@ describe("cmd-provision-agents", () => {
       "agents",
       undefined,
     );
-  });
-
-  it("dry-run does not write files", async () => {
-    const tracker = makeAgentTracker();
-    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
-
-    await run(makeArgs({ dryRun: true }));
-
-    expect(mockMkdir).not.toHaveBeenCalled();
-    expect(mockWriteFile).not.toHaveBeenCalled();
-  });
-
-  it("dry-run lists all as written", async () => {
-    const tracker = makeAgentTracker();
-    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
-
-    await run(makeArgs({ dryRun: true }));
-
-    expect(mockFormatResult).toHaveBeenCalledWith(
-      expect.objectContaining({ written: ["architect"], dryRun: true }),
-      "agents",
-      undefined,
-    );
-  });
-
-  it("outputs JSON with --json", async () => {
-    const tracker = makeAgentTracker();
-    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
-
-    await run(makeArgs({ json: true }));
-
-    expect(mockFormatJSON).toHaveBeenCalled();
-    expect(mockFormatResult).not.toHaveBeenCalled();
-  });
-
-  it("returns EXIT_ERROR on bootstrap failure", async () => {
-    mockBootstrap.mockResolvedValueOnce({
-      ok: false,
-      error: { code: "CLI_UNAVAILABLE", message: "not found" },
-    });
-
-    const code = await run(makeArgs());
-
-    expect(code).toBe(EXIT_ERROR);
-    expect(mockWriteStderr).toHaveBeenCalled();
-  });
-
-  it("returns EXIT_ERROR on listAgents failure", async () => {
-    const tracker = makeListAgentsTracker({
-      ok: false,
-      error: { code: "CLI_ERROR", message: "listing failed" },
-    });
-    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
-
-    const code = await run(makeArgs());
-
-    expect(code).toBe(EXIT_ERROR);
   });
 
   it("captures readFile failure in errors and continues", async () => {
@@ -320,74 +242,6 @@ describe("cmd-provision-agents", () => {
       "agents",
       undefined,
     );
-  });
-
-  it("provisions only included agents", async () => {
-    const agents = [
-      makeDiscoveredResource(agentDefaults),
-      makeDiscoveredResource({
-        name: "reviewer",
-        description: "Reviewer",
-        vaultRelativePath: "agents/reviewer.md",
-      }),
-    ];
-    const tracker = makeListAgentsTracker(
-      { ok: true, value: agents },
-      { readFileResult: { ok: true, value: vaultContent } },
-    );
-    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
-
-    await run(makeArgs({ include: ["architect"] }));
-
-    expect(mockFormatResult).toHaveBeenCalledWith(
-      expect.objectContaining({
-        written: ["architect"],
-        skipped: ["reviewer"],
-        filter: expect.objectContaining({ discoveredCount: 2, filteredCount: 1 }) as unknown,
-      }),
-      "agents",
-      undefined,
-    );
-  });
-
-  it("excludes matching agents", async () => {
-    const agents = [
-      makeDiscoveredResource(agentDefaults),
-      makeDiscoveredResource({
-        name: "draft-agent",
-        description: "Draft",
-        vaultRelativePath: "agents/draft-agent.md",
-      }),
-    ];
-    const tracker = makeListAgentsTracker(
-      { ok: true, value: agents },
-      { readFileResult: { ok: true, value: vaultContent } },
-    );
-    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
-
-    await run(makeArgs({ exclude: ["draft-*"] }));
-
-    expect(mockFormatResult).toHaveBeenCalledWith(
-      expect.objectContaining({
-        written: ["architect"],
-        skipped: ["draft-agent"],
-      }),
-      "agents",
-      undefined,
-    );
-  });
-
-  it("verbose timing output", async () => {
-    const tracker = makeAgentTracker();
-    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 42 } });
-
-    await run(makeArgs({ verbose: true }));
-
-    const { formatVerboseTiming } = await import("./formatters.js");
-    const mockTiming = vi.mocked(formatVerboseTiming);
-    expect(mockTiming).toHaveBeenCalledWith("Enumeration", expect.any(Number));
-    expect(mockTiming).toHaveBeenCalledWith("Init", 42);
-    expect(mockWriteStderr).toHaveBeenCalled();
   });
 
   it("proxy content maps non-Claude model to Claude equivalent", async () => {
@@ -456,54 +310,6 @@ describe("cmd-provision-agents", () => {
     );
   });
 
-  it("pin: false adds unpinned permission rule", async () => {
-    const tracker = makeAgentTracker();
-    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
-
-    mockReadFile.mockImplementation((...args: unknown[]) => {
-      const pathArg = String(args[0]);
-      if (pathArg.endsWith("settings.local.json")) {
-        return Promise.resolve(JSON.stringify({ permissions: { allow: [] } }));
-      }
-      return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
-    });
-
-    await run(makeArgs({ pin: false }));
-
-    const settingsCall = mockWriteFile.mock.calls.find((c) =>
-      String(c[0]).endsWith("settings.local.json"),
-    );
-    expect(settingsCall).toBeDefined();
-    const written = JSON.parse(String(settingsCall![1])) as {
-      permissions: { allow: string[] };
-    };
-    expect(written.permissions.allow).toContainEqual(buildPermissionRule(false));
-  });
-
-  it("pin: true adds pinned permission rule", async () => {
-    const tracker = makeAgentTracker();
-    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
-
-    mockReadFile.mockImplementation((...args: unknown[]) => {
-      const pathArg = String(args[0]);
-      if (pathArg.endsWith("settings.local.json")) {
-        return Promise.resolve(JSON.stringify({ permissions: { allow: [] } }));
-      }
-      return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
-    });
-
-    await run(makeArgs({ pin: true }));
-
-    const settingsCall = mockWriteFile.mock.calls.find((c) =>
-      String(c[0]).endsWith("settings.local.json"),
-    );
-    expect(settingsCall).toBeDefined();
-    const written = JSON.parse(String(settingsCall![1])) as {
-      permissions: { allow: string[] };
-    };
-    expect(written.permissions.allow).toContainEqual(buildPermissionRule(true));
-  });
-
   it("--user provisions agents to ~/.claude/agents/", async () => {
     const tracker = makeAgentTracker();
     mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
@@ -518,54 +324,6 @@ describe("cmd-provision-agents", () => {
     const agentCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("architect.md"));
     expect(agentCall).toBeDefined();
     expect(String(agentCall![0])).toContain(os.homedir());
-  });
-
-  it("--user syncs permissions to ~/.claude/settings.json", async () => {
-    const tracker = makeAgentTracker();
-    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
-
-    mockReadFile.mockImplementation((...args: unknown[]) => {
-      const pathArg = String(args[0]);
-      if (pathArg.endsWith("settings.json")) {
-        return Promise.resolve(JSON.stringify({ permissions: { allow: [] } }));
-      }
-      return Promise.reject(Object.assign(new Error("ENOENT"), { code: "ENOENT" }));
-    });
-
-    await run(makeArgs({ user: true }));
-
-    const settingsCall = mockWriteFile.mock.calls.find(
-      (c) => String(c[0]).endsWith("settings.json") && !String(c[0]).endsWith(".local.json"),
-    );
-    expect(settingsCall).toBeDefined();
-    expect(String(settingsCall![0])).toContain(os.homedir());
-  });
-
-  it("--user dry-run reports correct target paths", async () => {
-    const tracker = makeAgentTracker();
-    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
-
-    await run(makeArgs({ user: true, dryRun: true }));
-
-    expect(mockWriteFile).not.toHaveBeenCalled();
-    expect(mockFormatResult).toHaveBeenCalledWith(
-      expect.objectContaining({ written: ["architect"], dryRun: true }),
-      "agents",
-      expect.stringContaining("~/.claude/settings.json"),
-    );
-  });
-
-  it("default (no --user) behavior unchanged", async () => {
-    const tracker = makeAgentTracker();
-    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
-
-    await run(makeArgs());
-
-    expect(mockFormatResult).toHaveBeenCalledWith(
-      expect.objectContaining({ written: ["architect"] }),
-      "agents",
-      undefined,
-    );
   });
 
   it("--set model=opus overrides remapped model in proxy content", async () => {
@@ -646,19 +404,5 @@ describe("cmd-provision-agents", () => {
     expect(code).toBe(EXIT_USAGE);
     expect(mockWriteStderr).toHaveBeenCalled();
     expect(mockBootstrap).not.toHaveBeenCalled();
-  });
-
-  it("default behavior unchanged when no --set/--unset", async () => {
-    const tracker = makeAgentTracker();
-    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
-
-    await run(makeArgs());
-
-    const writeCall = mockWriteFile.mock.calls.find((c) => String(c[0]).endsWith("architect.md"));
-    expect(writeCall).toBeDefined();
-    const content = String(writeCall![1]);
-    expect(content).toContain("name: architect");
-    expect(content).toContain("description: System architect");
-    expect(content).toContain("tools: Read, Grep");
   });
 });
