@@ -257,7 +257,7 @@ export function fakeContext(): {
 const PROVIDER_TRACKER_CONTEXT = { physicalPath: "/vault", name: "TestVault" };
 
 /** Build a mock tracker with provider-required context. */
-export function mockTracker(
+export function mockLocalIndexTracker(
   extraMethods: Partial<Record<keyof LocalIndexTracker, Mock>> = {},
   contextOverrides: Partial<{ physicalPath: string; name: string }> = {},
 ): LocalIndexTracker {

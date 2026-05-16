@@ -29,8 +29,10 @@ import {
   FOLDER_NAME_PREFIX,
   addVaultWorkspaceFolder,
   clearManagedExcludes,
+  excludeVaultFromGitDetection,
   generateWorkspaceFile,
   hasVaultWorkspaceFolder,
+  includeVaultInGitDetection,
   openWorkspaceFile,
   removeVaultWorkspaceFolders,
   syncFilesExclude,
@@ -328,366 +330,394 @@ describe("syncFilesExclude", () => {
     });
   });
 
-  it("splits dotfiles to WorkspaceFolder and non-dotfiles to Workspace", async () => {
-    vi.mocked(readdir).mockResolvedValueOnce([
-      "Notes",
-      ".obsidian",
-      ".trash",
-      "Private",
-    ] as unknown as Awaited<ReturnType<typeof readdir>>);
-
-    const result = await syncFilesExclude("/vault", ["Notes"], [], []);
-
-    expect(result).toContain(".obsidian");
-    expect(result).toContain(".trash");
-    expect(result).toContain("Private");
-    expect(result).not.toContain("Notes");
-    expect(mockUpdate).toHaveBeenCalledWith(
-      "exclude",
-      expect.objectContaining({ ".obsidian": true, ".trash": true }),
-      vscode.ConfigurationTarget.WorkspaceFolder,
-    );
-    expect(mockUpdate).toHaveBeenCalledWith(
-      "exclude",
-      expect.objectContaining({ Private: true }),
-      vscode.ConfigurationTarget.Workspace,
-    );
-  });
-
-  it("skips .vscode from files.exclude patterns", async () => {
-    vi.mocked(readdir).mockResolvedValueOnce([
-      "Notes",
-      ".vscode",
-      ".obsidian",
-      "Private",
-    ] as unknown as Awaited<ReturnType<typeof readdir>>);
-
-    const result = await syncFilesExclude("/vault", ["Notes"], [], []);
-
-    expect(result).not.toContain(".vscode");
-    const folderCall = mockUpdate.mock.calls.find(
-      (c: unknown[]) => c[2] === vscode.ConfigurationTarget.WorkspaceFolder,
-    );
-    expect(folderCall?.[1]).not.toHaveProperty(".vscode");
-    const wsCall = mockUpdate.mock.calls.find(
-      (c: unknown[]) => c[2] === vscode.ConfigurationTarget.Workspace,
-    );
-    expect(wsCall?.[1]).not.toHaveProperty(".vscode");
-  });
-
-  it("writes blocked paths to WorkspaceFolder tier", async () => {
-    vi.mocked(readdir).mockResolvedValueOnce([
-      "20-areas",
-      "30-resources",
-      "00-inbox",
-    ] as unknown as Awaited<ReturnType<typeof readdir>>);
-
-    const result = await syncFilesExclude(
-      "/vault",
-      ["20-areas", "30-resources"],
-      ["20-areas/career", "30-resources/hardware"],
-      [],
-    );
-
-    expect(result).toContain("00-inbox");
-    expect(result).toContain("20-areas/career");
-    expect(result).toContain("30-resources/hardware");
-    expect(result).not.toContain("20-areas");
-    expect(result).not.toContain("30-resources");
-    expect(mockUpdate).toHaveBeenCalledWith(
-      "exclude",
-      expect.objectContaining({
-        "20-areas/career": true,
-        "30-resources/hardware": true,
-      }),
-      vscode.ConfigurationTarget.WorkspaceFolder,
-    );
-    expect(mockUpdate).toHaveBeenCalledWith(
-      "exclude",
-      expect.objectContaining({ "00-inbox": true }),
-      vscode.ConfigurationTarget.Workspace,
-    );
-  });
-
-  it("adds blocked paths directly as folder-scoped exclude patterns", async () => {
-    vi.mocked(readdir).mockResolvedValueOnce(["Notes", "Areas"] as unknown as Awaited<
-      ReturnType<typeof readdir>
-    >);
-
-    const result = await syncFilesExclude("/vault", ["Notes", "Areas"], ["Areas/private"], []);
-
-    expect(result).toContain("Areas/private");
-    expect(result).not.toContain("Areas");
-    expect(mockUpdate).toHaveBeenCalledWith(
-      "exclude",
-      expect.objectContaining({ "Areas/private": true }),
-      vscode.ConfigurationTarget.WorkspaceFolder,
-    );
-  });
-
-  it("preserves autoMount entries with nested paths", async () => {
-    vi.mocked(readdir)
-      .mockResolvedValueOnce(["docs", "Notes", ".obsidian"] as unknown as Awaited<
-        ReturnType<typeof readdir>
-      >)
-      .mockResolvedValueOnce([]);
-
-    const result = await syncFilesExclude("/vault", ["docs/readme.md", "Notes"], [], []);
-
-    expect(result).toContain(".obsidian");
-    expect(result).not.toContain("docs");
-    expect(result).not.toContain("Notes");
-  });
-
-  it("preserves existing folder-scoped patterns from user", async () => {
-    vi.mocked(readdir).mockResolvedValueOnce(["Notes", ".obsidian"] as unknown as Awaited<
-      ReturnType<typeof readdir>
-    >);
-    mockInspect.mockReturnValue({
-      workspaceFolderValue: { "**/.git": true },
-      workspaceValue: undefined,
-    });
-
-    const result = await syncFilesExclude("/vault", ["Notes"], [], []);
-
-    expect(mockUpdate).toHaveBeenCalledWith(
-      "exclude",
-      expect.objectContaining({ "**/.git": true, ".obsidian": true }),
-      vscode.ConfigurationTarget.WorkspaceFolder,
-    );
-    expect(result).toEqual([".obsidian"]);
-  });
-
-  it("removes stale managed patterns no longer needed", async () => {
-    vi.mocked(readdir).mockResolvedValueOnce(["Notes", "Private"] as unknown as Awaited<
-      ReturnType<typeof readdir>
-    >);
-    mockInspect.mockReturnValue({
-      workspaceFolderValue: { ".OldDot": true },
-      workspaceValue: { OldDir: true, Private: true },
-    });
-
-    const result = await syncFilesExclude("/vault", ["Notes"], [], [".OldDot", "OldDir", "Private"]);
-
-    expect(result).toContain("Private");
-    expect(result).not.toContain("OldDir");
-    expect(result).not.toContain(".OldDot");
-    const folderCall = mockUpdate.mock.calls.find(
-      (c: unknown[]) => c[2] === vscode.ConfigurationTarget.WorkspaceFolder,
-    );
-    expect(folderCall?.[1]).not.toHaveProperty(".OldDot");
-    const wsCall = mockUpdate.mock.calls.find(
-      (c: unknown[]) => c[2] === vscode.ConfigurationTarget.Workspace,
-    );
-    expect(wsCall?.[1]).toHaveProperty("Private");
-    expect(wsCall?.[1]).not.toHaveProperty("OldDir");
-  });
-
-  it("returns empty array when all entries are autoMounted", async () => {
-    vi.mocked(readdir).mockResolvedValueOnce(["Notes", "Projects"] as unknown as Awaited<
-      ReturnType<typeof readdir>
-    >);
-
-    const result = await syncFilesExclude("/vault", ["Notes", "Projects"], [], []);
-
-    expect(result).toEqual([]);
-  });
-
-  it("writes only workspace-scoped patterns when vault is not a workspace folder", async () => {
-    workspace.workspaceFolders = [
-      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
-    ];
-    vi.mocked(readdir).mockResolvedValueOnce(["Notes", ".obsidian", "Private"] as unknown as Awaited<
-      ReturnType<typeof readdir>
-    >);
-
-    const result = await syncFilesExclude("/vault", ["Notes"], [], []);
-
-    expect(result).toContain(".obsidian");
-    expect(result).toContain("Private");
-    expect(mockUpdate).not.toHaveBeenCalledWith(
-      "exclude",
-      expect.anything(),
-      vscode.ConfigurationTarget.WorkspaceFolder,
-    );
-    expect(mockUpdate).toHaveBeenCalledWith(
-      "exclude",
-      expect.objectContaining({ ".obsidian": true, Private: true }),
-      vscode.ConfigurationTarget.Workspace,
-    );
-  });
-
-  it("migrates dotfile patterns from workspace to folder scope", async () => {
-    vi.mocked(readdir).mockResolvedValueOnce(["Notes", ".obsidian"] as unknown as Awaited<
-      ReturnType<typeof readdir>
-    >);
-    mockInspect.mockReturnValue({
-      workspaceFolderValue: {},
-      workspaceValue: { ".obsidian": true, node_modules: true },
-    });
-
-    const result = await syncFilesExclude("/vault", ["Notes"], [], [".obsidian"]);
-
-    expect(result).toContain(".obsidian");
-    expect(mockUpdate).toHaveBeenCalledWith(
-      "exclude",
-      expect.objectContaining({ ".obsidian": true }),
-      vscode.ConfigurationTarget.WorkspaceFolder,
-    );
-    // Migration: .obsidian removed from workspace level, node_modules preserved
-    expect(mockUpdate).toHaveBeenCalledWith(
-      "exclude",
-      { node_modules: true },
-      vscode.ConfigurationTarget.Workspace,
-    );
-  });
-
-  it("returns previouslyManaged when readdir fails", async () => {
-    vi.mocked(readdir).mockRejectedValueOnce(new Error("EACCES: permission denied"));
-
-    const result = await syncFilesExclude("/vault", ["Notes"], [], [".obsidian", "Private"]);
-
-    expect(result).toEqual([".obsidian", "Private"]);
-    expect(mockUpdate).not.toHaveBeenCalled();
-  });
-
-  it("computes sub-path exclusions for partially-mounted directories", async () => {
-    vi.mocked(readdir)
-      .mockResolvedValueOnce(["20-areas", "00-inbox"] as unknown as Awaited<
-        ReturnType<typeof readdir>
-      >)
-      .mockResolvedValueOnce([
-        makeDirent("career", true),
-        makeDirent("idea", true),
-        makeDirent("otaviof", true),
-        makeDirent("readme.md", false),
+  describe("tier separation", () => {
+    it("splits dotfiles to WorkspaceFolder and non-dotfiles to Workspace", async () => {
+      vi.mocked(readdir).mockResolvedValueOnce([
+        "Notes",
+        ".obsidian",
+        ".trash",
+        "Private",
       ] as unknown as Awaited<ReturnType<typeof readdir>>);
 
-    const result = await syncFilesExclude("/vault", ["20-areas/idea"], [], []);
+      const result = await syncFilesExclude("/vault", ["Notes"], [], []);
 
-    expect(result).toContain("20-areas/career");
-    expect(result).toContain("20-areas/otaviof");
-    expect(result).toContain("00-inbox");
-    expect(result).not.toContain("20-areas/idea");
-    expect(result).not.toContain("20-areas");
-  });
+      expect(result).toContain(".obsidian");
+      expect(result).toContain(".trash");
+      expect(result).toContain("Private");
+      expect(result).not.toContain("Notes");
+      expect(mockUpdate).toHaveBeenCalledWith(
+        "exclude",
+        expect.objectContaining({ ".obsidian": true, ".trash": true }),
+        vscode.ConfigurationTarget.WorkspaceFolder,
+      );
+      expect(mockUpdate).toHaveBeenCalledWith(
+        "exclude",
+        expect.objectContaining({ Private: true }),
+        vscode.ConfigurationTarget.Workspace,
+      );
+    });
 
-  it("skips files in sub-path enumeration (directories only)", async () => {
-    vi.mocked(readdir)
-      .mockResolvedValueOnce(["20-areas"] as unknown as Awaited<ReturnType<typeof readdir>>)
-      .mockResolvedValueOnce([
-        makeDirent("idea", true),
-        makeDirent("notes.md", false),
-        makeDirent("index.md", false),
+    it("skips .vscode from files.exclude patterns", async () => {
+      vi.mocked(readdir).mockResolvedValueOnce([
+        "Notes",
+        ".vscode",
+        ".obsidian",
+        "Private",
       ] as unknown as Awaited<ReturnType<typeof readdir>>);
 
-    const result = await syncFilesExclude("/vault", ["20-areas/idea"], [], []);
+      const result = await syncFilesExclude("/vault", ["Notes"], [], []);
 
-    expect(result).toEqual([]);
-  });
+      expect(result).not.toContain(".vscode");
+      const folderCall = mockUpdate.mock.calls.find(
+        (c: unknown[]) => c[2] === vscode.ConfigurationTarget.WorkspaceFolder,
+      );
+      expect(folderCall?.[1]).not.toHaveProperty(".vscode");
+      const wsCall = mockUpdate.mock.calls.find(
+        (c: unknown[]) => c[2] === vscode.ConfigurationTarget.Workspace,
+      );
+      expect(wsCall?.[1]).not.toHaveProperty(".vscode");
+    });
 
-  it("handles deeply nested partial mounts", async () => {
-    vi.mocked(readdir)
-      .mockResolvedValueOnce(["10-projects"] as unknown as Awaited<ReturnType<typeof readdir>>)
-      .mockResolvedValueOnce([
-        makeDirent("active", true),
-        makeDirent("archived", true),
-      ] as unknown as Awaited<ReturnType<typeof readdir>>)
-      .mockResolvedValueOnce([
-        makeDirent("2024", true),
-        makeDirent("2023", true),
+    it("writes only workspace-scoped patterns when vault is not a workspace folder", async () => {
+      workspace.workspaceFolders = [
+        { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
+      ];
+      vi.mocked(readdir).mockResolvedValueOnce([
+        "Notes",
+        ".obsidian",
+        "Private",
       ] as unknown as Awaited<ReturnType<typeof readdir>>);
 
-    const result = await syncFilesExclude("/vault", ["10-projects/active/2024"], [], []);
+      const result = await syncFilesExclude("/vault", ["Notes"], [], []);
 
-    expect(result).toContain("10-projects/archived");
-    expect(result).toContain("10-projects/active/2023");
-    expect(result).not.toContain("10-projects/active/2024");
-    expect(result).not.toContain("10-projects");
-  });
+      expect(result).toContain(".obsidian");
+      expect(result).toContain("Private");
+      expect(mockUpdate).not.toHaveBeenCalledWith(
+        "exclude",
+        expect.anything(),
+        vscode.ConfigurationTarget.WorkspaceFolder,
+      );
+      expect(mockUpdate).toHaveBeenCalledWith(
+        "exclude",
+        expect.objectContaining({ ".obsidian": true, Private: true }),
+        vscode.ConfigurationTarget.Workspace,
+      );
+    });
 
-  it("treats fully-mounted paths as before (no sub-enumeration)", async () => {
-    vi.mocked(readdir).mockResolvedValueOnce(["20-areas", "00-inbox"] as unknown as Awaited<
-      ReturnType<typeof readdir>
-    >);
-
-    const result = await syncFilesExclude("/vault", ["20-areas"], [], []);
-
-    expect(result).toContain("00-inbox");
-    expect(result).not.toContain("20-areas");
-    expect(readdir).toHaveBeenCalledTimes(1);
-  });
-
-  it("handles sub-readdir failure gracefully", async () => {
-    vi.mocked(readdir)
-      .mockResolvedValueOnce(["20-areas", "00-inbox"] as unknown as Awaited<
+    it("preserves existing .vscode entry in vault folder-scoped patterns", async () => {
+      vi.mocked(readdir).mockResolvedValueOnce(["Notes", ".obsidian"] as unknown as Awaited<
         ReturnType<typeof readdir>
-      >)
-      .mockRejectedValueOnce(new Error("EACCES"));
+      >);
+      mockInspect.mockReturnValue({
+        workspaceFolderValue: { ".vscode": true, ".obsidian": true },
+        workspaceValue: undefined,
+      });
 
-    const result = await syncFilesExclude("/vault", ["20-areas/idea"], [], []);
+      await syncFilesExclude("/vault", ["Notes"], [], []);
 
-    expect(result).toContain("00-inbox");
-    expect(result).not.toContain("20-areas");
+      const folderCall = mockUpdate.mock.calls.find(
+        (c: unknown[]) => c[2] === vscode.ConfigurationTarget.WorkspaceFolder,
+      );
+      expect(folderCall?.[1]).toHaveProperty(".vscode");
+      expect(folderCall?.[1]).toHaveProperty(".obsidian");
+    });
   });
 
-  it("preserves existing .vscode entry in vault folder-scoped patterns", async () => {
-    vi.mocked(readdir).mockResolvedValueOnce(["Notes", ".obsidian"] as unknown as Awaited<
-      ReturnType<typeof readdir>
-    >);
-    mockInspect.mockReturnValue({
-      workspaceFolderValue: { ".vscode": true, ".obsidian": true },
-      workspaceValue: undefined,
+  describe("blocked paths", () => {
+    it("writes blocked paths to WorkspaceFolder tier", async () => {
+      vi.mocked(readdir).mockResolvedValueOnce([
+        "20-areas",
+        "30-resources",
+        "00-inbox",
+      ] as unknown as Awaited<ReturnType<typeof readdir>>);
+
+      const result = await syncFilesExclude(
+        "/vault",
+        ["20-areas", "30-resources"],
+        ["20-areas/career", "30-resources/hardware"],
+        [],
+      );
+
+      expect(result).toContain("00-inbox");
+      expect(result).toContain("20-areas/career");
+      expect(result).toContain("30-resources/hardware");
+      expect(result).not.toContain("20-areas");
+      expect(result).not.toContain("30-resources");
+      expect(mockUpdate).toHaveBeenCalledWith(
+        "exclude",
+        expect.objectContaining({
+          "20-areas/career": true,
+          "30-resources/hardware": true,
+        }),
+        vscode.ConfigurationTarget.WorkspaceFolder,
+      );
+      expect(mockUpdate).toHaveBeenCalledWith(
+        "exclude",
+        expect.objectContaining({ "00-inbox": true }),
+        vscode.ConfigurationTarget.Workspace,
+      );
     });
 
-    await syncFilesExclude("/vault", ["Notes"], [], []);
+    it("adds blocked paths directly as folder-scoped exclude patterns", async () => {
+      vi.mocked(readdir).mockResolvedValueOnce(["Notes", "Areas"] as unknown as Awaited<
+        ReturnType<typeof readdir>
+      >);
 
-    const folderCall = mockUpdate.mock.calls.find(
-      (c: unknown[]) => c[2] === vscode.ConfigurationTarget.WorkspaceFolder,
-    );
-    expect(folderCall?.[1]).toHaveProperty(".vscode");
-    expect(folderCall?.[1]).toHaveProperty(".obsidian");
+      const result = await syncFilesExclude("/vault", ["Notes", "Areas"], ["Areas/private"], []);
+
+      expect(result).toContain("Areas/private");
+      expect(result).not.toContain("Areas");
+      expect(mockUpdate).toHaveBeenCalledWith(
+        "exclude",
+        expect.objectContaining({ "Areas/private": true }),
+        vscode.ConfigurationTarget.WorkspaceFolder,
+      );
+    });
   });
 
-  it("removes stale managed patterns from non-vault workspace folders", async () => {
-    const projectMockUpdate = vi.fn().mockResolvedValue(undefined);
-    const projectMockInspect = vi.fn(() => ({
-      workspaceFolderValue: {
-        ".obsidian": true,
-        Private: true,
-        "editor.fontSize": true,
-      },
-      workspaceValue: undefined,
-    }));
+  describe("sub-path exclusions", () => {
+    it("preserves autoMount entries with nested paths", async () => {
+      vi.mocked(readdir)
+        .mockResolvedValueOnce(["docs", "Notes", ".obsidian"] as unknown as Awaited<
+          ReturnType<typeof readdir>
+        >)
+        .mockResolvedValueOnce([]);
 
-    workspace.getConfiguration = vi.fn().mockImplementation((_section: string, scope?: unknown) => {
-      const isProjectFolder =
-        scope && typeof scope === "object" && "fsPath" in scope && scope.fsPath === "/projects/foo";
-      if (isProjectFolder) {
-        return {
-          get: vi.fn((_key: string, defaultValue: unknown) => defaultValue),
-          inspect: projectMockInspect,
-          update: projectMockUpdate,
-        };
-      }
-      return {
-        get: vi.fn((_key: string, defaultValue: unknown) => defaultValue),
-        inspect: mockInspect,
-        update: mockUpdate,
-      };
+      const result = await syncFilesExclude("/vault", ["docs/readme.md", "Notes"], [], []);
+
+      expect(result).toContain(".obsidian");
+      expect(result).not.toContain("docs");
+      expect(result).not.toContain("Notes");
     });
 
-    vi.mocked(readdir).mockResolvedValueOnce(["Notes", ".obsidian", "Private"] as unknown as Awaited<
-      ReturnType<typeof readdir>
-    >);
+    it("computes sub-path exclusions for partially-mounted directories", async () => {
+      vi.mocked(readdir)
+        .mockResolvedValueOnce(["20-areas", "00-inbox"] as unknown as Awaited<
+          ReturnType<typeof readdir>
+        >)
+        .mockResolvedValueOnce([
+          makeDirent("career", true),
+          makeDirent("idea", true),
+          makeDirent("otaviof", true),
+          makeDirent("readme.md", false),
+        ] as unknown as Awaited<ReturnType<typeof readdir>>);
 
-    await syncFilesExclude("/vault", ["Notes"], [], []);
+      const result = await syncFilesExclude("/vault", ["20-areas/idea"], [], []);
 
-    expect(projectMockUpdate).toHaveBeenCalledWith(
-      "exclude",
-      { "editor.fontSize": true },
-      vscode.ConfigurationTarget.WorkspaceFolder,
-    );
+      expect(result).toContain("20-areas/career");
+      expect(result).toContain("20-areas/otaviof");
+      expect(result).toContain("00-inbox");
+      expect(result).not.toContain("20-areas/idea");
+      expect(result).not.toContain("20-areas");
+    });
+
+    it("skips files in sub-path enumeration (directories only)", async () => {
+      vi.mocked(readdir)
+        .mockResolvedValueOnce(["20-areas"] as unknown as Awaited<ReturnType<typeof readdir>>)
+        .mockResolvedValueOnce([
+          makeDirent("idea", true),
+          makeDirent("notes.md", false),
+          makeDirent("index.md", false),
+        ] as unknown as Awaited<ReturnType<typeof readdir>>);
+
+      const result = await syncFilesExclude("/vault", ["20-areas/idea"], [], []);
+
+      expect(result).toEqual([]);
+    });
+
+    it("handles deeply nested partial mounts", async () => {
+      vi.mocked(readdir)
+        .mockResolvedValueOnce(["10-projects"] as unknown as Awaited<ReturnType<typeof readdir>>)
+        .mockResolvedValueOnce([
+          makeDirent("active", true),
+          makeDirent("archived", true),
+        ] as unknown as Awaited<ReturnType<typeof readdir>>)
+        .mockResolvedValueOnce([
+          makeDirent("2024", true),
+          makeDirent("2023", true),
+        ] as unknown as Awaited<ReturnType<typeof readdir>>);
+
+      const result = await syncFilesExclude("/vault", ["10-projects/active/2024"], [], []);
+
+      expect(result).toContain("10-projects/archived");
+      expect(result).toContain("10-projects/active/2023");
+      expect(result).not.toContain("10-projects/active/2024");
+      expect(result).not.toContain("10-projects");
+    });
+
+    it("treats fully-mounted paths as before (no sub-enumeration)", async () => {
+      vi.mocked(readdir).mockResolvedValueOnce(["20-areas", "00-inbox"] as unknown as Awaited<
+        ReturnType<typeof readdir>
+      >);
+
+      const result = await syncFilesExclude("/vault", ["20-areas"], [], []);
+
+      expect(result).toContain("00-inbox");
+      expect(result).not.toContain("20-areas");
+      expect(readdir).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("stale pattern cleanup", () => {
+    it("preserves existing folder-scoped patterns from user", async () => {
+      vi.mocked(readdir).mockResolvedValueOnce(["Notes", ".obsidian"] as unknown as Awaited<
+        ReturnType<typeof readdir>
+      >);
+      mockInspect.mockReturnValue({
+        workspaceFolderValue: { "**/.git": true },
+        workspaceValue: undefined,
+      });
+
+      const result = await syncFilesExclude("/vault", ["Notes"], [], []);
+
+      expect(mockUpdate).toHaveBeenCalledWith(
+        "exclude",
+        expect.objectContaining({ "**/.git": true, ".obsidian": true }),
+        vscode.ConfigurationTarget.WorkspaceFolder,
+      );
+      expect(result).toEqual([".obsidian"]);
+    });
+
+    it("removes stale managed patterns no longer needed", async () => {
+      vi.mocked(readdir).mockResolvedValueOnce(["Notes", "Private"] as unknown as Awaited<
+        ReturnType<typeof readdir>
+      >);
+      mockInspect.mockReturnValue({
+        workspaceFolderValue: { ".OldDot": true },
+        workspaceValue: { OldDir: true, Private: true },
+      });
+
+      const result = await syncFilesExclude(
+        "/vault",
+        ["Notes"],
+        [],
+        [".OldDot", "OldDir", "Private"],
+      );
+
+      expect(result).toContain("Private");
+      expect(result).not.toContain("OldDir");
+      expect(result).not.toContain(".OldDot");
+      const folderCall = mockUpdate.mock.calls.find(
+        (c: unknown[]) => c[2] === vscode.ConfigurationTarget.WorkspaceFolder,
+      );
+      expect(folderCall?.[1]).not.toHaveProperty(".OldDot");
+      const wsCall = mockUpdate.mock.calls.find(
+        (c: unknown[]) => c[2] === vscode.ConfigurationTarget.Workspace,
+      );
+      expect(wsCall?.[1]).toHaveProperty("Private");
+      expect(wsCall?.[1]).not.toHaveProperty("OldDir");
+    });
+
+    it("returns empty array when all entries are autoMounted", async () => {
+      vi.mocked(readdir).mockResolvedValueOnce(["Notes", "Projects"] as unknown as Awaited<
+        ReturnType<typeof readdir>
+      >);
+
+      const result = await syncFilesExclude("/vault", ["Notes", "Projects"], [], []);
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("migration", () => {
+    it("migrates dotfile patterns from workspace to folder scope", async () => {
+      vi.mocked(readdir).mockResolvedValueOnce(["Notes", ".obsidian"] as unknown as Awaited<
+        ReturnType<typeof readdir>
+      >);
+      mockInspect.mockReturnValue({
+        workspaceFolderValue: {},
+        workspaceValue: { ".obsidian": true, node_modules: true },
+      });
+
+      const result = await syncFilesExclude("/vault", ["Notes"], [], [".obsidian"]);
+
+      expect(result).toContain(".obsidian");
+      expect(mockUpdate).toHaveBeenCalledWith(
+        "exclude",
+        expect.objectContaining({ ".obsidian": true }),
+        vscode.ConfigurationTarget.WorkspaceFolder,
+      );
+      // Migration: .obsidian removed from workspace level, node_modules preserved
+      expect(mockUpdate).toHaveBeenCalledWith(
+        "exclude",
+        { node_modules: true },
+        vscode.ConfigurationTarget.Workspace,
+      );
+    });
+  });
+
+  describe("error handling", () => {
+    it("returns previouslyManaged when readdir fails", async () => {
+      vi.mocked(readdir).mockRejectedValueOnce(new Error("EACCES: permission denied"));
+
+      const result = await syncFilesExclude("/vault", ["Notes"], [], [".obsidian", "Private"]);
+
+      expect(result).toEqual([".obsidian", "Private"]);
+      expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it("handles sub-readdir failure gracefully", async () => {
+      vi.mocked(readdir)
+        .mockResolvedValueOnce(["20-areas", "00-inbox"] as unknown as Awaited<
+          ReturnType<typeof readdir>
+        >)
+        .mockRejectedValueOnce(new Error("EACCES"));
+
+      const result = await syncFilesExclude("/vault", ["20-areas/idea"], [], []);
+
+      expect(result).toContain("00-inbox");
+      expect(result).not.toContain("20-areas");
+    });
+  });
+
+  describe("cross-folder cleanup", () => {
+    it("removes stale managed patterns from non-vault workspace folders", async () => {
+      const projectMockUpdate = vi.fn().mockResolvedValue(undefined);
+      const projectMockInspect = vi.fn(() => ({
+        workspaceFolderValue: {
+          ".obsidian": true,
+          Private: true,
+          "editor.fontSize": true,
+        },
+        workspaceValue: undefined,
+      }));
+
+      workspace.getConfiguration = vi
+        .fn()
+        .mockImplementation((_section: string, scope?: unknown) => {
+          const isProjectFolder =
+            scope &&
+            typeof scope === "object" &&
+            "fsPath" in scope &&
+            scope.fsPath === "/projects/foo";
+          if (isProjectFolder) {
+            return {
+              get: vi.fn((_key: string, defaultValue: unknown) => defaultValue),
+              inspect: projectMockInspect,
+              update: projectMockUpdate,
+            };
+          }
+          return {
+            get: vi.fn((_key: string, defaultValue: unknown) => defaultValue),
+            inspect: mockInspect,
+            update: mockUpdate,
+          };
+        });
+
+      vi.mocked(readdir).mockResolvedValueOnce([
+        "Notes",
+        ".obsidian",
+        "Private",
+      ] as unknown as Awaited<ReturnType<typeof readdir>>);
+
+      await syncFilesExclude("/vault", ["Notes"], [], []);
+
+      expect(projectMockUpdate).toHaveBeenCalledWith(
+        "exclude",
+        { "editor.fontSize": true },
+        vscode.ConfigurationTarget.WorkspaceFolder,
+      );
+    });
   });
 });
 
@@ -972,5 +1002,135 @@ describe("openWorkspaceFile", () => {
     await openWorkspaceFile(fileUri);
 
     expect(vscode.commands.executeCommand).toHaveBeenCalledWith("vscode.openFolder", fileUri);
+  });
+});
+
+describe("excludeVaultFromGitDetection", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("adds path to git.ignoredRepositories when not present", async () => {
+    const gitConfig = { get: vi.fn(), update: vi.fn() };
+    gitConfig.get.mockReturnValue(["/other/vault"]);
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(gitConfig as never);
+
+    await excludeVaultFromGitDetection("/path/to/vault");
+
+    expect(gitConfig.update).toHaveBeenCalledWith(
+      "ignoredRepositories",
+      ["/other/vault", "/path/to/vault"],
+      vscode.ConfigurationTarget.Global,
+    );
+  });
+
+  it("is idempotent when path already present", async () => {
+    const gitConfig = { get: vi.fn(), update: vi.fn() };
+    gitConfig.get.mockReturnValue(["/path/to/vault", "/other/vault"]);
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(gitConfig as never);
+
+    await excludeVaultFromGitDetection("/path/to/vault");
+
+    expect(gitConfig.update).not.toHaveBeenCalled();
+  });
+
+  it("creates array when ignoredRepositories is empty", async () => {
+    const gitConfig = { get: vi.fn(), update: vi.fn() };
+    gitConfig.get.mockReturnValue([]);
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(gitConfig as never);
+
+    await excludeVaultFromGitDetection("/path/to/vault");
+
+    expect(gitConfig.update).toHaveBeenCalledWith(
+      "ignoredRepositories",
+      ["/path/to/vault"],
+      vscode.ConfigurationTarget.Global,
+    );
+  });
+
+  it("uses ConfigurationTarget.Global", async () => {
+    const gitConfig = { get: vi.fn(), update: vi.fn() };
+    gitConfig.get.mockReturnValue([]);
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(gitConfig as never);
+
+    await excludeVaultFromGitDetection("/vault");
+
+    expect(gitConfig.update).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      vscode.ConfigurationTarget.Global,
+    );
+  });
+});
+
+describe("includeVaultInGitDetection", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("removes path from git.ignoredRepositories when present", async () => {
+    const gitConfig = { get: vi.fn(), update: vi.fn() };
+    gitConfig.get.mockReturnValue(["/path/to/vault", "/other/vault"]);
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(gitConfig as never);
+
+    await includeVaultInGitDetection("/path/to/vault");
+
+    expect(gitConfig.update).toHaveBeenCalledWith(
+      "ignoredRepositories",
+      ["/other/vault"],
+      vscode.ConfigurationTarget.Global,
+    );
+  });
+
+  it("is idempotent when path not present", async () => {
+    const gitConfig = { get: vi.fn(), update: vi.fn() };
+    gitConfig.get.mockReturnValue(["/other/vault"]);
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(gitConfig as never);
+
+    await includeVaultInGitDetection("/path/to/vault");
+
+    expect(gitConfig.update).not.toHaveBeenCalled();
+  });
+
+  it("writes undefined when array becomes empty", async () => {
+    const gitConfig = { get: vi.fn(), update: vi.fn() };
+    gitConfig.get.mockReturnValue(["/path/to/vault"]);
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(gitConfig as never);
+
+    await includeVaultInGitDetection("/path/to/vault");
+
+    expect(gitConfig.update).toHaveBeenCalledWith(
+      "ignoredRepositories",
+      undefined,
+      vscode.ConfigurationTarget.Global,
+    );
+  });
+
+  it("preserves other entries when removing one path", async () => {
+    const gitConfig = { get: vi.fn(), update: vi.fn() };
+    gitConfig.get.mockReturnValue(["/vault1", "/vault2", "/vault3"]);
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(gitConfig as never);
+
+    await includeVaultInGitDetection("/vault2");
+
+    expect(gitConfig.update).toHaveBeenCalledWith(
+      "ignoredRepositories",
+      ["/vault1", "/vault3"],
+      vscode.ConfigurationTarget.Global,
+    );
+  });
+
+  it("uses ConfigurationTarget.Global", async () => {
+    const gitConfig = { get: vi.fn(), update: vi.fn() };
+    gitConfig.get.mockReturnValue(["/vault", "/other"]);
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue(gitConfig as never);
+
+    await includeVaultInGitDetection("/vault");
+
+    expect(gitConfig.update).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      vscode.ConfigurationTarget.Global,
+    );
   });
 });

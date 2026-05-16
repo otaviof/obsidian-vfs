@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import type { LocalIndexTracker } from "@obsidian-vfs/core";
 import { buildObsUri } from "@obsidian-vfs/core";
 
-import { CONFIG_KEY, CONFIG_SECTION } from "./types.js";
+import { COMMAND, CONFIG_KEY, CONFIG_SECTION } from "./types.js";
 import { SCHEME, toFileUri, toVaultPath, toVaultPathFromFile } from "./uri-adapter.js";
 import type { VaultTreeDataProvider } from "./vault-tree-provider.js";
 import { readAutoMount } from "./vault-tree-provider.js";
@@ -163,15 +163,15 @@ export function registerCommands(
   outputChannel: vscode.OutputChannel,
 ): void {
   context.subscriptions.push(
-    vscode.commands.registerCommand("obsidianVFS.mount", () => mountCommand(tracker, treeProvider)),
-    vscode.commands.registerCommand("obsidianVFS.mountNote", () =>
+    vscode.commands.registerCommand(COMMAND.mount, () => mountCommand(tracker, treeProvider)),
+    vscode.commands.registerCommand(COMMAND.mountNote, () =>
       mountNoteCommand(tracker, treeProvider),
     ),
-    vscode.commands.registerCommand("obsidianVFS.unmount", () => unmountCommand(treeProvider)),
-    vscode.commands.registerCommand("obsidianVFS.openInObsidian", () =>
+    vscode.commands.registerCommand(COMMAND.unmount, () => unmountCommand(treeProvider)),
+    vscode.commands.registerCommand(COMMAND.openInObsidian, () =>
       openInObsidianCommand(tracker, outputChannel),
     ),
-    vscode.commands.registerCommand("obsidianVFS.searchNotes", () => searchNotesCommand(tracker)),
-    vscode.commands.registerCommand("obsidianVFS.copyPath", () => copyPathCommand(tracker)),
+    vscode.commands.registerCommand(COMMAND.searchNotes, () => searchNotesCommand(tracker)),
+    vscode.commands.registerCommand(COMMAND.copyPath, () => copyPathCommand(tracker)),
   );
 }

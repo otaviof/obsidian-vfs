@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createVscodeMock, fakeUri, mockTracker } from "./test-helpers.js";
+import { createVscodeMock, fakeUri, mockLocalIndexTracker } from "./test-helpers.js";
 
 vi.mock("vscode", () =>
   createVscodeMock({
@@ -59,7 +59,7 @@ describe("ObsidianFileSystemProvider", () => {
 
   describe("stat", () => {
     it("returns mapped FileStat on success", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         stat: vi.fn().mockResolvedValue({
           ok: true,
           value: { type: "file", mtime: 1000, ctime: 900, size: 42 },
@@ -75,7 +75,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("maps directory type", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         stat: vi.fn().mockResolvedValue({
           ok: true,
           value: { type: "directory", mtime: 500, ctime: 400, size: 0 },
@@ -88,7 +88,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("throws on stat failure", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         stat: vi.fn().mockResolvedValue({
           ok: false,
           error: { code: "FILE_NOT_FOUND", message: "gone" },
@@ -102,7 +102,7 @@ describe("ObsidianFileSystemProvider", () => {
 
   describe("readFile", () => {
     it("returns Uint8Array from readVirtualFile", async () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new ObsidianFileSystemProvider(tracker);
       const bytes = new Uint8Array([72, 101, 108, 108, 111]);
       mockReadVirtualFile.mockResolvedValueOnce({ ok: true, value: bytes });
@@ -117,7 +117,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("throws on readVirtualFile failure", async () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new ObsidianFileSystemProvider(tracker);
       mockReadVirtualFile.mockResolvedValueOnce({
         ok: false,
@@ -132,7 +132,7 @@ describe("ObsidianFileSystemProvider", () => {
 
   describe("readDirectory", () => {
     it("returns mapped directory entries", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         readDirectory: vi.fn().mockResolvedValue({
           ok: true,
           value: [
@@ -151,7 +151,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("throws on readDirectory failure", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         readDirectory: vi.fn().mockResolvedValue({
           ok: false,
           error: { code: "FILE_NOT_FOUND", message: "missing dir" },
@@ -165,7 +165,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("filters root entries by autoMount when set", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         readDirectory: vi.fn().mockResolvedValue({
           ok: true,
           value: [
@@ -185,7 +185,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("does not filter non-root entries by autoMount", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         readDirectory: vi.fn().mockResolvedValue({
           ok: true,
           value: [
@@ -204,7 +204,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("returns all root entries when autoMount is empty", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         readDirectory: vi.fn().mockResolvedValue({
           ok: true,
           value: [
@@ -223,7 +223,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("extracts first path segment for file-level autoMount entries", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         readDirectory: vi.fn().mockResolvedValue({
           ok: true,
           value: [
@@ -245,7 +245,7 @@ describe("ObsidianFileSystemProvider", () => {
 
   describe("setAutoMount", () => {
     it("updates root filtering on subsequent readDirectory calls", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         readDirectory: vi.fn().mockResolvedValue({
           ok: true,
           value: [
@@ -267,7 +267,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("fires Created event for added entries", () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new ObsidianFileSystemProvider(tracker, ["Notes"]);
 
       const fired: unknown[] = [];
@@ -282,7 +282,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("fires Deleted event for removed entries", () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new ObsidianFileSystemProvider(tracker, ["Notes", "Projects"]);
 
       const fired: unknown[] = [];
@@ -297,7 +297,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("fires both Created and Deleted events on replacement", () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new ObsidianFileSystemProvider(tracker, ["Notes"]);
 
       const fired: unknown[] = [];
@@ -319,7 +319,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("does not fire events when autoMount set is unchanged", () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new ObsidianFileSystemProvider(tracker, ["Notes", "Projects"]);
 
       const fired: unknown[] = [];
@@ -333,7 +333,7 @@ describe("ObsidianFileSystemProvider", () => {
 
   describe("writeFile", () => {
     it("writes to existing file with overwrite", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         stat: vi.fn().mockResolvedValue({
           ok: true,
           value: { type: "file", mtime: 0, ctime: 0, size: 0 },
@@ -355,7 +355,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("creates parent directories for new file with create=true", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         stat: vi.fn().mockResolvedValue({
           ok: false,
           error: { code: "FILE_NOT_FOUND", message: "nope" },
@@ -380,7 +380,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("throws FileNotFound when file missing and create=false", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         stat: vi.fn().mockResolvedValue({
           ok: false,
           error: { code: "FILE_NOT_FOUND", message: "nope" },
@@ -398,7 +398,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("throws FileExists when file exists and overwrite=false", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         stat: vi.fn().mockResolvedValue({
           ok: true,
           value: { type: "file", mtime: 0, ctime: 0, size: 0 },
@@ -416,7 +416,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("throws on path validation failure", async () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new ObsidianFileSystemProvider(tracker);
       mockValidatePathForWrite.mockResolvedValueOnce({
         ok: false,
@@ -434,7 +434,7 @@ describe("ObsidianFileSystemProvider", () => {
 
   describe("createDirectory", () => {
     it("creates directory after path validation", async () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new ObsidianFileSystemProvider(tracker);
       mockValidatePathForWrite.mockResolvedValueOnce({ ok: true, value: "/vault/newdir" });
       mockMkdir.mockResolvedValueOnce(undefined);
@@ -445,7 +445,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("throws on path validation failure", async () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new ObsidianFileSystemProvider(tracker);
       mockValidatePathForWrite.mockResolvedValueOnce({
         ok: false,
@@ -460,7 +460,7 @@ describe("ObsidianFileSystemProvider", () => {
 
   describe("copy", () => {
     it("reads source and writes to destination", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         stat: vi.fn().mockResolvedValue({
           ok: false,
           error: { code: "FILE_NOT_FOUND", message: "nope" },
@@ -486,7 +486,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("fires Created change event on success", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         stat: vi.fn().mockResolvedValue({
           ok: false,
           error: { code: "FILE_NOT_FOUND", message: "nope" },
@@ -516,7 +516,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("throws FileExists when overwrite=false and destination exists", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         stat: vi.fn().mockResolvedValue({
           ok: true,
           value: { type: "file", mtime: 0, ctime: 0, size: 10 },
@@ -540,7 +540,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("throws on path validation failure", async () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new ObsidianFileSystemProvider(tracker);
 
       mockWorkspaceFsReadFile.mockResolvedValueOnce(new Uint8Array());
@@ -561,7 +561,7 @@ describe("ObsidianFileSystemProvider", () => {
 
   describe("delete", () => {
     it("deletes file after path validation", async () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new ObsidianFileSystemProvider(tracker);
       mockValidatePath.mockResolvedValueOnce({ ok: true, value: "/vault/note.md" });
 
@@ -571,7 +571,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("passes recursive flag through", async () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new ObsidianFileSystemProvider(tracker);
       mockValidatePath.mockResolvedValueOnce({ ok: true, value: "/vault/folder" });
 
@@ -581,7 +581,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("throws on path validation failure", async () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new ObsidianFileSystemProvider(tracker);
       mockValidatePath.mockResolvedValueOnce({
         ok: false,
@@ -596,7 +596,7 @@ describe("ObsidianFileSystemProvider", () => {
 
   describe("rename", () => {
     it("renames file within vault using fs.rename", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         stat: vi.fn().mockResolvedValue({
           ok: false,
           error: { code: "FILE_NOT_FOUND", message: "nope" },
@@ -615,7 +615,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("creates parent directories for rename destination", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         stat: vi.fn().mockResolvedValue({
           ok: false,
           error: { code: "FILE_NOT_FOUND", message: "nope" },
@@ -634,7 +634,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("throws FileExists when overwrite=false and dest exists", async () => {
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         stat: vi.fn().mockResolvedValue({
           ok: true,
           value: { type: "file", mtime: 0, ctime: 0, size: 0 },
@@ -652,7 +652,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("throws on source path validation failure", async () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new ObsidianFileSystemProvider(tracker);
       mockValidatePath.mockResolvedValueOnce({
         ok: false,
@@ -667,7 +667,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("copies to destination and deletes source for outbound cross-scheme move", async () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new ObsidianFileSystemProvider(tracker);
       mockValidatePath.mockResolvedValueOnce({ ok: true, value: "/vault/note.md" });
 
@@ -681,7 +681,7 @@ describe("ObsidianFileSystemProvider", () => {
     });
 
     it("copies without deleting source for inbound cross-scheme move", async () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new ObsidianFileSystemProvider(tracker);
 
       const source = fakeUri("/workspace/note.md", "", "file");
@@ -697,7 +697,7 @@ describe("ObsidianFileSystemProvider", () => {
   describe("watch", () => {
     it("registers a file change listener and returns disposable", () => {
       const mockDisposable = { dispose: vi.fn() };
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         onDidChangeFile: vi.fn().mockReturnValue(mockDisposable),
       });
       const provider = new ObsidianFileSystemProvider(tracker);
@@ -710,7 +710,7 @@ describe("ObsidianFileSystemProvider", () => {
 
     it("forwards events under watched prefix with mapped types", () => {
       let capturedCallback: (events: readonly { type: string; path: string }[]) => void;
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         onDidChangeFile: vi.fn((cb: typeof capturedCallback) => {
           capturedCallback = cb;
           return { dispose: vi.fn() };
@@ -738,7 +738,7 @@ describe("ObsidianFileSystemProvider", () => {
 
     it("filters out events outside watched prefix", () => {
       let capturedCallback: (events: readonly { type: string; path: string }[]) => void;
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         onDidChangeFile: vi.fn((cb: typeof capturedCallback) => {
           capturedCallback = cb;
           return { dispose: vi.fn() };
@@ -763,7 +763,7 @@ describe("ObsidianFileSystemProvider", () => {
 
     it("root watch forwards all events", () => {
       let capturedCallback: (events: readonly { type: string; path: string }[]) => void;
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         onDidChangeFile: vi.fn((cb: typeof capturedCallback) => {
           capturedCallback = cb;
           return { dispose: vi.fn() };
@@ -786,7 +786,7 @@ describe("ObsidianFileSystemProvider", () => {
 
     it("does not fire when no events match prefix", () => {
       let capturedCallback: (events: readonly { type: string; path: string }[]) => void;
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         onDidChangeFile: vi.fn((cb: typeof capturedCallback) => {
           capturedCallback = cb;
           return { dispose: vi.fn() };
@@ -806,7 +806,7 @@ describe("ObsidianFileSystemProvider", () => {
 
     it("avoids false prefix match on similar directory names", () => {
       let capturedCallback: (events: readonly { type: string; path: string }[]) => void;
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         onDidChangeFile: vi.fn((cb: typeof capturedCallback) => {
           capturedCallback = cb;
           return { dispose: vi.fn() };
@@ -829,7 +829,7 @@ describe("ObsidianFileSystemProvider", () => {
 
     it("builds URIs with correct vault name", () => {
       let capturedCallback: (events: readonly { type: string; path: string }[]) => void;
-      const tracker = mockTracker({
+      const tracker = mockLocalIndexTracker({
         onDidChangeFile: vi.fn((cb: typeof capturedCallback) => {
           capturedCallback = cb;
           return { dispose: vi.fn() };
@@ -847,6 +847,22 @@ describe("ObsidianFileSystemProvider", () => {
       const event = fired[0] as { uri: { scheme: string; authority: string } };
       expect(event.uri.scheme).toBe("obs");
       expect(event.uri.authority).toBe("TestVault");
+    });
+  });
+
+  describe("dispose", () => {
+    it("disposes the event emitter", () => {
+      const tracker = mockLocalIndexTracker();
+      const provider = new ObsidianFileSystemProvider(tracker);
+
+      const listener = vi.fn();
+      provider.onDidChangeFile(listener);
+
+      provider.dispose();
+
+      // After dispose, the event emitter should be disposed
+      // This verifies the Disposable contract is fulfilled
+      expect(() => provider.dispose()).not.toThrow();
     });
   });
 });

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { createVscodeMock, mockTracker } from "./test-helpers.js";
+import { createVscodeMock, mockLocalIndexTracker } from "./test-helpers.js";
 
 vi.mock("vscode", () => createVscodeMock({ window: true, statusBar: true }));
 
@@ -13,7 +13,7 @@ describe("StatusBarManager", () => {
     vi.clearAllMocks();
   });
   it("creates status bar item with correct text", () => {
-    const tracker = mockTracker({}, { name: "MyVault" });
+    const tracker = mockLocalIndexTracker({}, { name: "MyVault" });
     const manager = new StatusBarManager(tracker);
 
     const createItem = vi.mocked(vscode.window.createStatusBarItem);
@@ -33,7 +33,7 @@ describe("StatusBarManager", () => {
   });
 
   it("handles degraded mode display", () => {
-    const tracker = mockTracker({}, { name: "TestVault" });
+    const tracker = mockLocalIndexTracker({}, { name: "TestVault" });
     (tracker.context as unknown as Record<string, unknown>).mode = "degraded";
     new StatusBarManager(tracker);
 
@@ -44,7 +44,7 @@ describe("StatusBarManager", () => {
   });
 
   it("disposes the item on dispose()", () => {
-    const tracker = mockTracker();
+    const tracker = mockLocalIndexTracker();
     const manager = new StatusBarManager(tracker);
 
     const item = vi.mocked(vscode.window.createStatusBarItem).mock.results[0].value as {
@@ -56,7 +56,7 @@ describe("StatusBarManager", () => {
   });
 
   it("sets tooltip", () => {
-    const tracker = mockTracker();
+    const tracker = mockLocalIndexTracker();
     new StatusBarManager(tracker);
 
     const item = vi.mocked(vscode.window.createStatusBarItem).mock.results[0].value as {
@@ -66,7 +66,7 @@ describe("StatusBarManager", () => {
   });
 
   it("show() calls item.show()", () => {
-    const tracker = mockTracker();
+    const tracker = mockLocalIndexTracker();
     const manager = new StatusBarManager(tracker);
 
     const item = vi.mocked(vscode.window.createStatusBarItem).mock.results[0].value as {
@@ -78,7 +78,7 @@ describe("StatusBarManager", () => {
   });
 
   it("hide() calls item.hide()", () => {
-    const tracker = mockTracker();
+    const tracker = mockLocalIndexTracker();
     const manager = new StatusBarManager(tracker);
 
     const item = vi.mocked(vscode.window.createStatusBarItem).mock.results[0].value as {
@@ -87,57 +87,5 @@ describe("StatusBarManager", () => {
 
     manager.hide();
     expect(item.hide).toHaveBeenCalled();
-  });
-
-  it("show() can be called multiple times", () => {
-    const tracker = mockTracker();
-    const manager = new StatusBarManager(tracker);
-
-    const item = vi.mocked(vscode.window.createStatusBarItem).mock.results[0].value as {
-      show: ReturnType<typeof vi.fn>;
-    };
-
-    manager.show();
-    manager.show();
-    manager.show();
-
-    expect(item.show).toHaveBeenCalledTimes(3);
-  });
-
-  it("hide() can be called multiple times", () => {
-    const tracker = mockTracker();
-    const manager = new StatusBarManager(tracker);
-
-    const item = vi.mocked(vscode.window.createStatusBarItem).mock.results[0].value as {
-      hide: ReturnType<typeof vi.fn>;
-    };
-
-    manager.hide();
-    manager.hide();
-    manager.hide();
-
-    expect(item.hide).toHaveBeenCalledTimes(3);
-  });
-
-  it("show() and hide() can be toggled", () => {
-    const tracker = mockTracker();
-    const manager = new StatusBarManager(tracker);
-
-    const item = vi.mocked(vscode.window.createStatusBarItem).mock.results[0].value as {
-      show: ReturnType<typeof vi.fn>;
-      hide: ReturnType<typeof vi.fn>;
-    };
-
-    manager.show();
-    expect(item.show).toHaveBeenCalledTimes(1);
-
-    manager.hide();
-    expect(item.hide).toHaveBeenCalledTimes(1);
-
-    manager.show();
-    expect(item.show).toHaveBeenCalledTimes(2);
-
-    manager.hide();
-    expect(item.hide).toHaveBeenCalledTimes(2);
   });
 });

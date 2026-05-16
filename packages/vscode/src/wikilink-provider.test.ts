@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createVscodeMock, mockTracker } from "./test-helpers.js";
+import { createVscodeMock, mockLocalIndexTracker } from "./test-helpers.js";
 
 vi.mock("vscode", () => createVscodeMock({ uri: true, documentLink: true, range: true }));
 
@@ -45,7 +45,7 @@ function makeParsedLink(overrides: Partial<ParsedLink> = {}): ParsedLink {
 
 describe("WikilinkDocumentLinkProvider", () => {
   it("resolves wikilinks and returns DocumentLinks", async () => {
-    const tracker = mockTracker({
+    const tracker = mockLocalIndexTracker({
       resolveWikilink: vi.fn().mockResolvedValue({
         ok: true,
         value: { resolvedPath: "folder/Note.md", candidates: [] },
@@ -65,7 +65,7 @@ describe("WikilinkDocumentLinkProvider", () => {
   });
 
   it("skips failed wikilink resolutions", async () => {
-    const tracker = mockTracker({
+    const tracker = mockLocalIndexTracker({
       resolveWikilink: vi.fn().mockResolvedValue({
         ok: false,
         error: { code: "FILE_NOT_FOUND", message: "nope" },
@@ -81,7 +81,7 @@ describe("WikilinkDocumentLinkProvider", () => {
   });
 
   it("returns empty array for documents with no wikilinks", async () => {
-    const tracker = mockTracker();
+    const tracker = mockLocalIndexTracker();
     mockParseMarkdownLinks.mockReturnValueOnce([]);
 
     const provider = new WikilinkDocumentLinkProvider(tracker);
@@ -91,7 +91,7 @@ describe("WikilinkDocumentLinkProvider", () => {
   });
 
   it("excludes embed entries", async () => {
-    const tracker = mockTracker({
+    const tracker = mockLocalIndexTracker({
       resolveWikilink: vi.fn().mockResolvedValue({
         ok: true,
         value: { resolvedPath: "Note.md", candidates: [] },
@@ -114,7 +114,7 @@ describe("WikilinkDocumentLinkProvider", () => {
   });
 
   it("handles multiple wikilinks in same document", async () => {
-    const tracker = mockTracker({
+    const tracker = mockLocalIndexTracker({
       resolveWikilink: vi
         .fn()
         .mockResolvedValueOnce({ ok: true, value: { resolvedPath: "A.md", candidates: [] } })
@@ -133,7 +133,7 @@ describe("WikilinkDocumentLinkProvider", () => {
   });
 
   it("handles wikilinks with sections (section is part of target)", async () => {
-    const tracker = mockTracker({
+    const tracker = mockLocalIndexTracker({
       resolveWikilink: vi.fn().mockResolvedValue({
         ok: true,
         value: { resolvedPath: "Note.md", candidates: [] },
@@ -153,7 +153,7 @@ describe("WikilinkDocumentLinkProvider", () => {
   });
 
   it("handles empty document", async () => {
-    const tracker = mockTracker();
+    const tracker = mockLocalIndexTracker();
     mockParseMarkdownLinks.mockReturnValueOnce([]);
 
     const provider = new WikilinkDocumentLinkProvider(tracker);
@@ -164,7 +164,7 @@ describe("WikilinkDocumentLinkProvider", () => {
 
   it("handles document with only embeds (no wikilinks)", async () => {
     const resolveWikilink = vi.fn();
-    const tracker = mockTracker({ resolveWikilink });
+    const tracker = mockLocalIndexTracker({ resolveWikilink });
 
     mockParseMarkdownLinks.mockReturnValueOnce([
       makeParsedLink({ kind: "embed", target: "A" }),
@@ -179,7 +179,7 @@ describe("WikilinkDocumentLinkProvider", () => {
   });
 
   it("handles mixed successful and failed resolutions", async () => {
-    const tracker = mockTracker({
+    const tracker = mockLocalIndexTracker({
       resolveWikilink: vi
         .fn()
         .mockResolvedValueOnce({ ok: true, value: { resolvedPath: "A.md", candidates: [] } })
@@ -202,7 +202,7 @@ describe("WikilinkDocumentLinkProvider", () => {
   });
 
   it("correctly maps character positions to VSCode ranges", async () => {
-    const tracker = mockTracker({
+    const tracker = mockLocalIndexTracker({
       resolveWikilink: vi.fn().mockResolvedValue({
         ok: true,
         value: { resolvedPath: "Note.md", candidates: [] },
@@ -223,7 +223,7 @@ describe("WikilinkDocumentLinkProvider", () => {
   });
 
   it("handles multiline documents correctly", async () => {
-    const tracker = mockTracker({
+    const tracker = mockLocalIndexTracker({
       resolveWikilink: vi.fn().mockResolvedValue({
         ok: true,
         value: { resolvedPath: "Note.md", candidates: [] },

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createVscodeMock, mockTracker } from "./test-helpers.js";
+import { createVscodeMock, mockLocalIndexTracker } from "./test-helpers.js";
 
 vi.mock("vscode", () =>
   createVscodeMock({ eventEmitter: true, treeView: true, uri: true, workspace: true }),
@@ -49,7 +49,7 @@ describe("VaultTreeDataProvider", () => {
   });
 
   it("returns empty tree when autoMount is empty", async () => {
-    const tracker = mockTracker();
+    const tracker = mockLocalIndexTracker();
     const provider = new VaultTreeDataProvider(tracker);
     const children = await provider.getChildren();
 
@@ -66,7 +66,7 @@ describe("VaultTreeDataProvider", () => {
       }),
     } as never);
 
-    const tracker = mockTracker({
+    const tracker = mockLocalIndexTracker({
       stat: vi.fn().mockResolvedValue({
         ok: true,
         value: { type: "directory", mtime: 0, ctime: 0, size: 0 },
@@ -92,7 +92,7 @@ describe("VaultTreeDataProvider", () => {
       }),
     } as never);
 
-    const tracker = mockTracker({
+    const tracker = mockLocalIndexTracker({
       stat: vi
         .fn()
         .mockImplementation((path: string) =>
@@ -127,7 +127,7 @@ describe("VaultTreeDataProvider", () => {
       }),
     } as never);
 
-    const tracker = mockTracker({
+    const tracker = mockLocalIndexTracker({
       stat: vi.fn().mockResolvedValue({
         ok: false,
         error: { code: "FILE_NOT_FOUND", message: "not found" },
@@ -144,7 +144,7 @@ describe("VaultTreeDataProvider", () => {
   });
 
   it("returns nested children for a folder element", async () => {
-    const tracker = mockTracker({
+    const tracker = mockLocalIndexTracker({
       readDirectory: vi.fn().mockResolvedValue({
         ok: true,
         value: [
@@ -166,7 +166,7 @@ describe("VaultTreeDataProvider", () => {
   });
 
   it("sorts folders before files, then alphabetically", async () => {
-    const tracker = mockTracker({
+    const tracker = mockLocalIndexTracker({
       readDirectory: vi.fn().mockResolvedValue({
         ok: true,
         value: [
@@ -189,7 +189,7 @@ describe("VaultTreeDataProvider", () => {
   });
 
   it("returns empty array on readDirectory failure", async () => {
-    const tracker = mockTracker({
+    const tracker = mockLocalIndexTracker({
       readDirectory: vi.fn().mockResolvedValue({
         ok: false,
         error: { code: "VAULT_NOT_FOUND", message: "nope" },
@@ -206,7 +206,7 @@ describe("VaultTreeDataProvider", () => {
   });
 
   it("fires onDidChangeTreeData on refresh()", () => {
-    const tracker = mockTracker();
+    const tracker = mockLocalIndexTracker();
     const provider = new VaultTreeDataProvider(tracker);
 
     const listener = vi.fn();
@@ -226,7 +226,7 @@ describe("VaultTreeDataProvider", () => {
       }),
     } as never);
 
-    const tracker = mockTracker({
+    const tracker = mockLocalIndexTracker({
       stat: vi.fn().mockResolvedValue({
         ok: true,
         value: { type: "directory", mtime: 0, ctime: 0, size: 0 },
@@ -242,7 +242,7 @@ describe("VaultTreeDataProvider", () => {
   });
 
   it("refreshes when enabled changes", () => {
-    const tracker = mockTracker();
+    const tracker = mockLocalIndexTracker();
     const provider = new VaultTreeDataProvider(tracker);
 
     const listener = vi.fn();
@@ -259,7 +259,7 @@ describe("VaultTreeDataProvider", () => {
   });
 
   it("getTreeItem returns the element itself", () => {
-    const tracker = mockTracker();
+    const tracker = mockLocalIndexTracker();
     const provider = new VaultTreeDataProvider(tracker);
     const item = new VaultTreeItem("test.md", "test.md", "file", "/vault");
 
@@ -270,7 +270,7 @@ describe("VaultTreeDataProvider", () => {
 
   describe("getParent", () => {
     it("returns undefined for root-level items", () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new VaultTreeDataProvider(tracker);
       const item = new VaultTreeItem("notes", "notes", "directory", "/vault");
 
@@ -280,7 +280,7 @@ describe("VaultTreeDataProvider", () => {
     });
 
     it("returns parent folder for nested file", () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new VaultTreeDataProvider(tracker);
       const item = new VaultTreeItem("readme.md", "docs/readme.md", "file", "/vault");
 
@@ -294,7 +294,7 @@ describe("VaultTreeDataProvider", () => {
     });
 
     it("returns parent folder for deeply nested item", () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new VaultTreeDataProvider(tracker);
       const item = new VaultTreeItem("plan.md", "projects/active/plan.md", "file", "/vault");
 
@@ -307,7 +307,7 @@ describe("VaultTreeDataProvider", () => {
     });
 
     it("returns parent for nested directory", () => {
-      const tracker = mockTracker();
+      const tracker = mockLocalIndexTracker();
       const provider = new VaultTreeDataProvider(tracker);
       const item = new VaultTreeItem("sub", "notes/sub", "directory", "/vault");
 

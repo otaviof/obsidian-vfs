@@ -11,6 +11,16 @@ export const CONFIG_KEY = {
   depthLimit: `${CONFIG_SECTION}.depthLimit`,
 } as const;
 
+/** Command identifiers for the extension. */
+export const COMMAND = {
+  mount: `${CONFIG_SECTION}.mount`,
+  mountNote: `${CONFIG_SECTION}.mountNote`,
+  unmount: `${CONFIG_SECTION}.unmount`,
+  openInObsidian: `${CONFIG_SECTION}.openInObsidian`,
+  searchNotes: `${CONFIG_SECTION}.searchNotes`,
+  copyPath: `${CONFIG_SECTION}.copyPath`,
+} as const;
+
 /** VSCode extension configuration read from `obsidianVFS` settings. */
 export interface ExtensionConfig {
   readonly cliPath: string;
