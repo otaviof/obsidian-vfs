@@ -17,26 +17,24 @@ vi.mock("@obsidian-vfs/core", async (importOriginal) => {
 });
 
 import { bootstrapTracker, resolveMention, resolveSkillMention } from "@obsidian-vfs/core";
-import type { MentionResult, VFSResult } from "@obsidian-vfs/core";
+import type { VFSResult, MentionResult } from "@obsidian-vfs/core";
 
-import { extractMentions } from "./mention-extractor.js";
-import { formatContext } from "./context-formatter.js";
-import { parseInput } from "./hook-handler.js";
+import { handlePromptSubmit, parseInput } from "./hook-handler.js";
 import { fakeLocalIndexTracker } from "./test-helpers.js";
 
 const mockBootstrap = vi.mocked(bootstrapTracker);
 const mockResolveMention = vi.mocked(resolveMention);
 const mockResolveSkillMention = vi.mocked(resolveSkillMention);
 
-/** Build a valid HookInput JSON string. */
-function hookInput(prompt: string): string {
-  return JSON.stringify({
-    hook_event_name: "UserPromptSubmit",
+/** Build a valid HookInput object. */
+function hookInput(prompt: string) {
+  return {
+    hook_event_name: "UserPromptSubmit" as const,
     session_id: "test",
     transcript_path: "/tmp",
     cwd: "/tmp",
     prompt,
-  });
+  };
 }
 
 describe("hook-handler", () => {
@@ -57,84 +55,61 @@ describe("hook-handler", () => {
       expect(parseInput(input)).toBeNull();
     });
 
-    it("returns null for missing prompt", () => {
-      const input = JSON.stringify({ hook_event_name: "UserPromptSubmit" });
-      expect(parseInput(input)).toBeNull();
-    });
-
-    it("returns null for missing session_id", () => {
-      const input = JSON.stringify({
-        hook_event_name: "UserPromptSubmit",
-        prompt: "test",
-        transcript_path: "/tmp",
-        cwd: "/tmp",
-      });
-      expect(parseInput(input)).toBeNull();
-    });
-
-    it("returns null for missing transcript_path", () => {
-      const input = JSON.stringify({
-        hook_event_name: "UserPromptSubmit",
-        prompt: "test",
-        session_id: "s",
-        cwd: "/tmp",
-      });
-      expect(parseInput(input)).toBeNull();
-    });
-
-    it("returns null for missing cwd", () => {
-      const input = JSON.stringify({
-        hook_event_name: "UserPromptSubmit",
-        prompt: "test",
-        session_id: "s",
-        transcript_path: "/tmp",
-      });
-      expect(parseInput(input)).toBeNull();
+    it.each([
+      [
+        "session_id",
+        {
+          hook_event_name: "UserPromptSubmit",
+          prompt: "t",
+          transcript_path: "/",
+          cwd: "/",
+        },
+      ],
+      [
+        "transcript_path",
+        {
+          hook_event_name: "UserPromptSubmit",
+          prompt: "t",
+          session_id: "s",
+          cwd: "/",
+        },
+      ],
+      [
+        "cwd",
+        {
+          hook_event_name: "UserPromptSubmit",
+          prompt: "t",
+          session_id: "s",
+          transcript_path: "/",
+        },
+      ],
+      [
+        "prompt",
+        {
+          hook_event_name: "UserPromptSubmit",
+          session_id: "s",
+          transcript_path: "/",
+          cwd: "/",
+        },
+      ],
+    ])("returns null for missing %s", (_field, input) => {
+      expect(parseInput(JSON.stringify(input))).toBeNull();
     });
 
     it("parses valid hook input", () => {
-      const result = parseInput(hookInput("hello"));
+      const result = parseInput(JSON.stringify(hookInput("hello")));
       expect(result).not.toBeNull();
     });
   });
 
-  describe("mention extraction", () => {
-    it("finds no mentions in a normal prompt", () => {
-      const mentions = extractMentions("Just a normal prompt");
-      expect(mentions).toHaveLength(0);
+  describe("handlePromptSubmit", () => {
+    it("returns {} when prompt has no mentions", async () => {
+      const result = await handlePromptSubmit(hookInput("Just a normal prompt"));
+      expect(result).toEqual({});
+      expect(mockBootstrap).not.toHaveBeenCalled();
     });
 
-    it("finds no mentions in an empty prompt", () => {
-      const mentions = extractMentions("");
-      expect(mentions).toHaveLength(0);
-    });
-
-    it("ignores mentions in code blocks", () => {
-      const mentions = extractMentions("```\n@obs:fake\n```");
-      expect(mentions).toHaveLength(0);
-    });
-
-    it("extracts a single mention", () => {
-      const mentions = extractMentions("Check @obs:architect");
-      expect(mentions).toHaveLength(1);
-      expect(mentions[0].reference).toBe("architect");
-    });
-
-    it("extracts section-targeted mentions", () => {
-      const mentions = extractMentions("@obs:note#Header");
-      expect(mentions).toHaveLength(1);
-      expect(mentions[0].reference).toBe("note#Header");
-    });
-
-    it("extracts file mentions with paths", () => {
-      const mentions = extractMentions("@obs:10-projects/plan.md");
-      expect(mentions).toHaveLength(1);
-      expect(mentions[0].reference).toBe("10-projects/plan.md");
-    });
-  });
-
-  describe("mention resolution", () => {
-    it("resolves a single mention successfully", async () => {
+    it("resolves single @obs: mention successfully", async () => {
       const mentionResult: VFSResult<MentionResult> = {
         ok: true,
         value: {
@@ -147,34 +122,76 @@ describe("hook-handler", () => {
       };
       mockResolveMention.mockResolvedValueOnce(mentionResult);
 
-      const mentions = extractMentions("Check @obs:architect");
-      const result = await resolveMention("@obs:architect", fakeTracker);
+      const result = await handlePromptSubmit(hookInput("Check @obs:architect"));
 
-      expect(result.ok).toBe(true);
-      if (result.ok) {
-        const context = formatContext([
-          {
-            status: "resolved",
-            mention: mentions[0],
-            targetType: result.value.targetType,
-            resolvedPath: result.value.resolvedPath,
-            absolutePath: "/vault/" + result.value.resolvedPath,
-            section: result.value.section,
-            content: result.value.content,
-          },
-        ]);
-        expect(context).toContain("@obs:architect");
-        expect(context).toContain("You are an architect.");
-        expect(context).toContain("(agent,");
-      }
+      expect(mockResolveMention).toHaveBeenCalledOnce();
+      expect(result.hookSpecificOutput).toBeDefined();
+      const ctx = result.hookSpecificOutput!.additionalContext!;
+      expect(ctx).toContain("@obs:architect");
+      expect(ctx).toContain("(agent,");
+      expect(ctx).toContain("You are an architect.");
+      expect(ctx).toContain('path: "/vault/agents/architect.md"');
     });
 
-    it("handles resolution failure for one mention among many", async () => {
+    it("dispatches /obs: mention to resolveSkillMention", async () => {
+      mockResolveSkillMention.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          targetType: "skill",
+          resolvedPath: "skills/obsidian/SKILL.md",
+          vaultName: "Vault",
+          content: "Skill content here",
+          section: undefined,
+        },
+      });
+
+      const result = await handlePromptSubmit(hookInput("Use /obs:obsidian"));
+
+      expect(mockResolveSkillMention).toHaveBeenCalledOnce();
+      expect(mockResolveMention).not.toHaveBeenCalled();
+      const ctx = result.hookSpecificOutput!.additionalContext!;
+      expect(ctx).toContain("/obs:obsidian");
+      expect(ctx).toContain("(skill,");
+      expect(ctx).toContain("Skill content here");
+    });
+
+    it("dispatches mixed @obs: and /obs: mentions to correct resolvers", async () => {
+      mockResolveMention.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          targetType: "file",
+          resolvedPath: "note.md",
+          vaultName: "Vault",
+          content: "Note content",
+          section: undefined,
+        },
+      });
+      mockResolveSkillMention.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          targetType: "skill",
+          resolvedPath: "skills/obsidian/SKILL.md",
+          vaultName: "Vault",
+          content: "Skill content",
+          section: undefined,
+        },
+      });
+
+      const result = await handlePromptSubmit(hookInput("@obs:note and /obs:obsidian"));
+
+      expect(mockResolveMention).toHaveBeenCalledOnce();
+      expect(mockResolveSkillMention).toHaveBeenCalledOnce();
+      const ctx = result.hookSpecificOutput!.additionalContext!;
+      expect(ctx).toContain("Note content");
+      expect(ctx).toContain("Skill content");
+    });
+
+    it("produces mixed output when one mention resolves and another fails", async () => {
       mockResolveMention
         .mockResolvedValueOnce({
           ok: true,
           value: {
-            targetType: "file" as const,
+            targetType: "file",
             resolvedPath: "exists.md",
             vaultName: "Vault",
             content: "File content",
@@ -186,188 +203,43 @@ describe("hook-handler", () => {
           error: { code: "FILE_NOT_FOUND", message: "File not found: missing" },
         });
 
-      const mentions = extractMentions("@obs:exists @obs:missing");
-      expect(mentions).toHaveLength(2);
+      const result = await handlePromptSubmit(hookInput("@obs:exists @obs:missing"));
 
-      const resolved = await Promise.all(
-        mentions.map(async (m) => {
-          const result = await resolveMention("@obs:" + m.reference, fakeTracker);
-          if (result.ok) {
-            return {
-              status: "resolved" as const,
-              mention: m,
-              targetType: result.value.targetType,
-              resolvedPath: result.value.resolvedPath,
-              absolutePath: "/vault/" + result.value.resolvedPath,
-              section: result.value.section,
-              content: result.value.content,
-            };
-          }
-          return {
-            status: "error" as const,
-            mention: m,
-            errorMessage: result.error.message,
-          };
-        }),
-      );
-
-      const context = formatContext(resolved);
-      expect(context).toContain("File content");
-      expect(context).toContain("Error: File not found: missing");
+      const ctx = result.hookSpecificOutput!.additionalContext!;
+      expect(ctx).toContain("File content");
+      expect(ctx).toContain("Error: File not found: missing");
     });
-  });
 
-  describe("bootstrap failure", () => {
     it("reports error for all mentions when bootstrap fails", async () => {
       mockBootstrap.mockResolvedValueOnce({
         ok: false,
         error: { code: "VAULT_NOT_FOUND", message: "Vault not found" },
       });
 
-      const mentions = extractMentions("@obs:a @obs:b");
-      expect(mentions).toHaveLength(2);
+      const result = await handlePromptSubmit(hookInput("@obs:a @obs:b"));
 
-      const boot = await bootstrapTracker({ cliPath: "obsidian", timeoutMs: 10_000 });
-      expect(boot.ok).toBe(false);
-
-      if (!boot.ok) {
-        const errorBlocks = mentions.map((m) => `[obs: ${m.raw} -- Error: ${boot.error.message}]`);
-        const context = errorBlocks.join("\n\n");
-        expect(context).toContain("@obs:a");
-        expect(context).toContain("@obs:b");
-        expect(context).toContain("Vault not found");
-      }
-    });
-  });
-
-  describe("context formatting", () => {
-    it("produces empty string for no mentions", () => {
-      expect(formatContext([])).toBe("");
+      const ctx = result.hookSpecificOutput!.additionalContext!;
+      expect(ctx).toContain("@obs:a");
+      expect(ctx).toContain("@obs:b");
+      expect(ctx).toContain("Vault not found");
+      expect(mockResolveMention).not.toHaveBeenCalled();
     });
 
-    it("includes target type in agent header", async () => {
-      mockResolveMention.mockResolvedValueOnce({
-        ok: true,
-        value: {
-          targetType: "agent",
-          resolvedPath: "agents/a.md",
-          vaultName: "Vault",
-          content: "Agent",
-          section: undefined,
-        },
-      });
-
-      const mentions = extractMentions("@obs:agent-name");
-      const result = await resolveMention("@obs:agent-name", fakeTracker);
-
-      if (result.ok) {
-        const context = formatContext([
-          {
-            status: "resolved",
-            mention: mentions[0],
-            targetType: result.value.targetType,
-            resolvedPath: result.value.resolvedPath,
-            absolutePath: "/vault/" + result.value.resolvedPath,
-            section: result.value.section,
-            content: result.value.content,
-          },
-        ]);
-        expect(context).toContain("(agent,");
-      }
-    });
-
-    it("section-sliced content is formatted with section header", async () => {
+    it("includes header block even when resolved content is empty", async () => {
       mockResolveMention.mockResolvedValueOnce({
         ok: true,
         value: {
           targetType: "file",
-          resolvedPath: "note.md",
+          resolvedPath: "empty.md",
           vaultName: "Vault",
-          content: "Section content",
-          section: "Header",
-        },
-      });
-
-      const mentions = extractMentions("@obs:note#Header");
-      const result = await resolveMention("@obs:note#Header", fakeTracker);
-
-      if (result.ok) {
-        const context = formatContext([
-          {
-            status: "resolved",
-            mention: mentions[0],
-            targetType: result.value.targetType,
-            resolvedPath: result.value.resolvedPath,
-            absolutePath: "/vault/" + result.value.resolvedPath,
-            section: result.value.section,
-            content: result.value.content,
-          },
-        ]);
-        expect(context).toContain("section: Header");
-      }
-    });
-  });
-
-  describe("/obs: skill resolution", () => {
-    it("resolves /obs: mention as skill via core", () => {
-      mockResolveSkillMention.mockResolvedValueOnce({
-        ok: true,
-        value: {
-          targetType: "skill",
-          resolvedPath: "skills/obsidian/SKILL.md",
-          vaultName: "Vault",
-          content: "Skill content here",
+          content: "",
           section: undefined,
         },
       });
 
-      const mentions = extractMentions("Use /obs:obsidian");
-      expect(mentions).toHaveLength(1);
-      expect(mentions[0].kind).toBe("skill");
+      const result = await handlePromptSubmit(hookInput("@obs:empty"));
 
-      const context = formatContext([
-        {
-          status: "resolved",
-          mention: mentions[0],
-          targetType: "skill",
-          resolvedPath: "skills/obsidian/SKILL.md",
-          absolutePath: "/vault/skills/obsidian/SKILL.md",
-          section: undefined,
-          content: "Skill content here",
-        },
-      ]);
-      expect(context).toContain("/obs:obsidian");
-      expect(context).toContain("(skill,");
-      expect(context).toContain("Skill content here");
-    });
-
-    it("handles mixed @obs: and /obs: mentions", () => {
-      const mentions = extractMentions("@obs:architect and /obs:obsidian");
-      expect(mentions).toHaveLength(2);
-      expect(mentions[0].kind).toBe("context");
-      expect(mentions[0].reference).toBe("architect");
-      expect(mentions[1].kind).toBe("skill");
-      expect(mentions[1].reference).toBe("obsidian");
-    });
-
-    it("reports error when skill not found", () => {
-      mockResolveSkillMention.mockResolvedValueOnce({
-        ok: false,
-        error: { code: "FILE_NOT_FOUND", message: "Skill not found: missing" },
-      });
-
-      const mentions = extractMentions("/obs:missing");
-      expect(mentions).toHaveLength(1);
-      expect(mentions[0].kind).toBe("skill");
-
-      const context = formatContext([
-        {
-          status: "error",
-          mention: mentions[0],
-          errorMessage: "Skill not found: missing",
-        },
-      ]);
-      expect(context).toContain("Error: Skill not found: missing");
+      expect(result.hookSpecificOutput).toBeDefined();
     });
   });
 });

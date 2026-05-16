@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { runHookEntry } from "./stdin-runner.js";
 
@@ -19,6 +19,10 @@ function mockStdin(data: string): void {
 }
 
 describe("runHookEntry", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("writes {} when parser returns null", async () => {
     const writes: string[] = [];
     vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
@@ -29,10 +33,9 @@ describe("runHookEntry", () => {
     mockStdin("invalid");
     runHookEntry("test", () => null, vi.fn());
 
-    await new Promise((r) => setTimeout(r, 50));
-
-    expect(writes).toContain("{}\n");
-    vi.restoreAllMocks();
+    await vi.waitFor(() => {
+      expect(writes).toContain("{}\n");
+    });
   });
 
   it("writes handler output as JSON when parser succeeds", async () => {
@@ -51,10 +54,9 @@ describe("runHookEntry", () => {
       () => Promise.resolve({ result: "ok" }),
     );
 
-    await new Promise((r) => setTimeout(r, 50));
-
-    expect(writes).toContain('{"result":"ok"}\n');
-    vi.restoreAllMocks();
+    await vi.waitFor(() => {
+      expect(writes).toContain('{"result":"ok"}\n');
+    });
   });
 
   it("writes {} and logs to stderr when handler throws", async () => {
@@ -77,10 +79,9 @@ describe("runHookEntry", () => {
       () => Promise.reject(new Error("boom")),
     );
 
-    await new Promise((r) => setTimeout(r, 50));
-
-    expect(stdoutWrites).toContain("{}\n");
-    expect(stderrWrites.some((w) => w.includes("test-handler") && w.includes("boom"))).toBe(true);
-    vi.restoreAllMocks();
+    await vi.waitFor(() => {
+      expect(stdoutWrites).toContain("{}\n");
+      expect(stderrWrites.some((w) => w.includes("test-handler") && w.includes("boom"))).toBe(true);
+    });
   });
 });
