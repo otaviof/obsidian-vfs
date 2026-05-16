@@ -1,15 +1,24 @@
-/**
- * Literal union of all error codes returned by the VFS layer.
- */
-export type ErrorCode =
-  | "VAULT_NOT_FOUND"
-  | "FILE_NOT_FOUND"
-  | "PARSE_ERROR"
-  | "CLI_ERROR"
-  | "CLI_UNAVAILABLE"
-  | "TIMEOUT"
-  | "PERMISSION_DENIED"
-  | "INVALID_URI";
+/** Node.js filesystem error codes used in catch blocks. */
+export const ERRNO = {
+  ENOENT: "ENOENT",
+  ENOTDIR: "ENOTDIR",
+  EACCES: "EACCES",
+} as const;
+
+/** VFS error codes — use these constants instead of bare string literals. */
+export const ERR = {
+  VAULT_NOT_FOUND: "VAULT_NOT_FOUND",
+  FILE_NOT_FOUND: "FILE_NOT_FOUND",
+  PARSE_ERROR: "PARSE_ERROR",
+  CLI_ERROR: "CLI_ERROR",
+  CLI_UNAVAILABLE: "CLI_UNAVAILABLE",
+  TIMEOUT: "TIMEOUT",
+  PERMISSION_DENIED: "PERMISSION_DENIED",
+  INVALID_URI: "INVALID_URI",
+} as const;
+
+/** Literal union of all error codes returned by the VFS layer. */
+export type ErrorCode = (typeof ERR)[keyof typeof ERR];
 
 /**
  * Structured error with a typed code and optional originating CLI command.

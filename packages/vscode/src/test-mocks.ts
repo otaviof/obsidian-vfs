@@ -267,6 +267,7 @@ export function mockTracker(
     {
       readDirectory: vi.fn(),
       readFile: vi.fn(),
+      listFolders: vi.fn(),
       onDidChangeFile: vi.fn().mockReturnValue({ dispose: vi.fn() }),
       ...extraMethods,
     },

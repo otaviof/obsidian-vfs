@@ -1,6 +1,7 @@
 import { execFile as execFileCb } from "node:child_process";
 import { promisify } from "node:util";
 
+import { ERR, ERRNO } from "./types.js";
 import type { VFSResult } from "./types.js";
 import { resolveCliPath } from "./resolve-cli-path.js";
 
@@ -61,20 +62,24 @@ export async function execCLI(
     if (err instanceof Error && err.name === "AbortError") {
       return {
         ok: false,
-        error: { code: "TIMEOUT", message: `CLI timed out after ${options.timeoutMs}ms` },
+        error: { code: ERR.TIMEOUT, message: `CLI timed out after ${options.timeoutMs}ms` },
       };
     }
-    if (err instanceof Error && "code" in err && (err as NodeJS.ErrnoException).code === "ENOENT") {
+    if (
+      err instanceof Error &&
+      "code" in err &&
+      (err as NodeJS.ErrnoException).code === ERRNO.ENOENT
+    ) {
       return {
         ok: false,
         error: {
-          code: "CLI_UNAVAILABLE",
+          code: ERR.CLI_UNAVAILABLE,
           message: `CLI binary not found: ${options.cliPath}`,
         },
       };
     }
     const message = err instanceof Error ? err.message : String(err);
-    return { ok: false, error: { code: "CLI_ERROR", message } };
+    return { ok: false, error: { code: ERR.CLI_ERROR, message } };
   } finally {
     clearTimeout(timer);
   }

@@ -1,9 +1,27 @@
+import type { Dirent } from "node:fs";
+
 import type { Mock } from "vitest";
 import { vi } from "vitest";
 
 import type { ObsidianCLI } from "./cli.js";
 import type { LocalIndexTracker } from "./local-index-tracker.js";
 import type { DiscoveredResource, VFSResult } from "./types.js";
+
+/** Build a fake `Dirent` for mocking `readdir({ withFileTypes: true })`. */
+export function makeDirent(name: string, isDir: boolean): Dirent {
+  return {
+    name,
+    isDirectory: () => isDir,
+    isFile: () => !isDir,
+    isBlockDevice: () => false,
+    isCharacterDevice: () => false,
+    isFIFO: () => false,
+    isSocket: () => false,
+    isSymbolicLink: () => false,
+    parentPath: "",
+    path: "",
+  };
+}
 
 /** Wrap a mocked `node:fs/promises` function with a type-safe cast to avoid verbose inline casts. */
 export function mockFsFunction<T>(fn: T): Mock<(...args: unknown[]) => Promise<unknown>> {

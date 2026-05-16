@@ -1,4 +1,5 @@
 import { buildObsUri } from "./uri.js";
+import { ERR } from "./types.js";
 import type { VFSResult } from "./types.js";
 
 /**
@@ -46,7 +47,7 @@ export function sliceContent(markdown: string, heading: string): VFSResult<strin
 
   return {
     ok: false,
-    error: { code: "FILE_NOT_FOUND", message: `Section not found: ${heading}` },
+    error: { code: ERR.FILE_NOT_FOUND, message: `Section not found: ${heading}` },
   };
 }
 
@@ -79,7 +80,7 @@ export function processContent(markdown: string, options: ContentSliceOptions): 
     if (options.vaultName === undefined) {
       return {
         ok: false,
-        error: { code: "INVALID_URI", message: "vaultName is required when scrubbing wikilinks" },
+        error: { code: ERR.INVALID_URI, message: "vaultName is required when scrubbing wikilinks" },
       };
     }
     result = scrubWikilinks(result, options.vaultName);

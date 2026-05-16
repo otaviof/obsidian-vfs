@@ -4,6 +4,7 @@ import path from "node:path";
 import type { LocalIndexTracker } from "./local-index-tracker.js";
 import type { PathSecurityOptions } from "./path-security.js";
 import { isAllowedPath } from "./path-security.js";
+import { ERR } from "./types.js";
 import type { MentionResult, VFSResult } from "./types.js";
 import { processContent } from "./content-slice.js";
 import { resolveResource, resolveSkillResource } from "./resolve-resource.js";
@@ -71,7 +72,7 @@ async function resolveNonAgent(
     if (!isAllowedPath(namePart, securityOptions)) {
       return {
         ok: false,
-        error: { code: "PERMISSION_DENIED", message: "Path not within allowed folders" },
+        error: { code: ERR.PERMISSION_DENIED, message: "Path not within allowed folders" },
       };
     }
 
@@ -125,7 +126,7 @@ export async function resolveMention(
     return {
       ok: false,
       error: {
-        code: "INVALID_URI",
+        code: ERR.INVALID_URI,
         message: `Invalid ${MENTION_PREFIX} mention: missing prefix`,
       },
     };
@@ -136,7 +137,7 @@ export async function resolveMention(
     return {
       ok: false,
       error: {
-        code: "INVALID_URI",
+        code: ERR.INVALID_URI,
         message: `Invalid ${MENTION_PREFIX} mention: empty reference`,
       },
     };
@@ -146,7 +147,7 @@ export async function resolveMention(
   if (namePart === "") {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: `Invalid ${MENTION_PREFIX} mention: empty path` },
+      error: { code: ERR.INVALID_URI, message: `Invalid ${MENTION_PREFIX} mention: empty path` },
     };
   }
 
@@ -207,7 +208,7 @@ export async function resolveSkillMention(
     return {
       ok: false,
       error: {
-        code: "INVALID_URI",
+        code: ERR.INVALID_URI,
         message: `Invalid ${SKILL_PREFIX} mention: missing prefix`,
       },
     };
@@ -218,7 +219,7 @@ export async function resolveSkillMention(
     return {
       ok: false,
       error: {
-        code: "INVALID_URI",
+        code: ERR.INVALID_URI,
         message: `Invalid ${SKILL_PREFIX} mention: empty reference`,
       },
     };
@@ -228,7 +229,7 @@ export async function resolveSkillMention(
   if (namePart === "") {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: `Invalid ${SKILL_PREFIX} mention: empty path` },
+      error: { code: ERR.INVALID_URI, message: `Invalid ${SKILL_PREFIX} mention: empty path` },
     };
   }
 

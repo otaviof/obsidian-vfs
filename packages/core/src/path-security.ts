@@ -1,6 +1,7 @@
 import { realpath } from "node:fs/promises";
 import path from "node:path";
 
+import { ERR, ERRNO } from "./types.js";
 import type { VFSResult } from "./types.js";
 
 /**
@@ -22,7 +23,7 @@ export function canonicalizePath(virtualPath: string, vaultRoot: string): VFSRes
   if (resolved !== vaultRoot && !resolved.startsWith(vaultRoot + path.sep)) {
     return {
       ok: false,
-      error: { code: "PERMISSION_DENIED", message: "Path resolves outside vault root" },
+      error: { code: ERR.PERMISSION_DENIED, message: "Path resolves outside vault root" },
     };
   }
   return { ok: true, value: resolved };
@@ -40,7 +41,7 @@ export function checkBlockedFolder(
     if (absolutePath === blockedAbs || absolutePath.startsWith(blockedAbs + path.sep)) {
       return {
         ok: false,
-        error: { code: "PERMISSION_DENIED", message: "Path within blocked folders" },
+        error: { code: ERR.PERMISSION_DENIED, message: "Path within blocked folders" },
       };
     }
   }
@@ -75,7 +76,7 @@ export function checkAllowedFolder(
 
   return {
     ok: false,
-    error: { code: "PERMISSION_DENIED", message: "Path not within allowed folders" },
+    error: { code: ERR.PERMISSION_DENIED, message: "Path not within allowed folders" },
   };
 }
 
@@ -101,20 +102,20 @@ export async function checkSymlink(
     if (real !== vaultRoot && !real.startsWith(vaultRoot + path.sep)) {
       return {
         ok: false,
-        error: { code: "PERMISSION_DENIED", message: "Symlink resolves outside vault root" },
+        error: { code: ERR.PERMISSION_DENIED, message: "Symlink resolves outside vault root" },
       };
     }
     return { ok: true, value: real };
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+    if ((err as NodeJS.ErrnoException).code === ERRNO.ENOENT) {
       return {
         ok: false,
-        error: { code: "FILE_NOT_FOUND", message: `File does not exist: ${absolutePath}` },
+        error: { code: ERR.FILE_NOT_FOUND, message: `File does not exist: ${absolutePath}` },
       };
     }
     return {
       ok: false,
-      error: { code: "PERMISSION_DENIED", message: `Cannot resolve path: ${absolutePath}` },
+      error: { code: ERR.PERMISSION_DENIED, message: `Cannot resolve path: ${absolutePath}` },
     };
   }
 }
@@ -155,7 +156,7 @@ export async function validatePathForWrite(
   for (;;) {
     const result = await checkSymlink(ancestor, options.vaultRoot);
     if (result.ok) return { ok: true, value: canonical.value };
-    if (result.error.code !== "FILE_NOT_FOUND") return result;
+    if (result.error.code !== ERR.FILE_NOT_FOUND) return result;
     const parent = path.dirname(ancestor);
     if (parent === ancestor) return result;
     ancestor = parent;

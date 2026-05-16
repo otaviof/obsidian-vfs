@@ -28,7 +28,7 @@ Available via the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`):
 
 | Command | Description |
 |---------|-------------|
-| `Obsidian VFS: Mount Folder` | Pick a top-level vault folder and add it to the Explorer tree view |
+| `Obsidian VFS: Mount Folder` | Pick a vault folder (depth controlled by `depthLimit` setting) and add it to the Explorer tree view |
 | `Obsidian VFS: Mount Note` | Search vault notes and add one to the Explorer tree view |
 | `Obsidian VFS: Unmount Entry` | Remove a mounted vault entry from the tree view |
 | `Obsidian VFS: Open in Obsidian` | Open the active vault file in the Obsidian app (works from both `obs://` and `file://` documents) |
@@ -45,6 +45,7 @@ Configure via **Settings UI** or `settings.json`:
 | `obsidianVFS.timeoutMs` | `number` | `10000` | CLI operation timeout in milliseconds |
 | `obsidianVFS.treeViewTitle` | `string` | `""` | Custom title for the Explorer tree view (defaults to `obs://<vault>`) |
 | `obsidianVFS.autoMount` | `string[]` | `[]` | Vault-relative paths (folders or notes) to display in the Explorer tree view on activation |
+| `obsidianVFS.depthLimit` | `number` | `4` | Maximum directory depth when listing vault folders and notes (`0`: unlimited, `1`: top-level only) |
 | `obsidianVFS.explorer` | `boolean` | `true` | Show the Obsidian VFS tree view in the Explorer sidebar |
 | `obsidianVFS.statusBar` | `boolean` | `true` | Show vault name and mode in the status bar |
 | `obsidianVFS.workspace` | `boolean` | `true` | Add the vault as a workspace folder for Quick Open and Search (see below) |

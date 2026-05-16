@@ -2,33 +2,37 @@ import * as vscode from "vscode";
 import type { LocalIndexTracker } from "@obsidian-vfs/core";
 import { buildObsUri } from "@obsidian-vfs/core";
 
+import { CONFIG_KEY, CONFIG_SECTION } from "./types.js";
 import { SCHEME, toFileUri, toVaultPath, toVaultPathFromFile } from "./uri-adapter.js";
 import type { VaultTreeDataProvider } from "./vault-tree-provider.js";
 import { readAutoMount } from "./vault-tree-provider.js";
+
+function readDepthLimit(): number {
+  return vscode.workspace.getConfiguration().get<number>(CONFIG_KEY.depthLimit)!;
+}
 
 /** Add a folder to `obsidianVFS.autoMount` and refresh the tree. */
 async function mountCommand(
   tracker: LocalIndexTracker,
   treeProvider: VaultTreeDataProvider,
 ): Promise<void> {
-  const result = await tracker.readDirectory("");
-  if (!result.ok) return;
-
-  const folders = result.value.filter(([, type]) => type === "directory").map(([name]) => name);
-  if (folders.length === 0) return;
+  const result = await tracker.listFolders(readDepthLimit());
+  if (!result.ok || result.value.length === 0) return;
 
   const mounted = new Set(readAutoMount());
-  const available = folders.filter((f) => !mounted.has(f));
+  const available = result.value.filter((f) => !mounted.has(f));
   if (available.length === 0) return;
 
-  const picked = await vscode.window.showQuickPick(available, {
-    placeHolder: "Select a vault folder to mount",
-  });
+  const picked = await vscode.window.showQuickPick(
+    available.map((f) => `${f}/`),
+    { placeHolder: "Select a vault folder to mount" },
+  );
   if (!picked) return;
 
-  const updated = [...mounted, picked];
+  const folder = picked.replace(/\/$/, "");
+  const updated = [...mounted, folder];
   await vscode.workspace
-    .getConfiguration("obsidianVFS")
+    .getConfiguration(CONFIG_SECTION)
     .update("autoMount", updated, vscode.ConfigurationTarget.Workspace);
 
   treeProvider.refresh();
@@ -39,7 +43,7 @@ async function mountNoteCommand(
   tracker: LocalIndexTracker,
   treeProvider: VaultTreeDataProvider,
 ): Promise<void> {
-  const result = await tracker.listFiles();
+  const result = await tracker.listFiles(readDepthLimit());
   if (!result.ok || result.value.length === 0) return;
 
   const mounted = new Set(readAutoMount());
@@ -60,7 +64,7 @@ async function mountNoteCommand(
 
   const updated = [...mounted, picked.description];
   await vscode.workspace
-    .getConfiguration("obsidianVFS")
+    .getConfiguration(CONFIG_SECTION)
     .update("autoMount", updated, vscode.ConfigurationTarget.Workspace);
 
   treeProvider.refresh();
@@ -81,7 +85,7 @@ async function unmountCommand(treeProvider: VaultTreeDataProvider): Promise<void
 
   const updated = mounted.filter((f) => f !== picked);
   await vscode.workspace
-    .getConfiguration("obsidianVFS")
+    .getConfiguration(CONFIG_SECTION)
     .update("autoMount", updated, vscode.ConfigurationTarget.Workspace);
 
   treeProvider.refresh();
@@ -132,7 +136,7 @@ async function copyPathCommand(tracker: LocalIndexTracker): Promise<void> {
 
 /** Search vault notes via Quick Pick and open the selected file. */
 async function searchNotesCommand(tracker: LocalIndexTracker): Promise<void> {
-  const result = await tracker.listFiles();
+  const result = await tracker.listFiles(readDepthLimit());
   if (!result.ok || result.value.length === 0) return;
 
   const items = result.value.map((filePath) => ({

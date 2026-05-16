@@ -4,6 +4,7 @@ import type { ObsidianCLI } from "./cli.js";
 import { listMarkdownFiles } from "./fs-enumeration.js";
 import type { LRUCache } from "./lru-cache.js";
 import { isAllowedPath, type PathSecurityOptions } from "./path-security.js";
+import { ERR } from "./types.js";
 import type { VFSResult, WikilinkResolution } from "./types.js";
 
 /**
@@ -63,7 +64,7 @@ export async function resolveWikilink(
   if (normalizedName === "") {
     return {
       ok: false,
-      error: { code: "FILE_NOT_FOUND", message: "No file matches wikilink: (empty)" },
+      error: { code: ERR.FILE_NOT_FOUND, message: "No file matches wikilink: (empty)" },
     };
   }
 
@@ -72,7 +73,7 @@ export async function resolveWikilink(
       return {
         ok: false,
         error: {
-          code: "PERMISSION_DENIED",
+          code: ERR.PERMISSION_DENIED,
           message: `Path traversal in wikilink: ${normalizedName}`,
         },
       };
@@ -81,7 +82,7 @@ export async function resolveWikilink(
     if (!isAllowedPath(directPath, securityOptions(options))) {
       return {
         ok: false,
-        error: { code: "PERMISSION_DENIED", message: "Path not within allowed folders" },
+        error: { code: ERR.PERMISSION_DENIED, message: "Path not within allowed folders" },
       };
     }
     return { ok: true, value: { resolvedPath: directPath, candidates: [] } };
@@ -113,6 +114,6 @@ export async function resolveWikilink(
 
   return {
     ok: false,
-    error: { code: "FILE_NOT_FOUND", message: `No file matches wikilink: ${normalizedName}` },
+    error: { code: ERR.FILE_NOT_FOUND, message: `No file matches wikilink: ${normalizedName}` },
   };
 }

@@ -1,5 +1,6 @@
 import path from "node:path";
 
+import { ERR } from "./types.js";
 import type { VFSConfig, VFSResult } from "./types.js";
 
 /**
@@ -30,7 +31,7 @@ export function validateVFSConfig(raw: unknown): VFSResult<VFSConfig> {
   if (typeof raw !== "object" || Array.isArray(raw)) {
     return {
       ok: false,
-      error: { code: "PARSE_ERROR", message: "VFSConfig must be a non-null object" },
+      error: { code: ERR.PARSE_ERROR, message: "VFSConfig must be a non-null object" },
     };
   }
 
@@ -41,7 +42,7 @@ export function validateVFSConfig(raw: unknown): VFSResult<VFSConfig> {
     if (field in obj && !isStringArray(obj[field])) {
       return {
         ok: false,
-        error: { code: "PARSE_ERROR", message: `${field} must be string[]` },
+        error: { code: ERR.PARSE_ERROR, message: `${field} must be string[]` },
       };
     }
   }
@@ -58,7 +59,7 @@ export function validateVFSConfig(raw: unknown): VFSResult<VFSConfig> {
         return {
           ok: false,
           error: {
-            code: "PARSE_ERROR",
+            code: ERR.PARSE_ERROR,
             message: `"${b}" appears in both "allowed" and "blocked"`,
           },
         };
@@ -67,7 +68,7 @@ export function validateVFSConfig(raw: unknown): VFSResult<VFSConfig> {
         return {
           ok: false,
           error: {
-            code: "PARSE_ERROR",
+            code: ERR.PARSE_ERROR,
             message: `blocked entry "${b}" is a parent of allowed entry "${a}"`,
           },
         };

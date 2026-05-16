@@ -8,6 +8,7 @@ export const CONFIG_KEY = {
   autoMount: `${CONFIG_SECTION}.autoMount`,
   workspace: `${CONFIG_SECTION}.workspace`,
   workspaceFile: `${CONFIG_SECTION}.workspaceFile`,
+  depthLimit: `${CONFIG_SECTION}.depthLimit`,
 } as const;
 
 /** VSCode extension configuration read from `obsidianVFS` settings. */

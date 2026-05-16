@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 
+import { ERR, ERRNO } from "./types.js";
 import type { VFSResult } from "./types.js";
 import type { PathSecurityOptions } from "./path-security.js";
 import { validatePath } from "./path-security.js";
@@ -21,21 +22,21 @@ export async function readVirtualFile(
     return { ok: true, value: buffer };
   } catch (err) {
     const errno = err as NodeJS.ErrnoException;
-    if (errno.code === "ENOENT") {
+    if (errno.code === ERRNO.ENOENT) {
       return {
         ok: false,
-        error: { code: "FILE_NOT_FOUND", message: `File does not exist: ${pathResult.value}` },
+        error: { code: ERR.FILE_NOT_FOUND, message: `File does not exist: ${pathResult.value}` },
       };
     }
-    if (errno.code === "EACCES") {
+    if (errno.code === ERRNO.EACCES) {
       return {
         ok: false,
-        error: { code: "PERMISSION_DENIED", message: `Permission denied: ${pathResult.value}` },
+        error: { code: ERR.PERMISSION_DENIED, message: `Permission denied: ${pathResult.value}` },
       };
     }
     return {
       ok: false,
-      error: { code: "CLI_ERROR", message: (err as Error).message },
+      error: { code: ERR.CLI_ERROR, message: (err as Error).message },
     };
   }
 }

@@ -92,13 +92,9 @@ describe("mount command", () => {
     const { update } = setupConfigMock();
 
     const tracker = mockTracker({
-      readDirectory: vi.fn().mockResolvedValue({
+      listFolders: vi.fn().mockResolvedValue({
         ok: true,
-        value: [
-          ["10-projects", "directory"],
-          ["note.md", "file"],
-          ["20-areas", "directory"],
-        ],
+        value: ["10-projects", "20-areas"],
       }),
     });
 
@@ -107,7 +103,7 @@ describe("mount command", () => {
     const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
     registerCommands(ctx as never, tracker, tree as never, channel);
 
-    vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce("10-projects" as never);
+    vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce("10-projects/" as never);
 
     const mountHandler = vi
       .mocked(vscode.commands.registerCommand)
@@ -115,7 +111,7 @@ describe("mount command", () => {
     await mountHandler();
 
     expect(vscode.window.showQuickPick).toHaveBeenCalledWith(
-      ["10-projects", "20-areas"],
+      ["10-projects/", "20-areas/"],
       expect.anything(),
     );
     expect(update).toHaveBeenCalledWith(
@@ -131,9 +127,9 @@ describe("mount command", () => {
     const { update } = setupConfigMock();
 
     const tracker = mockTracker({
-      readDirectory: vi.fn().mockResolvedValue({
+      listFolders: vi.fn().mockResolvedValue({
         ok: true,
-        value: [["folder", "directory"]],
+        value: ["folder"],
       }),
     });
 
@@ -154,7 +150,7 @@ describe("mount command", () => {
 
   it("handles empty vault gracefully", async () => {
     const tracker = mockTracker({
-      readDirectory: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+      listFolders: vi.fn().mockResolvedValue({ ok: true, value: [] }),
     });
 
     const ctx = fakeContext();
@@ -175,12 +171,9 @@ describe("mount command", () => {
     setupConfigMock();
 
     const tracker = mockTracker({
-      readDirectory: vi.fn().mockResolvedValue({
+      listFolders: vi.fn().mockResolvedValue({
         ok: true,
-        value: [
-          ["10-projects", "directory"],
-          ["20-areas", "directory"],
-        ],
+        value: ["10-projects", "20-areas"],
       }),
     });
 
@@ -189,26 +182,23 @@ describe("mount command", () => {
     const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
     registerCommands(ctx as never, tracker, tree as never, channel);
 
-    vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce("20-areas" as never);
+    vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce("20-areas/" as never);
 
     const mountHandler = vi
       .mocked(vscode.commands.registerCommand)
       .mock.calls.find((c) => c[0] === "obsidianVFS.mount")![1] as () => Promise<void>;
     await mountHandler();
 
-    expect(vscode.window.showQuickPick).toHaveBeenCalledWith(["20-areas"], expect.anything());
+    expect(vscode.window.showQuickPick).toHaveBeenCalledWith(["20-areas/"], expect.anything());
   });
 
   it("does nothing when all folders already mounted", async () => {
     mockReadAutoMount.mockReturnValue(["10-projects", "20-areas"]);
 
     const tracker = mockTracker({
-      readDirectory: vi.fn().mockResolvedValue({
+      listFolders: vi.fn().mockResolvedValue({
         ok: true,
-        value: [
-          ["10-projects", "directory"],
-          ["20-areas", "directory"],
-        ],
+        value: ["10-projects", "20-areas"],
       }),
     });
 
@@ -225,9 +215,9 @@ describe("mount command", () => {
     expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
   });
 
-  it("handles readDirectory failure gracefully", async () => {
+  it("handles listFolders failure gracefully", async () => {
     const tracker = mockTracker({
-      readDirectory: vi.fn().mockResolvedValue({
+      listFolders: vi.fn().mockResolvedValue({
         ok: false,
         error: { code: "VAULT_NOT_FOUND", message: "Vault unavailable" },
       }),
@@ -246,19 +236,14 @@ describe("mount command", () => {
     expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
   });
 
-  it("filters out files when building folder list", async () => {
+  it("shows nested folders as full paths", async () => {
     mockReadAutoMount.mockReturnValue([]);
     setupConfigMock();
 
     const tracker = mockTracker({
-      readDirectory: vi.fn().mockResolvedValue({
+      listFolders: vi.fn().mockResolvedValue({
         ok: true,
-        value: [
-          ["folder1", "directory"],
-          ["note.md", "file"],
-          ["folder2", "directory"],
-          ["image.png", "file"],
-        ],
+        value: ["10-projects", "10-projects/active", "20-areas"],
       }),
     });
 
@@ -267,7 +252,7 @@ describe("mount command", () => {
     const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
     registerCommands(ctx as never, tracker, tree as never, channel);
 
-    vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce("folder1" as never);
+    vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce("10-projects/active/" as never);
 
     const mountHandler = vi
       .mocked(vscode.commands.registerCommand)
@@ -275,7 +260,7 @@ describe("mount command", () => {
     await mountHandler();
 
     expect(vscode.window.showQuickPick).toHaveBeenCalledWith(
-      ["folder1", "folder2"],
+      ["10-projects/", "10-projects/active/", "20-areas/"],
       expect.anything(),
     );
   });

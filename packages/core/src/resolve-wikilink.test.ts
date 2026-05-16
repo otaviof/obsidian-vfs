@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { LRUCache } from "./lru-cache.js";
 import { resolveWikilink, type ResolveWikilinkOptions } from "./resolve-wikilink.js";
-import { mockCLI, mockFsFunction } from "./test-helpers.js";
+import { makeDirent, mockCLI, mockFsFunction } from "./test-helpers.js";
 
 vi.mock("node:fs/promises", () => ({
   readdir: vi.fn(),
@@ -72,7 +72,9 @@ describe("resolveWikilink", () => {
       ok: true,
       value: ["archive/setup-guide.md"],
     });
-    readdirMock.mockResolvedValueOnce(["sub/setup.md"]);
+    readdirMock
+      .mockResolvedValueOnce([makeDirent("sub", true)])
+      .mockResolvedValueOnce([makeDirent("setup.md", false)]);
     const options = makeOptions({ cli: mockCLI({ search: searchMock }) });
 
     const result = await resolveWikilink("setup", options);
@@ -98,7 +100,9 @@ describe("resolveWikilink", () => {
   });
 
   it("falls back to glob when CLI returns empty", async () => {
-    readdirMock.mockResolvedValueOnce(["sub/deploy.md"]);
+    readdirMock
+      .mockResolvedValueOnce([makeDirent("sub", true)])
+      .mockResolvedValueOnce([makeDirent("deploy.md", false)]);
     const options = makeOptions();
 
     const result = await resolveWikilink("deploy", options);
@@ -109,7 +113,9 @@ describe("resolveWikilink", () => {
   });
 
   it("resolves via glob in degraded mode", async () => {
-    readdirMock.mockResolvedValueOnce(["folder/getting-started.md"]);
+    readdirMock
+      .mockResolvedValueOnce([makeDirent("folder", true)])
+      .mockResolvedValueOnce([makeDirent("getting-started.md", false)]);
     const options = makeOptions({ mode: "degraded" });
 
     const result = await resolveWikilink("getting-started", options);
@@ -120,7 +126,9 @@ describe("resolveWikilink", () => {
   });
 
   it("respects allowed in glob", async () => {
-    readdirMock.mockResolvedValueOnce(["deep/changelog.md"]);
+    readdirMock
+      .mockResolvedValueOnce([makeDirent("deep", true)])
+      .mockResolvedValueOnce([makeDirent("changelog.md", false)]);
     const options = makeOptions({
       mode: "degraded",
       allowed: ["notes"],
@@ -166,7 +174,9 @@ describe("resolveWikilink", () => {
       ok: false,
       error: { code: "CLI_ERROR", message: "CLI failed" },
     });
-    readdirMock.mockResolvedValueOnce(["sub/target.md"]);
+    readdirMock
+      .mockResolvedValueOnce([makeDirent("sub", true)])
+      .mockResolvedValueOnce([makeDirent("target.md", false)]);
     const options = makeOptions({ cli: mockCLI({ search: searchMock }) });
 
     const result = await resolveWikilink("target", options);
@@ -177,7 +187,7 @@ describe("resolveWikilink", () => {
   });
 
   it("matches case-insensitively in glob", async () => {
-    readdirMock.mockResolvedValueOnce(["Roadmap.md"]);
+    readdirMock.mockResolvedValueOnce([makeDirent("Roadmap.md", false)]);
     const options = makeOptions({ mode: "degraded" });
 
     const result = await resolveWikilink("roadmap", options);
@@ -274,7 +284,9 @@ describe("resolveWikilink", () => {
   });
 
   it("respects blocked folders in glob fallback (degraded mode)", async () => {
-    readdirMock.mockResolvedValueOnce(["notes/draft/secret.md"]);
+    readdirMock
+      .mockResolvedValueOnce([makeDirent("notes", true)])
+      .mockResolvedValueOnce([makeDirent("draft", true)]);
     const options = makeOptions({
       mode: "degraded",
       blocked: ["notes/draft"],

@@ -2,12 +2,8 @@ import { readdir, stat } from "node:fs/promises";
 import path from "node:path";
 
 import type { PathSecurityOptions } from "./path-security.js";
-import {
-  canonicalizePath,
-  checkAllowedFolder,
-  checkBlockedFolder,
-  validatePath,
-} from "./path-security.js";
+import { canonicalizePath, checkAllowedFolder, validatePath } from "./path-security.js";
+import { ERR, ERRNO } from "./types.js";
 import type { VFSFileStat, VFSFileType, VFSResult } from "./types.js";
 
 /**
@@ -28,21 +24,21 @@ export async function readDirectory(
     entries = await readdir(canonical.value, { withFileTypes: true });
   } catch (err) {
     const code = (err as NodeJS.ErrnoException).code;
-    if (code === "ENOENT") {
+    if (code === ERRNO.ENOENT) {
       return {
         ok: false,
-        error: { code: "FILE_NOT_FOUND", message: `Directory does not exist: ${virtualPath}` },
+        error: { code: ERR.FILE_NOT_FOUND, message: `Directory does not exist: ${virtualPath}` },
       };
     }
-    if (code === "ENOTDIR") {
+    if (code === ERRNO.ENOTDIR) {
       return {
         ok: false,
-        error: { code: "FILE_NOT_FOUND", message: `Not a directory: ${virtualPath}` },
+        error: { code: ERR.FILE_NOT_FOUND, message: `Not a directory: ${virtualPath}` },
       };
     }
     return {
       ok: false,
-      error: { code: "CLI_ERROR", message: (err as Error).message },
+      error: { code: ERR.CLI_ERROR, message: (err as Error).message },
     };
   }
 
@@ -61,48 +57,82 @@ export async function readDirectory(
   return { ok: true, value: tuples };
 }
 
-/** Check whether any path segment starts with a dot. */
-function hasDotSegment(relativePath: string): boolean {
-  return relativePath.split(path.sep).some((seg) => seg.startsWith("."));
-}
-
-/**
- * Recursively enumerate all markdown files in the vault.
- */
-export async function listMarkdownFiles(options: PathSecurityOptions): Promise<VFSResult<string[]>> {
-  const searchDirs =
+async function walkVault(
+  options: PathSecurityOptions,
+  depthLimit: number,
+  collect: (relativePath: string, isDirectory: boolean) => boolean,
+): Promise<string[]> {
+  const effectiveLimit = depthLimit === 0 ? Infinity : depthLimit;
+  const searchRoots =
     options.allowed.length > 0
       ? options.allowed.map((f) => path.resolve(options.vaultRoot, f))
       : [options.vaultRoot];
 
-  const files: string[] = [];
+  const results: string[] = [];
 
-  for (const dir of searchDirs) {
-    let entries: string[];
-    try {
-      entries = await readdir(dir, { recursive: true });
-    } catch {
-      continue;
-    }
-
-    for (const entry of entries) {
-      if (!entry.toLowerCase().endsWith(".md")) continue;
-      if (hasDotSegment(entry)) continue;
-      files.push(path.relative(options.vaultRoot, path.join(dir, entry)));
-    }
+  for (const root of searchRoots) {
+    if (root === options.vaultRoot) continue;
+    const rel = path.relative(options.vaultRoot, root);
+    if (collect(rel, true)) results.push(rel);
   }
 
-  if (options.blocked.length > 0) {
-    const filtered = files.filter((f) => {
-      const abs = path.resolve(options.vaultRoot, f);
-      return checkBlockedFolder(abs, options).ok;
-    });
-    filtered.sort();
-    return { ok: true, value: filtered };
+  let queue: [string, number][] = searchRoots.map((dir) => [dir, 1]);
+
+  while (queue.length > 0) {
+    const nextQueue: [string, number][] = [];
+
+    for (const [dir, depth] of queue) {
+      let entries;
+      try {
+        entries = await readdir(dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+
+      for (const entry of entries) {
+        if (entry.name.startsWith(".")) continue;
+
+        const childAbsolute = path.join(dir, entry.name);
+        if (!checkAllowedFolder(childAbsolute, options).ok) continue;
+
+        const relativePath = path.relative(options.vaultRoot, childAbsolute);
+        const isDir = entry.isDirectory();
+
+        if (collect(relativePath, isDir)) {
+          results.push(relativePath);
+        }
+
+        if (isDir && depth < effectiveLimit) {
+          nextQueue.push([childAbsolute, depth + 1]);
+        }
+      }
+    }
+
+    queue = nextQueue;
   }
 
-  files.sort();
+  results.sort();
+  return results;
+}
+
+export async function listMarkdownFiles(
+  options: PathSecurityOptions,
+  depthLimit = 0,
+): Promise<VFSResult<string[]>> {
+  const files = await walkVault(
+    options,
+    depthLimit,
+    (rel, isDir) => !isDir && rel.toLowerCase().endsWith(".md"),
+  );
   return { ok: true, value: files };
+}
+
+export async function listFolders(
+  options: PathSecurityOptions,
+  depthLimit = 0,
+): Promise<VFSResult<string[]>> {
+  const folders = await walkVault(options, depthLimit, (_, isDir) => isDir);
+  return { ok: true, value: folders };
 }
 
 /**
@@ -127,15 +157,15 @@ export async function statVirtualFile(
       },
     };
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+    if ((err as NodeJS.ErrnoException).code === ERRNO.ENOENT) {
       return {
         ok: false,
-        error: { code: "FILE_NOT_FOUND", message: `File does not exist: ${virtualPath}` },
+        error: { code: ERR.FILE_NOT_FOUND, message: `File does not exist: ${virtualPath}` },
       };
     }
     return {
       ok: false,
-      error: { code: "CLI_ERROR", message: (err as Error).message },
+      error: { code: ERR.CLI_ERROR, message: (err as Error).message },
     };
   }
 }

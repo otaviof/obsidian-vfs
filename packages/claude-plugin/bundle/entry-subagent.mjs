@@ -2,6 +2,23 @@
 import { readFile as readFile2 } from "node:fs/promises";
 import { join as join2 } from "node:path";
 
+// ../core/dist/types.js
+var ERRNO = {
+  ENOENT: "ENOENT",
+  ENOTDIR: "ENOTDIR",
+  EACCES: "EACCES"
+};
+var ERR = {
+  VAULT_NOT_FOUND: "VAULT_NOT_FOUND",
+  FILE_NOT_FOUND: "FILE_NOT_FOUND",
+  PARSE_ERROR: "PARSE_ERROR",
+  CLI_ERROR: "CLI_ERROR",
+  CLI_UNAVAILABLE: "CLI_UNAVAILABLE",
+  TIMEOUT: "TIMEOUT",
+  PERMISSION_DENIED: "PERMISSION_DENIED",
+  INVALID_URI: "INVALID_URI"
+};
+
 // ../core/dist/exec.js
 import { execFile as execFileCb } from "node:child_process";
 import { promisify } from "node:util";
@@ -51,20 +68,20 @@ async function execCLI(args, options) {
     if (err instanceof Error && err.name === "AbortError") {
       return {
         ok: false,
-        error: { code: "TIMEOUT", message: `CLI timed out after ${options.timeoutMs}ms` }
+        error: { code: ERR.TIMEOUT, message: `CLI timed out after ${options.timeoutMs}ms` }
       };
     }
-    if (err instanceof Error && "code" in err && err.code === "ENOENT") {
+    if (err instanceof Error && "code" in err && err.code === ERRNO.ENOENT) {
       return {
         ok: false,
         error: {
-          code: "CLI_UNAVAILABLE",
+          code: ERR.CLI_UNAVAILABLE,
           message: `CLI binary not found: ${options.cliPath}`
         }
       };
     }
     const message = err instanceof Error ? err.message : String(err);
-    return { ok: false, error: { code: "CLI_ERROR", message } };
+    return { ok: false, error: { code: ERR.CLI_ERROR, message } };
   } finally {
     clearTimeout(timer);
   }
@@ -138,7 +155,7 @@ function validateVFSConfig(raw) {
   if (typeof raw !== "object" || Array.isArray(raw)) {
     return {
       ok: false,
-      error: { code: "PARSE_ERROR", message: "VFSConfig must be a non-null object" }
+      error: { code: ERR.PARSE_ERROR, message: "VFSConfig must be a non-null object" }
     };
   }
   const obj = raw;
@@ -147,7 +164,7 @@ function validateVFSConfig(raw) {
     if (field in obj && !isStringArray(obj[field])) {
       return {
         ok: false,
-        error: { code: "PARSE_ERROR", message: `${field} must be string[]` }
+        error: { code: ERR.PARSE_ERROR, message: `${field} must be string[]` }
       };
     }
   }
@@ -162,7 +179,7 @@ function validateVFSConfig(raw) {
         return {
           ok: false,
           error: {
-            code: "PARSE_ERROR",
+            code: ERR.PARSE_ERROR,
             message: `"${b}" appears in both "allowed" and "blocked"`
           }
         };
@@ -171,7 +188,7 @@ function validateVFSConfig(raw) {
         return {
           ok: false,
           error: {
-            code: "PARSE_ERROR",
+            code: ERR.PARSE_ERROR,
             message: `blocked entry "${b}" is a parent of allowed entry "${a}"`
           }
         };
@@ -192,7 +209,7 @@ function canonicalizePath(virtualPath, vaultRoot) {
   if (resolved !== vaultRoot && !resolved.startsWith(vaultRoot + path2.sep)) {
     return {
       ok: false,
-      error: { code: "PERMISSION_DENIED", message: "Path resolves outside vault root" }
+      error: { code: ERR.PERMISSION_DENIED, message: "Path resolves outside vault root" }
     };
   }
   return { ok: true, value: resolved };
@@ -203,7 +220,7 @@ function checkBlockedFolder(absolutePath, options) {
     if (absolutePath === blockedAbs || absolutePath.startsWith(blockedAbs + path2.sep)) {
       return {
         ok: false,
-        error: { code: "PERMISSION_DENIED", message: "Path within blocked folders" }
+        error: { code: ERR.PERMISSION_DENIED, message: "Path within blocked folders" }
       };
     }
   }
@@ -227,7 +244,7 @@ function checkAllowedFolder(absolutePath, options) {
   }
   return {
     ok: false,
-    error: { code: "PERMISSION_DENIED", message: "Path not within allowed folders" }
+    error: { code: ERR.PERMISSION_DENIED, message: "Path not within allowed folders" }
   };
 }
 function isAllowedPath(virtualPath, options) {
@@ -242,20 +259,20 @@ async function checkSymlink(absolutePath, vaultRoot) {
     if (real !== vaultRoot && !real.startsWith(vaultRoot + path2.sep)) {
       return {
         ok: false,
-        error: { code: "PERMISSION_DENIED", message: "Symlink resolves outside vault root" }
+        error: { code: ERR.PERMISSION_DENIED, message: "Symlink resolves outside vault root" }
       };
     }
     return { ok: true, value: real };
   } catch (err) {
-    if (err.code === "ENOENT") {
+    if (err.code === ERRNO.ENOENT) {
       return {
         ok: false,
-        error: { code: "FILE_NOT_FOUND", message: `File does not exist: ${absolutePath}` }
+        error: { code: ERR.FILE_NOT_FOUND, message: `File does not exist: ${absolutePath}` }
       };
     }
     return {
       ok: false,
-      error: { code: "PERMISSION_DENIED", message: `Cannot resolve path: ${absolutePath}` }
+      error: { code: ERR.PERMISSION_DENIED, message: `Cannot resolve path: ${absolutePath}` }
     };
   }
 }
@@ -280,21 +297,21 @@ async function readVirtualFile(virtualPath, options) {
     return { ok: true, value: buffer };
   } catch (err) {
     const errno = err;
-    if (errno.code === "ENOENT") {
+    if (errno.code === ERRNO.ENOENT) {
       return {
         ok: false,
-        error: { code: "FILE_NOT_FOUND", message: `File does not exist: ${pathResult.value}` }
+        error: { code: ERR.FILE_NOT_FOUND, message: `File does not exist: ${pathResult.value}` }
       };
     }
-    if (errno.code === "EACCES") {
+    if (errno.code === ERRNO.EACCES) {
       return {
         ok: false,
-        error: { code: "PERMISSION_DENIED", message: `Permission denied: ${pathResult.value}` }
+        error: { code: ERR.PERMISSION_DENIED, message: `Permission denied: ${pathResult.value}` }
       };
     }
     return {
       ok: false,
-      error: { code: "CLI_ERROR", message: err.message }
+      error: { code: ERR.CLI_ERROR, message: err.message }
     };
   }
 }
@@ -317,21 +334,21 @@ async function readDirectory(virtualPath, options) {
     entries = await readdir(canonical.value, { withFileTypes: true });
   } catch (err) {
     const code = err.code;
-    if (code === "ENOENT") {
+    if (code === ERRNO.ENOENT) {
       return {
         ok: false,
-        error: { code: "FILE_NOT_FOUND", message: `Directory does not exist: ${virtualPath}` }
+        error: { code: ERR.FILE_NOT_FOUND, message: `Directory does not exist: ${virtualPath}` }
       };
     }
-    if (code === "ENOTDIR") {
+    if (code === ERRNO.ENOTDIR) {
       return {
         ok: false,
-        error: { code: "FILE_NOT_FOUND", message: `Not a directory: ${virtualPath}` }
+        error: { code: ERR.FILE_NOT_FOUND, message: `Not a directory: ${virtualPath}` }
       };
     }
     return {
       ok: false,
-      error: { code: "CLI_ERROR", message: err.message }
+      error: { code: ERR.CLI_ERROR, message: err.message }
     };
   }
   const tuples = [];
@@ -347,37 +364,55 @@ async function readDirectory(virtualPath, options) {
   tuples.sort((a, b) => a[0].localeCompare(b[0]));
   return { ok: true, value: tuples };
 }
-function hasDotSegment(relativePath) {
-  return relativePath.split(path3.sep).some((seg) => seg.startsWith("."));
-}
-async function listMarkdownFiles(options) {
-  const searchDirs = options.allowed.length > 0 ? options.allowed.map((f) => path3.resolve(options.vaultRoot, f)) : [options.vaultRoot];
-  const files = [];
-  for (const dir of searchDirs) {
-    let entries;
-    try {
-      entries = await readdir(dir, { recursive: true });
-    } catch {
+async function walkVault(options, depthLimit, collect) {
+  const effectiveLimit = depthLimit === 0 ? Infinity : depthLimit;
+  const searchRoots = options.allowed.length > 0 ? options.allowed.map((f) => path3.resolve(options.vaultRoot, f)) : [options.vaultRoot];
+  const results = [];
+  for (const root of searchRoots) {
+    if (root === options.vaultRoot)
       continue;
-    }
-    for (const entry of entries) {
-      if (!entry.toLowerCase().endsWith(".md"))
-        continue;
-      if (hasDotSegment(entry))
-        continue;
-      files.push(path3.relative(options.vaultRoot, path3.join(dir, entry)));
-    }
+    const rel = path3.relative(options.vaultRoot, root);
+    if (collect(rel, true))
+      results.push(rel);
   }
-  if (options.blocked.length > 0) {
-    const filtered = files.filter((f) => {
-      const abs = path3.resolve(options.vaultRoot, f);
-      return checkBlockedFolder(abs, options).ok;
-    });
-    filtered.sort();
-    return { ok: true, value: filtered };
+  let queue = searchRoots.map((dir) => [dir, 1]);
+  while (queue.length > 0) {
+    const nextQueue = [];
+    for (const [dir, depth] of queue) {
+      let entries;
+      try {
+        entries = await readdir(dir, { withFileTypes: true });
+      } catch {
+        continue;
+      }
+      for (const entry of entries) {
+        if (entry.name.startsWith("."))
+          continue;
+        const childAbsolute = path3.join(dir, entry.name);
+        if (!checkAllowedFolder(childAbsolute, options).ok)
+          continue;
+        const relativePath = path3.relative(options.vaultRoot, childAbsolute);
+        const isDir = entry.isDirectory();
+        if (collect(relativePath, isDir)) {
+          results.push(relativePath);
+        }
+        if (isDir && depth < effectiveLimit) {
+          nextQueue.push([childAbsolute, depth + 1]);
+        }
+      }
+    }
+    queue = nextQueue;
   }
-  files.sort();
+  results.sort();
+  return results;
+}
+async function listMarkdownFiles(options, depthLimit = 0) {
+  const files = await walkVault(options, depthLimit, (rel, isDir) => !isDir && rel.toLowerCase().endsWith(".md"));
   return { ok: true, value: files };
+}
+async function listFolders(options, depthLimit = 0) {
+  const folders = await walkVault(options, depthLimit, (_, isDir) => isDir);
+  return { ok: true, value: folders };
 }
 async function statVirtualFile(virtualPath, options) {
   const pathResult = await validatePath(virtualPath, options);
@@ -395,15 +430,15 @@ async function statVirtualFile(virtualPath, options) {
       }
     };
   } catch (err) {
-    if (err.code === "ENOENT") {
+    if (err.code === ERRNO.ENOENT) {
       return {
         ok: false,
-        error: { code: "FILE_NOT_FOUND", message: `File does not exist: ${virtualPath}` }
+        error: { code: ERR.FILE_NOT_FOUND, message: `File does not exist: ${virtualPath}` }
       };
     }
     return {
       ok: false,
-      error: { code: "CLI_ERROR", message: err.message }
+      error: { code: ERR.CLI_ERROR, message: err.message }
     };
   }
 }
@@ -439,7 +474,7 @@ async function resolveWikilink(name, options) {
   if (normalizedName === "") {
     return {
       ok: false,
-      error: { code: "FILE_NOT_FOUND", message: "No file matches wikilink: (empty)" }
+      error: { code: ERR.FILE_NOT_FOUND, message: "No file matches wikilink: (empty)" }
     };
   }
   if (normalizedName.includes("/")) {
@@ -447,7 +482,7 @@ async function resolveWikilink(name, options) {
       return {
         ok: false,
         error: {
-          code: "PERMISSION_DENIED",
+          code: ERR.PERMISSION_DENIED,
           message: `Path traversal in wikilink: ${normalizedName}`
         }
       };
@@ -456,7 +491,7 @@ async function resolveWikilink(name, options) {
     if (!isAllowedPath(directPath, securityOptions(options))) {
       return {
         ok: false,
-        error: { code: "PERMISSION_DENIED", message: "Path not within allowed folders" }
+        error: { code: ERR.PERMISSION_DENIED, message: "Path not within allowed folders" }
       };
     }
     return { ok: true, value: { resolvedPath: directPath, candidates: [] } };
@@ -484,7 +519,7 @@ async function resolveWikilink(name, options) {
   }
   return {
     ok: false,
-    error: { code: "FILE_NOT_FOUND", message: `No file matches wikilink: ${normalizedName}` }
+    error: { code: ERR.FILE_NOT_FOUND, message: `No file matches wikilink: ${normalizedName}` }
   };
 }
 
@@ -508,7 +543,7 @@ async function resolveSkillResource(name, dirs, securityOptions2) {
   }
   return {
     ok: false,
-    error: { code: "FILE_NOT_FOUND", message: `Skill not found: ${trimmed}` }
+    error: { code: ERR.FILE_NOT_FOUND, message: `Skill not found: ${trimmed}` }
   };
 }
 async function resolveResource(name, dirs, securityOptions2) {
@@ -528,7 +563,7 @@ async function resolveResource(name, dirs, securityOptions2) {
   }
   return {
     ok: false,
-    error: { code: "FILE_NOT_FOUND", message: `Resource not found: ${trimmed}` }
+    error: { code: ERR.FILE_NOT_FOUND, message: `Resource not found: ${trimmed}` }
   };
 }
 
@@ -544,7 +579,7 @@ function parseObsUri(uri) {
     return {
       ok: false,
       error: {
-        code: "INVALID_URI",
+        code: ERR.INVALID_URI,
         message: `Invalid ${URI_PREFIX} URI: missing or wrong scheme`
       }
     };
@@ -554,14 +589,14 @@ function parseObsUri(uri) {
   if (slashIndex < 0) {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: `Invalid ${URI_PREFIX} URI: missing path` }
+      error: { code: ERR.INVALID_URI, message: `Invalid ${URI_PREFIX} URI: missing path` }
     };
   }
   const rawVault = rest.slice(0, slashIndex);
   if (rawVault === "") {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: `Invalid ${URI_PREFIX} URI: empty vault name` }
+      error: { code: ERR.INVALID_URI, message: `Invalid ${URI_PREFIX} URI: empty vault name` }
     };
   }
   const afterVault = rest.slice(slashIndex + 1);
@@ -579,7 +614,7 @@ function parseObsUri(uri) {
   if (rawPath === "") {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: `Invalid ${URI_PREFIX} URI: empty path` }
+      error: { code: ERR.INVALID_URI, message: `Invalid ${URI_PREFIX} URI: empty path` }
     };
   }
   try {
@@ -595,7 +630,7 @@ function parseObsUri(uri) {
     return {
       ok: false,
       error: {
-        code: "INVALID_URI",
+        code: ERR.INVALID_URI,
         message: `Invalid ${URI_PREFIX} URI: malformed percent-encoding`
       }
     };
@@ -638,7 +673,7 @@ function sliceContent(markdown, heading) {
   }
   return {
     ok: false,
-    error: { code: "FILE_NOT_FOUND", message: `Section not found: ${heading}` }
+    error: { code: ERR.FILE_NOT_FOUND, message: `Section not found: ${heading}` }
   };
 }
 function scrubWikilinks(markdown, vaultName) {
@@ -662,7 +697,7 @@ function processContent(markdown, options) {
     if (options.vaultName === void 0) {
       return {
         ok: false,
-        error: { code: "INVALID_URI", message: "vaultName is required when scrubbing wikilinks" }
+        error: { code: ERR.INVALID_URI, message: "vaultName is required when scrubbing wikilinks" }
       };
     }
     result = scrubWikilinks(result, options.vaultName);
@@ -701,7 +736,7 @@ async function resolveNonAgent(namePart, tracker, securityOptions2) {
     if (!isAllowedPath(namePart, securityOptions2)) {
       return {
         ok: false,
-        error: { code: "PERMISSION_DENIED", message: "Path not within allowed folders" }
+        error: { code: ERR.PERMISSION_DENIED, message: "Path not within allowed folders" }
       };
     }
     const absolutePath = path6.resolve(securityOptions2.vaultRoot, namePart);
@@ -747,7 +782,7 @@ async function resolveMention(mention, tracker) {
     return {
       ok: false,
       error: {
-        code: "INVALID_URI",
+        code: ERR.INVALID_URI,
         message: `Invalid ${MENTION_PREFIX} mention: missing prefix`
       }
     };
@@ -757,7 +792,7 @@ async function resolveMention(mention, tracker) {
     return {
       ok: false,
       error: {
-        code: "INVALID_URI",
+        code: ERR.INVALID_URI,
         message: `Invalid ${MENTION_PREFIX} mention: empty reference`
       }
     };
@@ -766,7 +801,7 @@ async function resolveMention(mention, tracker) {
   if (namePart === "") {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: `Invalid ${MENTION_PREFIX} mention: empty path` }
+      error: { code: ERR.INVALID_URI, message: `Invalid ${MENTION_PREFIX} mention: empty path` }
     };
   }
   let targetType;
@@ -957,7 +992,7 @@ var LocalIndexTracker = class _LocalIndexTracker {
     if (!pathResult.ok) {
       return {
         ok: false,
-        error: { code: "VAULT_NOT_FOUND", message: pathResult.error.message }
+        error: { code: ERR.VAULT_NOT_FOUND, message: pathResult.error.message }
       };
     }
     const physicalPath = pathResult.value;
@@ -965,7 +1000,7 @@ var LocalIndexTracker = class _LocalIndexTracker {
     if (!nameResult.ok) {
       return {
         ok: false,
-        error: { code: "VAULT_NOT_FOUND", message: nameResult.error.message }
+        error: { code: ERR.VAULT_NOT_FOUND, message: nameResult.error.message }
       };
     }
     const name = nameResult.value;
@@ -979,7 +1014,7 @@ var LocalIndexTracker = class _LocalIndexTracker {
       } catch {
         return {
           ok: false,
-          error: { code: "PARSE_ERROR", message: "Invalid JSON in obsidian-vfs.json" }
+          error: { code: ERR.PARSE_ERROR, message: "Invalid JSON in obsidian-vfs.json" }
         };
       }
       const configResult = validateVFSConfig(parsed);
@@ -987,13 +1022,13 @@ var LocalIndexTracker = class _LocalIndexTracker {
         return configResult;
       vfsConfig = configResult.value;
     } catch (err) {
-      if (err.code === "ENOENT") {
+      if (err.code === ERRNO.ENOENT) {
         vfsConfig = { agents: [], skills: [], allowed: [], blocked: [] };
       } else {
         return {
           ok: false,
           error: {
-            code: "PARSE_ERROR",
+            code: ERR.PARSE_ERROR,
             message: `Cannot read config file: ${err.message}`
           }
         };
@@ -1054,8 +1089,12 @@ var LocalIndexTracker = class _LocalIndexTracker {
     return readDirectory(virtualPath, this.#securityOptions);
   }
   /** Recursively enumerate all markdown files in the vault. */
-  async listFiles() {
-    return listMarkdownFiles(this.#securityOptions);
+  async listFiles(depthLimit) {
+    return listMarkdownFiles(this.#securityOptions, depthLimit);
+  }
+  /** Enumerate vault folders up to the given depth. */
+  async listFolders(depthLimit) {
+    return listFolders(this.#securityOptions, depthLimit);
   }
   /** Get file or directory metadata. */
   async stat(virtualPath) {

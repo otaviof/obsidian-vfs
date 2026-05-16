@@ -20,6 +20,7 @@ export type {
   VFSResult,
   WikilinkResolution,
 } from "./types.js";
+export { ERR, ERRNO } from "./types.js";
 
 /**
  * Parsed `obs://` URI components.
@@ -119,7 +120,7 @@ export {
 } from "./markdown-links.js";
 export type { ParsedLink, EmbedResolver } from "./markdown-links.js";
 export { VaultFileWatcher } from "./file-watcher.js";
-export { listMarkdownFiles, readDirectory, statVirtualFile } from "./fs-enumeration.js";
+export { listFolders, listMarkdownFiles, readDirectory, statVirtualFile } from "./fs-enumeration.js";
 export {
   MENTION_PREFIX,
   SKILL_PREFIX,

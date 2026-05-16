@@ -2,6 +2,7 @@ import { readFile as fsReadFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { ObsidianCLI } from "./cli.js";
+import { ERR, ERRNO } from "./types.js";
 import type {
   DiscoveredResource,
   Disposable,
@@ -23,6 +24,7 @@ import { resolveWikilink as resolveWikilinkFn } from "./resolve-wikilink.js";
 import { resolveResource, resolveSkillResource } from "./resolve-resource.js";
 import { resolveMention as resolveMentionFn } from "./resolve-mention.js";
 import {
+  listFolders as listFoldersFn,
   listMarkdownFiles,
   readDirectory as readDirectoryFn,
   statVirtualFile,
@@ -99,7 +101,7 @@ export class LocalIndexTracker {
     if (!pathResult.ok) {
       return {
         ok: false,
-        error: { code: "VAULT_NOT_FOUND", message: pathResult.error.message },
+        error: { code: ERR.VAULT_NOT_FOUND, message: pathResult.error.message },
       };
     }
     const physicalPath = pathResult.value;
@@ -108,7 +110,7 @@ export class LocalIndexTracker {
     if (!nameResult.ok) {
       return {
         ok: false,
-        error: { code: "VAULT_NOT_FOUND", message: nameResult.error.message },
+        error: { code: ERR.VAULT_NOT_FOUND, message: nameResult.error.message },
       };
     }
     const name = nameResult.value;
@@ -124,20 +126,20 @@ export class LocalIndexTracker {
       } catch {
         return {
           ok: false,
-          error: { code: "PARSE_ERROR", message: "Invalid JSON in obsidian-vfs.json" },
+          error: { code: ERR.PARSE_ERROR, message: "Invalid JSON in obsidian-vfs.json" },
         };
       }
       const configResult = validateVFSConfig(parsed);
       if (!configResult.ok) return configResult;
       vfsConfig = configResult.value;
     } catch (err) {
-      if ((err as NodeJS.ErrnoException).code === "ENOENT") {
+      if ((err as NodeJS.ErrnoException).code === ERRNO.ENOENT) {
         vfsConfig = { agents: [], skills: [], allowed: [], blocked: [] };
       } else {
         return {
           ok: false,
           error: {
-            code: "PARSE_ERROR",
+            code: ERR.PARSE_ERROR,
             message: `Cannot read config file: ${(err as Error).message}`,
           },
         };
@@ -209,8 +211,13 @@ export class LocalIndexTracker {
   }
 
   /** Recursively enumerate all markdown files in the vault. */
-  async listFiles(): Promise<VFSResult<string[]>> {
-    return listMarkdownFiles(this.#securityOptions);
+  async listFiles(depthLimit?: number): Promise<VFSResult<string[]>> {
+    return listMarkdownFiles(this.#securityOptions, depthLimit);
+  }
+
+  /** Enumerate vault folders up to the given depth. */
+  async listFolders(depthLimit?: number): Promise<VFSResult<string[]>> {
+    return listFoldersFn(this.#securityOptions, depthLimit);
   }
 
   /** Get file or directory metadata. */

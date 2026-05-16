@@ -3,6 +3,7 @@ import path from "node:path";
 
 import type { PathSecurityOptions } from "./path-security.js";
 import { canonicalizePath } from "./path-security.js";
+import { ERR } from "./types.js";
 import type { VFSResult } from "./types.js";
 
 /** Canonical filename inside a skill directory. */
@@ -34,7 +35,7 @@ export async function resolveSkillResource(
 
   return {
     ok: false,
-    error: { code: "FILE_NOT_FOUND", message: `Skill not found: ${trimmed}` },
+    error: { code: ERR.FILE_NOT_FOUND, message: `Skill not found: ${trimmed}` },
   };
 }
 
@@ -65,6 +66,6 @@ export async function resolveResource(
 
   return {
     ok: false,
-    error: { code: "FILE_NOT_FOUND", message: `Resource not found: ${trimmed}` },
+    error: { code: ERR.FILE_NOT_FOUND, message: `Resource not found: ${trimmed}` },
   };
 }

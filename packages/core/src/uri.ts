@@ -1,3 +1,4 @@
+import { ERR } from "./types.js";
 import type { VFSResult } from "./types.js";
 
 /** The URI scheme identifier (`obs`). */
@@ -24,7 +25,7 @@ export function parseObsUri(uri: string): VFSResult<ObsUriComponents> {
     return {
       ok: false,
       error: {
-        code: "INVALID_URI",
+        code: ERR.INVALID_URI,
         message: `Invalid ${URI_PREFIX} URI: missing or wrong scheme`,
       },
     };
@@ -36,7 +37,7 @@ export function parseObsUri(uri: string): VFSResult<ObsUriComponents> {
   if (slashIndex < 0) {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: `Invalid ${URI_PREFIX} URI: missing path` },
+      error: { code: ERR.INVALID_URI, message: `Invalid ${URI_PREFIX} URI: missing path` },
     };
   }
 
@@ -44,7 +45,7 @@ export function parseObsUri(uri: string): VFSResult<ObsUriComponents> {
   if (rawVault === "") {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: `Invalid ${URI_PREFIX} URI: empty vault name` },
+      error: { code: ERR.INVALID_URI, message: `Invalid ${URI_PREFIX} URI: empty vault name` },
     };
   }
 
@@ -66,7 +67,7 @@ export function parseObsUri(uri: string): VFSResult<ObsUriComponents> {
   if (rawPath === "") {
     return {
       ok: false,
-      error: { code: "INVALID_URI", message: `Invalid ${URI_PREFIX} URI: empty path` },
+      error: { code: ERR.INVALID_URI, message: `Invalid ${URI_PREFIX} URI: empty path` },
     };
   }
 
@@ -83,7 +84,7 @@ export function parseObsUri(uri: string): VFSResult<ObsUriComponents> {
     return {
       ok: false,
       error: {
-        code: "INVALID_URI",
+        code: ERR.INVALID_URI,
         message: `Invalid ${URI_PREFIX} URI: malformed percent-encoding`,
       },
     };

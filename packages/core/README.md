@@ -38,7 +38,7 @@ The `./testing` entry point provides test doubles for consumer packages:
 | Category | Symbols |
 |----------|---------|
 | Resolution | `resolveMention`, `resolveSkillMention`, `resolveWikilink`, `normalizeMention`, `parseSection` |
-| File I/O | `readVirtualFile`, `listMarkdownFiles`, `readDirectory` |
+| File I/O | `readVirtualFile`, `listMarkdownFiles`, `listFolders`, `readDirectory` |
 | CLI | `ObsidianCLI`, `resolveExecConfig`, `resolveCliPath` |
 | Content | `sliceContent`, `scrubWikilinks`, `processContent`, `resolveEmbeds`, `maskCodeRegions` |
 | Frontmatter | `extractFrontmatter`, `extractCuratedFrontmatter`, `remapModelLine`, `mapModelToClaude` |
