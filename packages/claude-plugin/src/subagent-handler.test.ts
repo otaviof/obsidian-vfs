@@ -15,18 +15,17 @@ vi.mock("@obsidian-vfs/core", async (importOriginal) => {
 });
 
 import { bootstrapTracker, resolveMention } from "@obsidian-vfs/core";
-import type { LocalIndexTracker, VFSResult, MentionResult } from "@obsidian-vfs/core";
+import type { VFSResult, MentionResult } from "@obsidian-vfs/core";
 
 import { parseSubagentInput, handleSubagentStart } from "./subagent-handler.js";
+import { fakeLocalIndexTracker } from "./test-helpers.js";
 
 const mockBootstrap = vi.mocked(bootstrapTracker);
 const mockResolveMention = vi.mocked(resolveMention);
 
 describe("subagent-handler", () => {
   let cwd: string;
-  const fakeTracker = {
-    context: { name: "Vault", physicalPath: "/vault" },
-  } as unknown as LocalIndexTracker;
+  const fakeTracker = fakeLocalIndexTracker();
 
   beforeEach(() => {
     vi.clearAllMocks();

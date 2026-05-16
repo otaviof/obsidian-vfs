@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createVscodeMock } from "./test-mocks.js";
+import { createVscodeMock } from "./test-helpers.js";
 
 vi.mock("vscode", () =>
   createVscodeMock({ workspace: true, uri: true, configurationTarget: true, commands: true }),

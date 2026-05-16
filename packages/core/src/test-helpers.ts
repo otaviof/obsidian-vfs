@@ -1,3 +1,12 @@
+/**
+ * Test utilities exported via `@obsidian-vfs/core/testing`.
+ *
+ * Consumed by `cli` and `vscode` test suites as devDependencies.
+ *
+ * @example
+ * import { makeLocalIndexTrackerWith, makeDiscoveredResource } from "@obsidian-vfs/core/testing";
+ */
+
 import type { Dirent } from "node:fs";
 
 import type { Mock } from "vitest";

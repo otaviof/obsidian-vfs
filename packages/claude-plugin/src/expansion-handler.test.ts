@@ -17,11 +17,12 @@ vi.mock("./proxy-detector.js", () => ({
 }));
 
 import { bootstrapTracker, resolveSkillMention, resolveMention } from "@obsidian-vfs/core";
-import type { LocalIndexTracker, VFSResult, MentionResult } from "@obsidian-vfs/core";
+import type { VFSResult, MentionResult } from "@obsidian-vfs/core";
 
 import { detectProxy } from "./proxy-detector.js";
 import { parseExpansionInput, handleExpansion } from "./expansion-handler.js";
 import type { ExpansionInput } from "./expansion-handler.js";
+import { fakeLocalIndexTracker } from "./test-helpers.js";
 
 const mockBootstrap = vi.mocked(bootstrapTracker);
 const mockDetectProxy = vi.mocked(detectProxy);
@@ -59,9 +60,7 @@ function expansionInput(commandName: string): ExpansionInput {
 }
 
 describe("expansion-handler", () => {
-  const fakeTracker = {
-    context: { name: "Vault", physicalPath: "/vault" },
-  } as unknown as LocalIndexTracker;
+  const fakeTracker = fakeLocalIndexTracker();
 
   beforeEach(() => {
     vi.clearAllMocks();

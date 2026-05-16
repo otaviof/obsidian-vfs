@@ -9,16 +9,15 @@ vi.mock("@obsidian-vfs/core", async (importOriginal) => {
 });
 
 import { resolveMention } from "@obsidian-vfs/core";
-import type { LocalIndexTracker, VFSResult, MentionResult } from "@obsidian-vfs/core";
+import type { VFSResult, MentionResult } from "@obsidian-vfs/core";
 
 import { resolveObsUriReferences } from "./ref-resolver.js";
+import { fakeLocalIndexTracker } from "./test-helpers.js";
 
 const mockResolveMention = vi.mocked(resolveMention);
 
 describe("resolveObsUriReferences", () => {
-  const fakeTracker = {
-    context: { name: "Vault", physicalPath: "/vault" },
-  } as unknown as LocalIndexTracker;
+  const fakeTracker = fakeLocalIndexTracker();
 
   beforeEach(() => {
     vi.clearAllMocks();

@@ -17,11 +17,12 @@ vi.mock("@obsidian-vfs/core", async (importOriginal) => {
 });
 
 import { bootstrapTracker, resolveMention, resolveSkillMention } from "@obsidian-vfs/core";
-import type { LocalIndexTracker, MentionResult, VFSResult } from "@obsidian-vfs/core";
+import type { MentionResult, VFSResult } from "@obsidian-vfs/core";
 
 import { extractMentions } from "./mention-extractor.js";
 import { formatContext } from "./context-formatter.js";
 import { parseInput } from "./hook-handler.js";
+import { fakeLocalIndexTracker } from "./test-helpers.js";
 
 const mockBootstrap = vi.mocked(bootstrapTracker);
 const mockResolveMention = vi.mocked(resolveMention);
@@ -39,9 +40,7 @@ function hookInput(prompt: string): string {
 }
 
 describe("hook-handler", () => {
-  const fakeTracker = {
-    context: { name: "Vault", physicalPath: "/vault" },
-  } as unknown as LocalIndexTracker;
+  const fakeTracker = fakeLocalIndexTracker();
 
   beforeEach(() => {
     vi.clearAllMocks();

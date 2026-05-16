@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createVscodeMock, mockTracker } from "./test-mocks.js";
+import { createVscodeMock, fakeContext, mockTracker } from "./test-helpers.js";
 
 vi.mock("vscode", () =>
   createVscodeMock({
@@ -24,10 +24,6 @@ import { SCHEME } from "./uri-adapter.js";
 import { readAutoMount } from "./vault-tree-provider.js";
 
 const mockReadAutoMount = vi.mocked(readAutoMount);
-
-function fakeContext(): { subscriptions: { dispose: () => void }[] } {
-  return { subscriptions: [] };
-}
 
 function fakeTreeProvider(): { refresh: ReturnType<typeof vi.fn> } {
   return { refresh: vi.fn() };
