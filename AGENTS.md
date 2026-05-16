@@ -31,7 +31,7 @@ Style, file layout, patterns: [CONTRIBUTING.md#conventions](CONTRIBUTING.md#conv
 ## VSCode: Workspace Folder Architecture
 
 - **Single `file://` workspace folder at the vault root** for Quick Open (`Cmd+P`) and `Ctrl+Shift+F` search. VSCode's file discovery and ripgrep indexer only operate on `file://` workspace folders — `obs://` workspace folders provide zero discoverability (confirmed by spike, 2026-05-15).
-- **`files.exclude` patterns** hide non-autoMount vault content from Explorer and Quick Open. Patterns are managed via `ConfigurationTarget.Workspace` (routes to `.vscode/settings.json` or `.code-workspace` file automatically). Extension-managed patterns are tracked in `context.workspaceState` and cleaned up on autoMount change or workspace disable.
+- **`files.exclude` patterns** hide non-autoMount vault content. Two-tier split: dotfiles + `blocked` → `ConfigurationTarget.WorkspaceFolder` (`<vault>/.vscode/settings.json`); non-autoMount dirs → `ConfigurationTarget.Workspace`. Tracked in `context.workspaceState`, cleaned up on change or disable.
 - **`obs://` FileSystemProvider** remains registered for TreeView sidebar, wikilinks, drag-and-drop, and watch events — it does not back a workspace folder.
 - **`FileSearchProvider`/`TextSearchProvider` are proposed (unstable) APIs** as of `@types/vscode@1.118.0`. When stabilized, the extension can switch to a single `obs://` workspace folder with native search, eliminating the `files.exclude` workaround. Check `@types/vscode` for stable availability — do not use while proposed.
 

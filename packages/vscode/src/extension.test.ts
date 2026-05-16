@@ -597,7 +597,7 @@ describe("configuration change listener", () => {
 
     expect(mockRemoveWF).toHaveBeenCalledWith("/vault");
     expect(mockAddWF).not.toHaveBeenCalled();
-    expect(mockClearExclude).toHaveBeenCalledWith([]);
+    expect(mockClearExclude).toHaveBeenCalledWith("/vault", []);
     expect(mockIncludeGit).toHaveBeenCalledWith("/vault");
   });
 
@@ -641,7 +641,7 @@ describe("configuration change listener", () => {
     await new Promise((r) => setTimeout(r, 0));
 
     expect(mockRemoveWF).toHaveBeenCalledWith("/vault");
-    expect(mockClearExclude).toHaveBeenCalledWith([]);
+    expect(mockClearExclude).toHaveBeenCalledWith("/vault", []);
     expect(mockAddWF).not.toHaveBeenCalled();
   });
 

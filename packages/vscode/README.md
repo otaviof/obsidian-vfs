@@ -65,14 +65,14 @@ Non-autoMount vault content (`.obsidian/`, `.trash/`, and any directories not in
 
 **How it works:**
 
-- The extension scans the vault root and adds `files.exclude` patterns for entries not in `autoMount`. Patterns are written to workspace settings (`ConfigurationTarget.Workspace`) and tracked internally for cleanup.
+- The extension scans the vault root and adds `files.exclude` patterns for entries not in `autoMount`. Patterns are split into two tiers: vault-global patterns (dotfiles and `blocked` paths from `.obsidian-vfs.json`) are written to `<vault>/.vscode/settings.json`; remaining non-autoMount directories are written to workspace settings. All managed patterns are tracked internally for cleanup.
 - When `autoMount` entries change, patterns are re-synced automatically — stale patterns are removed and new ones added.
 - When `obsidianVFS.workspace` is disabled, all managed patterns are removed and the workspace folder is deleted.
 - The vault's `.git` repository is automatically added to `git.ignoredRepositories` (user-level setting) when the workspace folder is mounted, preventing VS Code's Git extension from listing it in Source Control. The entry is removed when `obsidianVFS.workspace` is disabled.
 
 **Known limitations:**
 
-- **Pattern scope:** `files.exclude` patterns apply to all workspace folders. If a non-autoMount vault directory shares a name with a directory in your project (e.g., both have a `docs/` folder), the project directory will also be hidden. Fix: add the vault directory to `autoMount`, or rename it in your vault.
+- **Vault `.vscode/` directory:** The extension creates `.vscode/settings.json` inside the vault for vault-global `files.exclude` patterns (dotfiles and `blocked` paths). These patterns are independent of `autoMount` and apply to any workspace that includes the vault. The `.vscode/` directory itself is never managed by the extension — if you want to hide it, add `.vscode` to your own `files.exclude`. When `obsidianVFS.workspace` is disabled, all managed patterns are removed from both folder and workspace settings. If your vault is git-tracked, consider adding `.vscode/` to the vault's `.gitignore`.
 - **Not a security boundary:** `files.exclude` hides content from Explorer and Quick Open but does not enforce access restrictions. The `obs://` FileSystemProvider's path security (`allowed`/`blocked` lists in `.obsidian-vfs.json`) applies to TreeView, wikilink, and drag-and-drop operations.
 - **Title bar:** Adding the vault as a workspace folder creates a multi-root workspace. VS Code may show "UNTITLED (WORKSPACE)" in the title bar.
 
@@ -92,15 +92,15 @@ Enable `obsidianVFS.workspaceFile` to fix this. The extension generates a `<proj
 1. The extension creates `<project-name>.code-workspace` in your project root containing the local folder(s) and the `file://` vault folder entry (named `obs://<VaultName>`).
 2. A notification asks: _"Open workspace file? This will reload the window."_
 3. If you click **Open**, the window reloads once. After that, the title bar shows the project name and the vault is part of the saved workspace.
-4. On subsequent activations, the extension detects you're already in a saved workspace and skips the prompt. `files.exclude` patterns are written to the `.code-workspace` file's `settings` section (via `ConfigurationTarget.Workspace`) instead of `.vscode/settings.json`.
-5. If you click **Not Now**, the extension falls back to adding the vault dynamically via `updateWorkspaceFolders` (with `files.exclude` patterns in `.vscode/settings.json`). You can open the generated workspace file later.
+4. On subsequent activations, the extension detects you're already in a saved workspace and skips the prompt. Vault-global `files.exclude` patterns (dotfiles and `blocked` paths) are written to `<vault>/.vscode/settings.json`; workspace-specific patterns (non-autoMount directories) are written to workspace settings (routed to the `.code-workspace` file when one is active, or to the project's `.vscode/settings.json` otherwise).
+5. If you click **Not Now**, the extension falls back to adding the vault dynamically via `updateWorkspaceFolders` (with `files.exclude` patterns in the vault's `.vscode/settings.json`). You can open the generated workspace file later.
 
 **UX trade-offs:**
 
 - **One-time window reload** — opening the workspace file causes VS Code to reload the window. This only happens once; after that the workspace file is saved and reloads are not needed.
 - **File on disk** — a `.code-workspace` file is created in your project root. You can commit it to version control (so teammates get the same workspace layout) or add it to `.gitignore`.
 - **No overwrite** — if a `.code-workspace` file already exists (e.g., from a previous run or your own), the extension will not overwrite it. It offers to open the existing file instead.
-- **`files.exclude` containment** — with a `.code-workspace` file, `files.exclude` patterns are scoped to the workspace file rather than `.vscode/settings.json`. This reduces the risk of pattern collisions with project directories (see Known limitations above).
+- **`files.exclude` containment** — vault-global patterns (dotfiles and `blocked` paths) are scoped to the vault workspace folder, preventing vault dotfiles (`.git`, `.obsidian`) from hiding same-named entries in your project. Workspace-specific patterns (non-autoMount directories like `00-inbox`, `40-log`) use workspace settings and are unlikely to collide with project entries.
 
 **When to use each setting:**
 

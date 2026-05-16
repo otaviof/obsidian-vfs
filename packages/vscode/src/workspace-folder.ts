@@ -8,6 +8,13 @@ import { canonicalizePath } from "@obsidian-vfs/core";
 
 import { SCHEME } from "./uri-adapter.js";
 
+/** Find the vault's workspace folder by matching `file://` scheme + fsPath. */
+function findVaultWorkspaceFolder(physicalPath: string): vscode.WorkspaceFolder | undefined {
+  return (vscode.workspace.workspaceFolders ?? []).find(
+    (f) => f.uri.scheme === "file" && f.uri.fsPath === physicalPath,
+  );
+}
+
 /** Result of attempting to add the vault as a workspace folder. */
 export type AddWorkspaceFolderResult =
   | { readonly status: "added" }
@@ -96,7 +103,14 @@ export function addVaultWorkspaceFolder(
 
 /**
  * Scan the vault root and update `files.exclude` to hide non-autoMount entries
- * and blocked paths. Preserves user-set patterns. Returns managed pattern keys.
+ * and blocked paths. Patterns are split into two tiers:
+ *
+ * - **Folder-scoped** (`WorkspaceFolder` → `<vault>/.vscode/settings.json`):
+ *   dotfiles and `blocked` paths — vault-global, independent of `autoMount`.
+ * - **Workspace-scoped** (`Workspace`): remaining non-autoMount top-level
+ *   directories — workspace-specific, varies per `autoMount` config.
+ *
+ * Returns all managed pattern keys (both tiers combined).
  */
 export async function syncFilesExclude(
   physicalPath: string,
@@ -112,54 +126,76 @@ export async function syncFilesExclude(
   }
   const autoMountRoots = new Set(autoMount.map((p) => p.split("/")[0]));
 
-  const projectFolders = (vscode.workspace.workspaceFolders ?? []).filter(
-    (f) => f.uri.scheme === "file" && f.uri.fsPath !== physicalPath,
-  );
-  const projectEntries = new Set<string>();
-  for (const folder of projectFolders) {
-    try {
-      const dirEntries = await readdir(folder.uri.fsPath);
-      for (const e of dirEntries) projectEntries.add(e);
-    } catch {
-      // Folder may not be readable
-    }
-  }
-
-  const toExclude: string[] = [];
+  const folderScoped: string[] = [];
+  const workspaceScoped: string[] = [];
 
   for (const entry of entries) {
-    if (!autoMountRoots.has(entry) && !projectEntries.has(entry)) toExclude.push(entry);
+    if (autoMountRoots.has(entry) || entry === ".vscode") continue;
+    if (entry.startsWith(".")) {
+      folderScoped.push(entry);
+    } else {
+      workspaceScoped.push(entry);
+    }
   }
 
   for (const b of blocked) {
-    if (!toExclude.includes(b)) toExclude.push(b);
+    if (!folderScoped.includes(b)) folderScoped.push(b);
   }
 
-  const managed = new Set(toExclude);
+  const allManaged = [...folderScoped, ...workspaceScoped];
+  const managedSet = new Set(allManaged);
 
-  const filesConfig = vscode.workspace.getConfiguration("files");
-  const current = filesConfig.get<Record<string, boolean>>("exclude", {});
-  const updated = { ...current };
+  // Tier 1: folder-scoped patterns (dotfiles + blocked)
+  const vaultFolder = findVaultWorkspaceFolder(physicalPath);
+  if (vaultFolder) {
+    const folderConfig = vscode.workspace.getConfiguration("files", vaultFolder.uri);
+    const current =
+      folderConfig.inspect<Record<string, boolean>>("exclude")?.workspaceFolderValue ?? {};
+    const updated = { ...current };
+
+    for (const key of previouslyManaged) {
+      if (!managedSet.has(key)) delete updated[key];
+    }
+    for (const entry of folderScoped) {
+      updated[entry] = true;
+    }
+
+    await folderConfig.update("exclude", updated, vscode.ConfigurationTarget.WorkspaceFolder);
+  } else {
+    // No vault workspace folder — fall back to workspace tier for all patterns
+    workspaceScoped.push(...folderScoped);
+  }
+
+  // Tier 2: workspace-scoped patterns (non-autoMount non-dotfile dirs,
+  // plus folderScoped fallback when vault is not a workspace folder)
+  const wsConfig = vscode.workspace.getConfiguration("files");
+  const wsCurrent = wsConfig.inspect<Record<string, boolean>>("exclude")?.workspaceValue ?? {};
+  const wsUpdated = { ...wsCurrent };
 
   for (const key of previouslyManaged) {
-    if (!managed.has(key)) {
-      delete updated[key];
+    if (!managedSet.has(key)) delete wsUpdated[key];
+  }
+  for (const entry of workspaceScoped) {
+    wsUpdated[entry] = true;
+  }
+
+  // Migrate: remove folder-scoped patterns that were previously at workspace level
+  if (vaultFolder) {
+    for (const entry of folderScoped) {
+      if (entry in wsUpdated) delete wsUpdated[entry];
     }
   }
 
-  for (const entry of entries) {
-    if (projectEntries.has(entry) && entry in updated) {
-      delete updated[entry];
-    }
+  const wsHasKeys = Object.keys(wsUpdated).length > 0;
+  if (wsHasKeys || Object.keys(wsCurrent).length > 0) {
+    await wsConfig.update(
+      "exclude",
+      wsHasKeys ? wsUpdated : undefined,
+      vscode.ConfigurationTarget.Workspace,
+    );
   }
 
-  for (const entry of toExclude) {
-    updated[entry] = true;
-  }
-
-  await filesConfig.update("exclude", updated, vscode.ConfigurationTarget.Workspace);
-
-  return toExclude;
+  return allManaged;
 }
 
 /** Result of attempting to generate a `.code-workspace` file. */
@@ -227,22 +263,54 @@ export async function openWorkspaceFile(fileUri: vscode.Uri): Promise<void> {
   await vscode.commands.executeCommand("vscode.openFolder", fileUri);
 }
 
-/** Remove all extension-managed `files.exclude` patterns from workspace settings. */
-export async function clearManagedExcludes(previouslyManaged: readonly string[]): Promise<void> {
+/** Remove all extension-managed `files.exclude` patterns from folder and workspace settings. */
+export async function clearManagedExcludes(
+  physicalPath: string,
+  previouslyManaged: readonly string[],
+): Promise<void> {
   if (previouslyManaged.length === 0) return;
 
-  const filesConfig = vscode.workspace.getConfiguration("files");
-  const current = filesConfig.get<Record<string, boolean>>("exclude", {});
-  const updated = { ...current };
+  const prevSet = new Set(previouslyManaged);
 
-  for (const key of previouslyManaged) {
-    delete updated[key];
+  // Clean folder-scoped patterns (dotfiles + blocked)
+  const vaultFolder = findVaultWorkspaceFolder(physicalPath);
+  if (vaultFolder) {
+    const folderConfig = vscode.workspace.getConfiguration("files", vaultFolder.uri);
+    const folderPatterns =
+      folderConfig.inspect<Record<string, boolean>>("exclude")?.workspaceFolderValue;
+    if (folderPatterns) {
+      const cleaned = { ...folderPatterns };
+      for (const key of previouslyManaged) {
+        delete cleaned[key];
+      }
+      const hasKeys = Object.keys(cleaned).length > 0;
+      await folderConfig.update(
+        "exclude",
+        hasKeys ? cleaned : undefined,
+        vscode.ConfigurationTarget.WorkspaceFolder,
+      );
+    }
   }
 
-  const hasKeys = Object.keys(updated).length > 0;
-  await filesConfig.update(
-    "exclude",
-    hasKeys ? updated : undefined,
-    vscode.ConfigurationTarget.Workspace,
-  );
+  // Clean workspace-scoped patterns (non-autoMount dirs)
+  const wsConfig = vscode.workspace.getConfiguration("files");
+  const wsPatterns = wsConfig.inspect<Record<string, boolean>>("exclude")?.workspaceValue;
+  if (wsPatterns) {
+    const cleaned = { ...wsPatterns };
+    let changed = false;
+    for (const key of Object.keys(cleaned)) {
+      if (prevSet.has(key)) {
+        delete cleaned[key];
+        changed = true;
+      }
+    }
+    if (changed) {
+      const hasKeys = Object.keys(cleaned).length > 0;
+      await wsConfig.update(
+        "exclude",
+        hasKeys ? cleaned : undefined,
+        vscode.ConfigurationTarget.Workspace,
+      );
+    }
+  }
 }

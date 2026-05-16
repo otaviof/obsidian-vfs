@@ -118,7 +118,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const runClear = (): void => {
     excludeSync = excludeSync.then(async () => {
-      await clearManagedExcludes(managedExcludes);
+      await clearManagedExcludes(tracker.context.physicalPath, managedExcludes);
       managedExcludes = [];
       await context.workspaceState.update(managedExcludesKey, []);
     });
@@ -138,13 +138,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   } else if (config.workspaceFile && !alreadySaved && config.autoMount.length > 0) {
     try {
       await excludeVaultFromGitDetection(tracker.context.physicalPath);
-      managedExcludes = await syncFilesExclude(
-        tracker.context.physicalPath,
-        config.autoMount,
-        blocked,
-        managedExcludes,
-      );
-      await context.workspaceState.update(managedExcludesKey, managedExcludes);
 
       const wfResult = generateWorkspaceFile(tracker.context.physicalPath, tracker.context.name);
       outputChannel.appendLine(`Workspace file: ${wfResult.status} — ${wfResult.fileUri.fsPath}`);
@@ -161,6 +154,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       const addResult = addVaultWorkspaceFolder(tracker.context.physicalPath, tracker.context.name);
       const detail = "reason" in addResult ? ` — ${addResult.reason}` : "";
       outputChannel.appendLine(`Workspace folder: ${addResult.status}${detail}`);
+      managedExcludes = await syncFilesExclude(
+        tracker.context.physicalPath,
+        config.autoMount,
+        blocked,
+        managedExcludes,
+      );
+      await context.workspaceState.update(managedExcludesKey, managedExcludes);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       outputChannel.appendLine(`Workspace file: skipped — ${msg}`);
