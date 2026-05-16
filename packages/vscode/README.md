@@ -57,6 +57,8 @@ All three toggle settings (`explorer`, `statusBar`, `workspace`) take effect imm
 
 When `obsidianVFS.workspace` is enabled and at least one `autoMount` entry is configured, the extension adds a single `file://` workspace folder at the vault root (named **obs://\<vault\>** in the sidebar). VS Code's **Quick Open** (`Cmd+P`) and **Search** (`Ctrl+Shift+F`) discover vault files through this folder.
 
+The **Explorer tree view** (the `obs://` custom sidebar panel) only shows entries in `autoMount`. The workspace folder shows everything unless hidden by `files.exclude` — the extension writes patterns to match the tree view's visibility.
+
 Non-autoMount vault content (`.obsidian/`, `.trash/`, and any directories not in `autoMount`) is hidden from Explorer and Quick Open via `files.exclude` patterns managed by the extension. Your own `files.exclude` patterns are never modified or removed.
 
 **Requirements:**
@@ -71,16 +73,31 @@ Non-autoMount vault content (`.obsidian/`, `.trash/`, and any directories not in
 - When `obsidianVFS.workspace` is disabled, all managed patterns are removed and the workspace folder is deleted.
 - The vault's `.git` repository is automatically added to `git.ignoredRepositories` (user-level setting) when the workspace folder is mounted, preventing VS Code's Git extension from listing it in Source Control. The entry is removed when `obsidianVFS.workspace` is disabled.
 
+**Sub-path mounting:** When `autoMount` contains nested paths (e.g., `["areas/projects"]`), only the mounted sub-directory is visible. Sibling directories under the same parent are hidden:
+
+```
+autoMount: ["areas/projects"]
+
+Vault structure:           File explorer visibility:
+areas/                     areas/
+  projects/                  projects/    ← visible (mounted)
+  personal/                (personal/ hidden)
+  work/                    (work/ hidden)
+```
+
+This matches the tree view — only mounted paths appear in both views.
+
 **Known limitations:**
 
 - **Vault `.vscode/` directory:** The extension creates `.vscode/settings.json` inside the vault for vault-global `files.exclude` patterns (dotfiles and `blocked` paths). These patterns are independent of `autoMount` and apply to any workspace that includes the vault. The `.vscode/` directory itself is never managed by the extension — if you want to hide it, add `.vscode` to your own `files.exclude`. When `obsidianVFS.workspace` is disabled, all managed patterns are removed from both folder and workspace settings. If your vault is git-tracked, consider adding `.vscode/` to the vault's `.gitignore`.
-- **Not a security boundary:** `files.exclude` hides content from Explorer and Quick Open but does not enforce access restrictions. The `obs://` FileSystemProvider's path security (`allowed`/`blocked` lists in `.obsidian-vfs.json`) applies to TreeView, wikilink, and drag-and-drop operations.
+- **Not a security boundary:** `files.exclude` hides content from Explorer and Quick Open but does not enforce access restrictions. The `obs://` `FileSystemProvider`'s path security (`allowed`/`blocked` lists in `.obsidian-vfs.json`) applies to tree view, wikilink, and drag-and-drop operations.
+- **Temporary workaround:** `files.exclude` is used because VS Code's [`FileSearchProvider`/`TextSearchProvider`](https://github.com/microsoft/vscode/issues/73524) APIs are still proposed (unstable). When stabilized, the extension can switch to a single `obs://` workspace folder with native search, eliminating the `files.exclude` patterns entirely.
 - **Title bar:** Adding the vault as a workspace folder creates a multi-root workspace. VS Code may show "UNTITLED (WORKSPACE)" in the title bar.
 
 **Notes:**
 
 - The Explorer tree view and the workspace folder both appear in the sidebar. The tree view provides custom UI (welcome view, context menus, drag-and-drop), while the workspace folder enables Quick Open and full-text search.
-- The `obs://` FileSystemProvider remains registered for the TreeView sidebar, wikilink navigation, and drag-and-drop — it does not back a workspace folder.
+- The `obs://` `FileSystemProvider` remains registered for the tree view sidebar, wikilink navigation, and drag-and-drop — it does not back a workspace folder.
 
 ### Workspace File (avoiding "Untitled Workspace")
 

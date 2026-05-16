@@ -9,6 +9,7 @@ Shared engine for Obsidian VFS. Provides `obs://` URI resolution, file I/O, Obsi
 - **Obsidian CLI wrapper** — Async queue-serialized calls to the `obsidian` binary for search, backlinks, vault discovery. JSON and plain-text response parsing.
 - **Content processing** — Section slicing by `#heading`, `[[wikilink]]` scrubbing to `obs://` URIs, `![[embed]]` transclusion, Markdown link parsing.
 - **Frontmatter** — Extraction, curation, and formatting of YAML frontmatter. Model field mapping to Claude model identifiers via `mapModelToClaude()`.
+- **Mount tree** — Pure visibility logic for partial `autoMount` paths. Used by VSCode to compute `files.exclude` sub-directory exclusions that match tree view visibility.
 - **Caching** — Generic `LRUCache<K, V>` with TTL expiration.
 - **Security** — `path.resolve` + vault-root prefix check on all I/O. Symlink rejection outside vault. `allowed`/`blocked` enforcement on general vault content; `agents`/`skills` implicitly allowed.
 - **Configuration** — Vault config from [`.obsidian/obsidian-vfs.json`](../../README.md#vault-configuration) (`agents`, `skills`, `allowed`, `blocked`).
@@ -43,6 +44,7 @@ The `./testing` entry point provides test doubles for consumer packages:
 | Content | `sliceContent`, `scrubWikilinks`, `processContent`, `resolveEmbeds`, `maskCodeRegions` |
 | Frontmatter | `extractFrontmatter`, `extractCuratedFrontmatter`, `remapModelLine`, `mapModelToClaude` |
 | Types | `VFSResult`, `VFSError`, `VFSConfig`, `ErrorCode`, `MentionKind` |
+| Mount tree | `buildMountTree`, `MountNode` |
 | Utilities | `LRUCache`, `LocalIndexTracker`, `AsyncQueue` |
 | Constants | `URI_SCHEME`, `URI_PREFIX`, `MENTION_PREFIX`, `SKILL_PREFIX` |
 

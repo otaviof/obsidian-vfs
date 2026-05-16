@@ -49,6 +49,7 @@ The consumer packages (`vscode`, `claude-plugin`, `cli`) depend on `core` but ha
 | Package | Entry point | Output |
 |---------|-------------|--------|
 | `packages/core` | `src/index.ts` | ESM (`dist/`) |
+| `packages/core` — mount tree | `src/mount-tree.ts` | Pure visibility logic for partial `autoMount` paths |
 | `packages/vscode` | `src/extension.ts` | CJS via esbuild (`dist/extension.js`) |
 | `packages/claude-plugin` | `src/hook-handler.ts`, `src/entry-expansion.ts`, `src/entry-subagent.ts` | ESM (`dist/`) + self-contained bundles (`bundle/*.mjs`) |
 | `packages/cli` | `src/main.ts` | ESM (`dist/main.js`) |
@@ -68,6 +69,7 @@ The consumer packages (`vscode`, `claude-plugin`, `cli`) depend on `core` but ha
 - **CLI parsing** — `search`/`backlinks` return JSON; `vault`/`files`/`folders`/`read` return plain text. Exit code always 0. Detect errors via `Error:` stdout prefix.
 - **Reads bypass CLI** — `readVirtualFile` uses `node:fs` directly.
 - **Degraded mode** (Obsidian not running) — reads/enumeration via `node:fs`; search, wikilinks unavailable.
+- **Mount tree** — visibility logic for partial `autoMount` paths extracted to core (`mount-tree.ts`). Pure functions, no I/O, exhaustively tested. Used by `syncFilesExclude()` to compute sub-directory exclusions.
 - **Security** — `path.resolve` + vault-root prefix check on all I/O. Reject symlinks outside vault. `allowed`/`blocked` enforced on all general vault content; `agents`/`skills` implicitly allowed.
 
 ### File Layout

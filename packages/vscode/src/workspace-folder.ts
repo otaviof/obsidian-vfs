@@ -1,10 +1,12 @@
+import type { Dirent } from "node:fs";
 import fs from "node:fs";
 import { readdir } from "node:fs/promises";
 import path from "node:path";
 
 import * as vscode from "vscode";
 
-import { canonicalizePath } from "@obsidian-vfs/core";
+import type { MountNode } from "@obsidian-vfs/core";
+import { buildMountTree, canonicalizePath } from "@obsidian-vfs/core";
 
 import { SCHEME } from "./uri-adapter.js";
 
@@ -124,17 +126,24 @@ export async function syncFilesExclude(
   } catch {
     return [...previouslyManaged];
   }
-  const autoMountRoots = new Set(autoMount.map((p) => p.split("/")[0]));
+  const mountTree = buildMountTree(autoMount);
 
   const folderScoped: string[] = [];
   const workspaceScoped: string[] = [];
 
   for (const entry of entries) {
-    if (autoMountRoots.has(entry) || entry === ".vscode") continue;
+    if (entry === ".vscode") continue;
     if (entry.startsWith(".")) {
       folderScoped.push(entry);
-    } else {
+      continue;
+    }
+
+    const node = mountTree.get(entry);
+    if (node === undefined) {
       workspaceScoped.push(entry);
+    } else if (node !== null) {
+      const subExclusions = await enumeratePartialMounts(physicalPath, entry, node);
+      workspaceScoped.push(...subExclusions);
     }
   }
 
@@ -194,6 +203,10 @@ export async function syncFilesExclude(
       vscode.ConfigurationTarget.Workspace,
     );
   }
+
+  const previousSet = new Set(previouslyManaged);
+  const combinedKeys = new Set([...managedSet, ...previousSet]);
+  await cleanStaleNonVaultExcludes(physicalPath, combinedKeys);
 
   return allManaged;
 }
@@ -310,6 +323,66 @@ export async function clearManagedExcludes(
         "exclude",
         hasKeys ? cleaned : undefined,
         vscode.ConfigurationTarget.Workspace,
+      );
+    }
+  }
+
+  await cleanStaleNonVaultExcludes(physicalPath, prevSet);
+}
+
+async function enumeratePartialMounts(
+  basePath: string,
+  prefix: string,
+  node: MountNode,
+): Promise<string[]> {
+  const excluded: string[] = [];
+  let children: Dirent[];
+  try {
+    children = await readdir(path.join(basePath, prefix), { withFileTypes: true });
+  } catch {
+    return excluded;
+  }
+
+  for (const child of children) {
+    if (!child.isDirectory() || child.name.startsWith(".")) continue;
+    const childPath = `${prefix}/${child.name}`;
+    const childNode = node.get(child.name);
+
+    if (childNode === undefined) {
+      excluded.push(childPath);
+    } else if (childNode !== null) {
+      excluded.push(...(await enumeratePartialMounts(basePath, childPath, childNode)));
+    }
+  }
+
+  return excluded;
+}
+
+async function cleanStaleNonVaultExcludes(
+  physicalPath: string,
+  keysToRemove: ReadonlySet<string>,
+): Promise<void> {
+  for (const folder of vscode.workspace.workspaceFolders ?? []) {
+    if (folder.uri.scheme !== "file" || folder.uri.fsPath === physicalPath) continue;
+    const folderConfig = vscode.workspace.getConfiguration("files", folder.uri);
+    const folderPatterns =
+      folderConfig.inspect<Record<string, boolean>>("exclude")?.workspaceFolderValue;
+    if (!folderPatterns) continue;
+
+    const cleaned = { ...folderPatterns };
+    let changed = false;
+    for (const key of Object.keys(cleaned)) {
+      if (keysToRemove.has(key)) {
+        delete cleaned[key];
+        changed = true;
+      }
+    }
+    if (changed) {
+      const hasKeys = Object.keys(cleaned).length > 0;
+      await folderConfig.update(
+        "exclude",
+        hasKeys ? cleaned : undefined,
+        vscode.ConfigurationTarget.WorkspaceFolder,
       );
     }
   }

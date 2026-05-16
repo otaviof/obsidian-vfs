@@ -106,6 +106,12 @@ export { readVirtualFile } from "./read-file.js";
 export { LocalIndexTracker } from "./local-index-tracker.js";
 
 /**
+ * Mount tree: visibility decisions for partial autoMount paths.
+ */
+export type { MountNode } from "./mount-tree.js";
+export { buildMountTree } from "./mount-tree.js";
+
+/**
  * Modules: resolution, content processing, watching, enumeration.
  */
 export { resolveWikilink } from "./resolve-wikilink.js";
