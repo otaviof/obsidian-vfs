@@ -25,6 +25,7 @@ import * as vscode from "vscode";
 import { makeDirent } from "@obsidian-vfs/core/testing";
 
 import { SCHEME } from "./uri-adapter.js";
+import { DEFAULT_EXCLUDE_FILE_PATTERN } from "./types.js";
 import {
   FOLDER_NAME_PREFIX,
   addVaultWorkspaceFolder,
@@ -502,27 +503,181 @@ describe("syncFilesExclude", () => {
           makeDirent("readme.md", false),
         ] as unknown as Awaited<ReturnType<typeof readdir>>);
 
-      const result = await syncFilesExclude("/vault", ["20-areas/idea"], [], []);
+      const result = await syncFilesExclude(
+        "/vault",
+        ["20-areas/idea"],
+        [],
+        [],
+        DEFAULT_EXCLUDE_FILE_PATTERN,
+      );
 
       expect(result).toContain("20-areas/career");
       expect(result).toContain("20-areas/otaviof");
       expect(result).toContain("00-inbox");
       expect(result).not.toContain("20-areas/idea");
       expect(result).not.toContain("20-areas");
+      expect(result).toContain("20-areas/*.md");
     });
 
-    it("skips files in sub-path enumeration (directories only)", async () => {
+    it("excludes files matching excludeFilePattern via extension globs", async () => {
       vi.mocked(readdir)
-        .mockResolvedValueOnce(["20-areas"] as unknown as Awaited<ReturnType<typeof readdir>>)
+        .mockResolvedValueOnce(["10-projects"] as unknown as Awaited<ReturnType<typeof readdir>>)
         .mockResolvedValueOnce([
-          makeDirent("idea", true),
-          makeDirent("notes.md", false),
-          makeDirent("index.md", false),
+          makeDirent("obsidian-vfs", true),
+          makeDirent("rhtap", true),
+          makeDirent("calunga", true),
+          makeDirent("rhtap.base", false),
+          makeDirent("calunga.base", false),
         ] as unknown as Awaited<ReturnType<typeof readdir>>);
 
-      const result = await syncFilesExclude("/vault", ["20-areas/idea"], [], []);
+      const result = await syncFilesExclude(
+        "/vault",
+        ["10-projects/obsidian-vfs"],
+        [],
+        [],
+        DEFAULT_EXCLUDE_FILE_PATTERN,
+      );
 
-      expect(result).toEqual([]);
+      expect(result).toContain("10-projects/rhtap");
+      expect(result).toContain("10-projects/calunga");
+      expect(result).toContain("10-projects/*.base");
+      expect(result).not.toContain("10-projects/rhtap.base");
+      expect(result).not.toContain("10-projects/calunga.base");
+      expect(result).not.toContain("10-projects/obsidian-vfs");
+    });
+
+    it("skips files when excludeFilePattern is empty", async () => {
+      vi.mocked(readdir)
+        .mockResolvedValueOnce(["10-projects"] as unknown as Awaited<ReturnType<typeof readdir>>)
+        .mockResolvedValueOnce([
+          makeDirent("obsidian-vfs", true),
+          makeDirent("rhtap.base", false),
+        ] as unknown as Awaited<ReturnType<typeof readdir>>);
+
+      const result = await syncFilesExclude("/vault", ["10-projects/obsidian-vfs"], [], [], "");
+
+      expect(result).not.toContain("10-projects/*.base");
+      expect(result).not.toContain("10-projects/rhtap.base");
+    });
+
+    it("leaves non-matching files visible", async () => {
+      vi.mocked(readdir)
+        .mockResolvedValueOnce(["10-projects"] as unknown as Awaited<ReturnType<typeof readdir>>)
+        .mockResolvedValueOnce([
+          makeDirent("obsidian-vfs", true),
+          makeDirent("rhtap.base", false),
+          makeDirent("photo.png", false),
+        ] as unknown as Awaited<ReturnType<typeof readdir>>);
+
+      const result = await syncFilesExclude(
+        "/vault",
+        ["10-projects/obsidian-vfs"],
+        [],
+        [],
+        DEFAULT_EXCLUDE_FILE_PATTERN,
+      );
+
+      expect(result).toContain("10-projects/*.base");
+      expect(result).not.toContain("10-projects/*.png");
+      expect(result).not.toContain("10-projects/photo.png");
+    });
+
+    it("handles invalid regex gracefully", async () => {
+      vi.mocked(readdir)
+        .mockResolvedValueOnce(["10-projects"] as unknown as Awaited<ReturnType<typeof readdir>>)
+        .mockResolvedValueOnce([
+          makeDirent("obsidian-vfs", true),
+          makeDirent("rhtap.base", false),
+        ] as unknown as Awaited<ReturnType<typeof readdir>>);
+
+      const result = await syncFilesExclude(
+        "/vault",
+        ["10-projects/obsidian-vfs"],
+        [],
+        [],
+        "[invalid",
+      );
+
+      expect(result).not.toContain("10-projects/*.base");
+    });
+
+    it("generates extension globs at each nested partial-mount level", async () => {
+      vi.mocked(readdir)
+        .mockResolvedValueOnce(["10-projects"] as unknown as Awaited<ReturnType<typeof readdir>>)
+        .mockResolvedValueOnce([
+          makeDirent("active", true),
+          makeDirent("archived", true),
+          makeDirent("overview.base", false),
+        ] as unknown as Awaited<ReturnType<typeof readdir>>)
+        .mockResolvedValueOnce([
+          makeDirent("2024", true),
+          makeDirent("2023", true),
+          makeDirent("summary.md", false),
+        ] as unknown as Awaited<ReturnType<typeof readdir>>);
+
+      const result = await syncFilesExclude(
+        "/vault",
+        ["10-projects/active/2024"],
+        [],
+        [],
+        "\\.(base|md)$",
+      );
+
+      expect(result).toContain("10-projects/archived");
+      expect(result).toContain("10-projects/*.base");
+      expect(result).toContain("10-projects/active/2023");
+      expect(result).toContain("10-projects/active/*.md");
+      expect(result).not.toContain("10-projects/active/2024");
+    });
+
+    it("writes file extension globs to folder-scoped tier", async () => {
+      vi.mocked(readdir)
+        .mockResolvedValueOnce(["10-projects"] as unknown as Awaited<ReturnType<typeof readdir>>)
+        .mockResolvedValueOnce([
+          makeDirent("obsidian-vfs", true),
+          makeDirent("rhtap.base", false),
+        ] as unknown as Awaited<ReturnType<typeof readdir>>);
+
+      await syncFilesExclude(
+        "/vault",
+        ["10-projects/obsidian-vfs"],
+        [],
+        [],
+        DEFAULT_EXCLUDE_FILE_PATTERN,
+      );
+
+      const folderCall = mockUpdate.mock.calls.find(
+        (c: unknown[]) => c[2] === vscode.ConfigurationTarget.WorkspaceFolder,
+      );
+      expect(folderCall?.[1]).toHaveProperty("10-projects/*.base", true);
+    });
+
+    it("removes file extension globs when parent becomes fully mounted", async () => {
+      vi.mocked(readdir).mockResolvedValueOnce([
+        ".obsidian",
+        "10-projects",
+        "00-inbox",
+      ] as unknown as Awaited<ReturnType<typeof readdir>>);
+      mockInspect.mockReturnValue({
+        workspaceFolderValue: { ".obsidian": true, "10-projects/*.base": true },
+        workspaceValue: { "10-projects/rhtap": true, "10-projects/calunga": true },
+      });
+
+      const result = await syncFilesExclude(
+        "/vault",
+        ["10-projects"],
+        [],
+        [".obsidian", "10-projects/*.base", "10-projects/rhtap", "10-projects/calunga"],
+        DEFAULT_EXCLUDE_FILE_PATTERN,
+      );
+
+      expect(result).not.toContain("10-projects/*.base");
+      expect(result).not.toContain("10-projects/rhtap");
+      const folderCall = mockUpdate.mock.calls.find(
+        (c: unknown[]) => c[2] === vscode.ConfigurationTarget.WorkspaceFolder,
+      );
+      expect(folderCall?.[1]).not.toHaveProperty("10-projects/*.base");
+      expect(folderCall?.[1]).toHaveProperty(".obsidian", true);
     });
 
     it("handles deeply nested partial mounts", async () => {

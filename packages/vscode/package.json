@@ -2,7 +2,7 @@
   "name": "obsidian-vfs",
   "displayName": "Obsidian VFS",
   "description": "Browse, search, and edit your Obsidian vault directly in VSCode via a virtual file system (obs://)",
-  "version": "0.3.4",
+  "version": "0.3.5",
   "private": true,
   "publisher": "otaviof",
   "engines": {
@@ -130,6 +130,11 @@
           "type": "boolean",
           "default": true,
           "description": "Show vault name and mode in the status bar"
+        },
+        "obsidianVFS.excludeFilePattern": {
+          "type": "string",
+          "default": "\\.(md|base|canvas)$",
+          "markdownDescription": "Regex pattern tested against file basenames (not including parent directories) at partially-mounted vault levels. Matching files are hidden from Explorer via `files.exclude` glob patterns scoped to the vault folder. Set to empty string to disable. Examples: `\\.(md|base|canvas|pdf)$` (with attachments), `\\.base$` (single extension), `^README` (by name prefix)."
         },
         "obsidianVFS.workspace": {
           "type": "boolean",

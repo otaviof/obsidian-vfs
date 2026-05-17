@@ -119,6 +119,7 @@ export async function syncFilesExclude(
   autoMount: readonly string[],
   blocked: readonly string[],
   previouslyManaged: readonly string[],
+  excludeFilePattern = "",
 ): Promise<string[]> {
   let entries: string[];
   try {
@@ -127,6 +128,15 @@ export async function syncFilesExclude(
     return [...previouslyManaged];
   }
   const mountTree = buildMountTree(autoMount);
+
+  let fileRegex: RegExp | null = null;
+  if (excludeFilePattern) {
+    try {
+      fileRegex = new RegExp(excludeFilePattern);
+    } catch {
+      // Invalid regex — skip file exclusion
+    }
+  }
 
   const folderScoped: string[] = [];
   const workspaceScoped: string[] = [];
@@ -142,8 +152,14 @@ export async function syncFilesExclude(
     if (node === undefined) {
       workspaceScoped.push(entry);
     } else if (node !== null) {
-      const subExclusions = await enumeratePartialMounts(physicalPath, entry, node);
-      workspaceScoped.push(...subExclusions);
+      const subExclusions = await enumeratePartialMounts(physicalPath, entry, node, fileRegex);
+      for (const ex of subExclusions) {
+        if (ex.includes("*")) {
+          folderScoped.push(ex);
+        } else {
+          workspaceScoped.push(ex);
+        }
+      }
     }
   }
 
@@ -334,6 +350,7 @@ async function enumeratePartialMounts(
   basePath: string,
   prefix: string,
   node: MountNode,
+  fileRegex: RegExp | null,
 ): Promise<string[]> {
   const excluded: string[] = [];
   let children: Dirent[];
@@ -343,16 +360,34 @@ async function enumeratePartialMounts(
     return excluded;
   }
 
-  for (const child of children) {
-    if (!child.isDirectory() || child.name.startsWith(".")) continue;
-    const childPath = `${prefix}/${child.name}`;
-    const childNode = node.get(child.name);
+  const fileExtensions = new Set<string>();
 
+  for (const child of children) {
+    if (child.name.startsWith(".")) continue;
+    const childPath = `${prefix}/${child.name}`;
+
+    if (!child.isDirectory()) {
+      if (fileRegex?.test(child.name)) {
+        const ext = path.extname(child.name);
+        if (ext) {
+          fileExtensions.add(ext);
+        } else {
+          excluded.push(childPath);
+        }
+      }
+      continue;
+    }
+
+    const childNode = node.get(child.name);
     if (childNode === undefined) {
       excluded.push(childPath);
     } else if (childNode !== null) {
-      excluded.push(...(await enumeratePartialMounts(basePath, childPath, childNode)));
+      excluded.push(...(await enumeratePartialMounts(basePath, childPath, childNode, fileRegex)));
     }
+  }
+
+  for (const ext of fileExtensions) {
+    excluded.push(`${prefix}/*${ext}`);
   }
 
   return excluded;

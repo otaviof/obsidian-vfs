@@ -49,6 +49,7 @@ Configure via **Settings UI** or `settings.json`:
 | `obsidianVFS.explorer` | `boolean` | `true` | Show the Obsidian VFS tree view in the Explorer sidebar |
 | `obsidianVFS.statusBar` | `boolean` | `true` | Show vault name and mode in the status bar |
 | `obsidianVFS.workspace` | `boolean` | `true` | Add the vault as a workspace folder for Quick Open and Search (see below) |
+| `obsidianVFS.excludeFilePattern` | `string` | `\.(md\|base\|canvas)$` | Regex pattern tested against file basenames at partially-mounted vault levels. Matching files are hidden from Explorer via `files.exclude` glob patterns scoped to the vault folder. Covers Obsidian's three core formats by default. Set to empty string to disable. Examples: `\.(md\|base\|canvas\|pdf)$`, `^README`. |
 | `obsidianVFS.workspaceFile` | `boolean` | `false` | Generate a `.code-workspace` file named after the project folder. Eliminates the "Untitled (Workspace)" label. The file contains a `file://` vault folder entry; `files.exclude` patterns are written to its `settings` section. Opening the file triggers a one-time window reload. |
 
 All three toggle settings (`explorer`, `statusBar`, `workspace`) take effect immediately — no reload required.

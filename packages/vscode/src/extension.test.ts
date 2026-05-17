@@ -17,7 +17,7 @@ vi.mock("vscode", () =>
 
 vi.mock("./bootstrap.js", () => ({
   bootstrapFromConfig: vi.fn(),
-  readConfig: vi.fn().mockReturnValue(fakeConfig()),
+  readConfig: vi.fn().mockReturnValue(fakeExtensionConfig()),
 }));
 
 vi.mock("./file-system-provider.js", () => ({
@@ -81,7 +81,7 @@ import { bootstrapFromConfig, readConfig } from "./bootstrap.js";
 import { registerCommands } from "./commands.js";
 import { activate, deactivate } from "./extension.js";
 import type { ExtensionConfig } from "./types.js";
-import { CONFIG_KEY } from "./types.js";
+import { CONFIG_KEY, DEFAULT_EXCLUDE_FILE_PATTERN } from "./types.js";
 import { SCHEME } from "./uri-adapter.js";
 import { FOLDER_NAME_PREFIX } from "./workspace-folder.js";
 import { ObsidianFileSystemProvider } from "./file-system-provider.js";
@@ -113,11 +113,12 @@ const mockClearExclude = vi.mocked(clearManagedExcludes);
 const mockGenerateWF = vi.mocked(generateWorkspaceFile);
 const mockOpenWF = vi.mocked(openWorkspaceFile);
 
-function fakeConfig(overrides?: Partial<ExtensionConfig>): ExtensionConfig {
+function fakeExtensionConfig(overrides?: Partial<ExtensionConfig>): ExtensionConfig {
   return {
     cliPath: "obsidian",
     timeoutMs: 10_000,
     autoMount: [],
+    excludeFilePattern: "\\.(md|base|canvas)$",
     explorer: true,
     statusBar: true,
     workspace: true,
@@ -261,7 +262,7 @@ describe("activate", () => {
 
   it("adds workspace folder and syncs excludes when workspace is true with autoMount", async () => {
     bootstrapOk();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ autoMount: ["Notes"] }));
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ autoMount: ["Notes"] }));
     mockSyncExclude.mockResolvedValueOnce([".obsidian", ".trash"]);
 
     const ctx = fakeContext();
@@ -269,13 +270,19 @@ describe("activate", () => {
 
     expect(mockAddWF).toHaveBeenCalledWith("/vault", "MyVault");
     expect(mockExcludeGit).toHaveBeenCalledWith("/vault");
-    expect(mockSyncExclude).toHaveBeenCalledWith("/vault", ["Notes"], [], []);
+    expect(mockSyncExclude).toHaveBeenCalledWith(
+      "/vault",
+      ["Notes"],
+      [],
+      [],
+      DEFAULT_EXCLUDE_FILE_PATTERN,
+    );
     expect(ctx.workspaceState.get("managedFilesExclude")).toEqual([".obsidian", ".trash"]);
   });
 
   it("skips workspace folder when workspace is false", async () => {
     bootstrapOk();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ workspace: false }));
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ workspace: false }));
 
     await activate(fakeContext() as never);
 
@@ -285,7 +292,7 @@ describe("activate", () => {
 
   it("skips workspace folder when autoMount is empty", async () => {
     bootstrapOk();
-    mockReadConfig.mockReturnValueOnce(fakeConfig());
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig());
 
     await activate(fakeContext() as never);
 
@@ -295,7 +302,7 @@ describe("activate", () => {
 
   it("logs workspace folder result when workspace is true and added", async () => {
     bootstrapOk();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ autoMount: ["Notes"] }));
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ autoMount: ["Notes"] }));
     mockAddWF.mockReturnValueOnce({ status: "added" });
 
     await activate(fakeContext() as never);
@@ -308,7 +315,7 @@ describe("activate", () => {
 
   it("logs workspace folder result when workspace is true and skipped", async () => {
     bootstrapOk();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ autoMount: ["Notes"] }));
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ autoMount: ["Notes"] }));
     mockAddWF.mockReturnValueOnce({ status: "skipped", reason: "no local workspace folder open" });
 
     await activate(fakeContext() as never);
@@ -323,7 +330,7 @@ describe("activate", () => {
 
   it("does not show status bar when statusBar is false", async () => {
     bootstrapOk();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ statusBar: false, workspace: false }));
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ statusBar: false, workspace: false }));
 
     await activate(fakeContext() as never);
 
@@ -335,7 +342,7 @@ describe("activate", () => {
 
   it("shows status bar when statusBar is true", async () => {
     bootstrapOk();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ workspace: false }));
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ workspace: false }));
 
     await activate(fakeContext() as never);
 
@@ -373,7 +380,7 @@ describe("activate", () => {
 
   it("disables tree provider when explorer is false", async () => {
     bootstrapOk();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ explorer: false, workspace: false }));
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ explorer: false, workspace: false }));
 
     await activate(fakeContext() as never);
 
@@ -385,7 +392,7 @@ describe("activate", () => {
 
   it("keeps tree provider enabled when explorer is true", async () => {
     bootstrapOk();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ statusBar: false, workspace: false }));
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ statusBar: false, workspace: false }));
 
     await activate(fakeContext() as never);
 
@@ -405,7 +412,9 @@ describe("workspace file activation", () => {
 
   it("prompts when workspaceFile is true and no saved workspace", async () => {
     bootstrapOk();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ workspaceFile: true, autoMount: ["Notes"] }));
+    mockReadConfig.mockReturnValueOnce(
+      fakeExtensionConfig({ workspaceFile: true, autoMount: ["Notes"] }),
+    );
     vi.mocked(vscode.window.showInformationMessage).mockResolvedValueOnce("Not Now" as never);
 
     await activate(fakeContext() as never);
@@ -417,7 +426,9 @@ describe("workspace file activation", () => {
   it("prompts when in an untitled workspace", async () => {
     workspace.workspaceFile = { scheme: "untitled" };
     bootstrapOk();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ workspaceFile: true, autoMount: ["Notes"] }));
+    mockReadConfig.mockReturnValueOnce(
+      fakeExtensionConfig({ workspaceFile: true, autoMount: ["Notes"] }),
+    );
     vi.mocked(vscode.window.showInformationMessage).mockResolvedValueOnce("Not Now" as never);
 
     await activate(fakeContext() as never);
@@ -428,7 +439,9 @@ describe("workspace file activation", () => {
   it("skips generation when already in a saved workspace", async () => {
     workspace.workspaceFile = { scheme: "file" };
     bootstrapOk();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ workspaceFile: true, autoMount: ["Notes"] }));
+    mockReadConfig.mockReturnValueOnce(
+      fakeExtensionConfig({ workspaceFile: true, autoMount: ["Notes"] }),
+    );
 
     await activate(fakeContext() as never);
 
@@ -439,7 +452,9 @@ describe("workspace file activation", () => {
 
   it("opens workspace file when user confirms", async () => {
     bootstrapOk();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ workspaceFile: true, autoMount: ["Notes"] }));
+    mockReadConfig.mockReturnValueOnce(
+      fakeExtensionConfig({ workspaceFile: true, autoMount: ["Notes"] }),
+    );
     vi.mocked(vscode.window.showInformationMessage).mockResolvedValueOnce("Open" as never);
 
     await activate(fakeContext() as never);
@@ -449,7 +464,9 @@ describe("workspace file activation", () => {
 
   it("falls through to workspace folder when user declines", async () => {
     bootstrapOk();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ workspaceFile: true, autoMount: ["Notes"] }));
+    mockReadConfig.mockReturnValueOnce(
+      fakeExtensionConfig({ workspaceFile: true, autoMount: ["Notes"] }),
+    );
     vi.mocked(vscode.window.showInformationMessage).mockResolvedValueOnce("Not Now" as never);
 
     await activate(fakeContext() as never);
@@ -461,7 +478,9 @@ describe("workspace file activation", () => {
 
   it("logs and continues when no local folder open", async () => {
     bootstrapOk();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ workspaceFile: true, autoMount: ["Notes"] }));
+    mockReadConfig.mockReturnValueOnce(
+      fakeExtensionConfig({ workspaceFile: true, autoMount: ["Notes"] }),
+    );
     mockGenerateWF.mockImplementationOnce(() => {
       throw new Error("No local workspace folder open");
     });
@@ -479,7 +498,7 @@ describe("workspace file activation", () => {
   it("workspaceFile takes precedence over workspace", async () => {
     bootstrapOk();
     mockReadConfig.mockReturnValueOnce(
-      fakeConfig({ workspaceFile: true, workspace: true, autoMount: ["Notes"] }),
+      fakeExtensionConfig({ workspaceFile: true, workspace: true, autoMount: ["Notes"] }),
     );
     vi.mocked(vscode.window.showInformationMessage).mockResolvedValueOnce("Not Now" as never);
 
@@ -490,7 +509,9 @@ describe("workspace file activation", () => {
 
   it("workspace runs when workspaceFile is false", async () => {
     bootstrapOk();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ workspace: true, autoMount: ["Notes"] }));
+    mockReadConfig.mockReturnValueOnce(
+      fakeExtensionConfig({ workspace: true, autoMount: ["Notes"] }),
+    );
 
     await activate(fakeContext() as never);
 
@@ -502,7 +523,9 @@ describe("workspace file activation", () => {
   it("excludes vault from git and syncs excludes when workspaceFile is true and already saved", async () => {
     workspace.workspaceFile = { scheme: "file" };
     bootstrapOk();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ workspaceFile: true, autoMount: ["Notes"] }));
+    mockReadConfig.mockReturnValueOnce(
+      fakeExtensionConfig({ workspaceFile: true, autoMount: ["Notes"] }),
+    );
 
     await activate(fakeContext() as never);
 
@@ -514,7 +537,7 @@ describe("workspace file activation", () => {
 
   it("skips all workspace logic when workspaceFile is true but autoMount is empty", async () => {
     bootstrapOk();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ workspaceFile: true }));
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ workspaceFile: true }));
 
     await activate(fakeContext() as never);
 
@@ -539,7 +562,7 @@ describe("configuration change listener", () => {
 
   it("enables tree provider when explorer config changes to true", async () => {
     const setup = await setupConfigListener();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ workspace: false }));
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ workspace: false }));
 
     fireConfigChange(setup, CONFIG_KEY.explorer);
 
@@ -548,7 +571,7 @@ describe("configuration change listener", () => {
 
   it("disables tree provider when explorer config changes to false", async () => {
     const setup = await setupConfigListener();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ explorer: false, workspace: false }));
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ explorer: false, workspace: false }));
 
     fireConfigChange(setup, CONFIG_KEY.explorer);
 
@@ -557,7 +580,7 @@ describe("configuration change listener", () => {
 
   it("shows status bar when statusBar config changes to true", async () => {
     const setup = await setupConfigListener();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ workspace: false }));
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ workspace: false }));
 
     fireConfigChange(setup, CONFIG_KEY.statusBar);
 
@@ -566,7 +589,7 @@ describe("configuration change listener", () => {
 
   it("hides status bar when statusBar config changes to false", async () => {
     const setup = await setupConfigListener();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ statusBar: false, workspace: false }));
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ statusBar: false, workspace: false }));
 
     fireConfigChange(setup, CONFIG_KEY.statusBar);
 
@@ -575,7 +598,7 @@ describe("configuration change listener", () => {
 
   it("adds workspace folder and syncs excludes when workspace config changes to true", async () => {
     const setup = await setupConfigListener();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ autoMount: ["Notes"] }));
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ autoMount: ["Notes"] }));
     mockAddWF.mockReturnValueOnce({ status: "added" });
     mockSyncExclude.mockResolvedValueOnce([".obsidian"]);
 
@@ -585,12 +608,18 @@ describe("configuration change listener", () => {
     expect(mockRemoveWF).toHaveBeenCalledWith("/vault");
     expect(mockAddWF).toHaveBeenCalledWith("/vault", "MyVault");
     expect(mockExcludeGit).toHaveBeenCalledWith("/vault");
-    expect(mockSyncExclude).toHaveBeenCalledWith("/vault", ["Notes"], [], []);
+    expect(mockSyncExclude).toHaveBeenCalledWith(
+      "/vault",
+      ["Notes"],
+      [],
+      [],
+      DEFAULT_EXCLUDE_FILE_PATTERN,
+    );
   });
 
   it("clears excludes and removes workspace folders when workspace config changes to false", async () => {
     const setup = await setupConfigListener();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ workspace: false }));
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ workspace: false }));
 
     fireConfigChange(setup, CONFIG_KEY.workspace);
     await new Promise((r) => setTimeout(r, 0));
@@ -605,7 +634,7 @@ describe("configuration change listener", () => {
     const setup = await setupConfigListener();
 
     mockHasWF.mockReturnValueOnce(true);
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ autoMount: ["Notes", "Projects"] }));
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ autoMount: ["Notes", "Projects"] }));
     mockSyncExclude.mockResolvedValueOnce([".obsidian"]);
 
     fireConfigChange(setup, CONFIG_KEY.autoMount);
@@ -614,7 +643,13 @@ describe("configuration change listener", () => {
     expect(setup.provider.setAutoMount).toHaveBeenCalledWith(["Notes", "Projects"]);
     expect(mockRemoveWF).not.toHaveBeenCalled();
     expect(mockAddWF).not.toHaveBeenCalled();
-    expect(mockSyncExclude).toHaveBeenCalledWith("/vault", ["Notes", "Projects"], [], []);
+    expect(mockSyncExclude).toHaveBeenCalledWith(
+      "/vault",
+      ["Notes", "Projects"],
+      [],
+      [],
+      DEFAULT_EXCLUDE_FILE_PATTERN,
+    );
   });
 
   it("adds workspace folder when autoMount goes from empty to non-empty", async () => {
@@ -622,20 +657,26 @@ describe("configuration change listener", () => {
     mockHasWF.mockReturnValueOnce(false);
     mockAddWF.mockReturnValueOnce({ status: "added" });
     mockSyncExclude.mockResolvedValueOnce([".obsidian"]);
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ autoMount: ["Notes"] }));
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ autoMount: ["Notes"] }));
 
     fireConfigChange(setup, CONFIG_KEY.autoMount);
     await new Promise((r) => setTimeout(r, 0));
 
     expect(mockAddWF).toHaveBeenCalledWith("/vault", "MyVault");
     expect(mockExcludeGit).toHaveBeenCalledWith("/vault");
-    expect(mockSyncExclude).toHaveBeenCalledWith("/vault", ["Notes"], [], []);
+    expect(mockSyncExclude).toHaveBeenCalledWith(
+      "/vault",
+      ["Notes"],
+      [],
+      [],
+      DEFAULT_EXCLUDE_FILE_PATTERN,
+    );
     expect(mockRemoveWF).not.toHaveBeenCalled();
   });
 
   it("removes workspace folder and clears excludes when autoMount becomes empty", async () => {
     const setup = await setupConfigListener();
-    mockReadConfig.mockReturnValueOnce(fakeConfig());
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig());
 
     fireConfigChange(setup, CONFIG_KEY.autoMount);
     await new Promise((r) => setTimeout(r, 0));
@@ -647,7 +688,9 @@ describe("configuration change listener", () => {
 
   it("config change triggers workspace file creation", async () => {
     const setup = await setupConfigListener();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ workspaceFile: true, autoMount: ["Notes"] }));
+    mockReadConfig.mockReturnValueOnce(
+      fakeExtensionConfig({ workspaceFile: true, autoMount: ["Notes"] }),
+    );
     vi.mocked(vscode.window.showInformationMessage).mockResolvedValueOnce("Not Now" as never);
 
     fireConfigChange(setup, CONFIG_KEY.workspaceFile);
@@ -657,7 +700,9 @@ describe("configuration change listener", () => {
 
   it("config change opens workspace file when user confirms", async () => {
     const setup = await setupConfigListener();
-    mockReadConfig.mockReturnValueOnce(fakeConfig({ workspaceFile: true, autoMount: ["Notes"] }));
+    mockReadConfig.mockReturnValueOnce(
+      fakeExtensionConfig({ workspaceFile: true, autoMount: ["Notes"] }),
+    );
     vi.mocked(vscode.window.showInformationMessage).mockResolvedValueOnce("Open" as never);
 
     fireConfigChange(setup, CONFIG_KEY.workspaceFile);
@@ -671,7 +716,7 @@ describe("configuration change listener", () => {
     const setup = await setupConfigListener();
     mockHasWF.mockReturnValueOnce(true);
     mockReadConfig.mockReturnValueOnce(
-      fakeConfig({ workspace: false, workspaceFile: true, autoMount: ["Notes"] }),
+      fakeExtensionConfig({ workspace: false, workspaceFile: true, autoMount: ["Notes"] }),
     );
     mockSyncExclude.mockResolvedValueOnce([".obsidian"]);
 
@@ -679,13 +724,33 @@ describe("configuration change listener", () => {
     await new Promise((r) => setTimeout(r, 0));
 
     expect(setup.provider.setAutoMount).toHaveBeenCalledWith(["Notes"]);
-    expect(mockSyncExclude).toHaveBeenCalledWith("/vault", ["Notes"], [], []);
+    expect(mockSyncExclude).toHaveBeenCalledWith(
+      "/vault",
+      ["Notes"],
+      [],
+      [],
+      DEFAULT_EXCLUDE_FILE_PATTERN,
+    );
+  });
+
+  it("syncs excludes when excludeFilePattern changes", async () => {
+    const setup = await setupConfigListener();
+    mockHasWF.mockReturnValueOnce(true);
+    mockReadConfig.mockReturnValueOnce(
+      fakeExtensionConfig({ autoMount: ["Notes"], excludeFilePattern: "\\.base$" }),
+    );
+    mockSyncExclude.mockResolvedValueOnce([".obsidian"]);
+
+    fireConfigChange(setup, CONFIG_KEY.excludeFilePattern);
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(mockSyncExclude).toHaveBeenCalledWith("/vault", ["Notes"], [], [], "\\.base$");
   });
 
   it("config change for workspace skipped when workspaceFile is true", async () => {
     const setup = await setupConfigListener();
     mockReadConfig.mockReturnValueOnce(
-      fakeConfig({ workspace: true, workspaceFile: true, autoMount: ["Notes"] }),
+      fakeExtensionConfig({ workspace: true, workspaceFile: true, autoMount: ["Notes"] }),
     );
 
     fireConfigChange(setup, CONFIG_KEY.workspace);

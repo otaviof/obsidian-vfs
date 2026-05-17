@@ -103,13 +103,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const { blocked } = tracker.context.vfsConfig;
 
-  const runSync = (autoMount: readonly string[]): void => {
+  const runSync = (autoMount: readonly string[], excludeFilePattern: string): void => {
     excludeSync = excludeSync.then(async () => {
       const keys = await syncFilesExclude(
         tracker.context.physicalPath,
         autoMount,
         blocked,
         managedExcludes,
+        excludeFilePattern,
       );
       managedExcludes = keys;
       await context.workspaceState.update(managedExcludesKey, keys);
@@ -133,6 +134,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       config.autoMount,
       blocked,
       managedExcludes,
+      config.excludeFilePattern,
     );
     await context.workspaceState.update(managedExcludesKey, managedExcludes);
   } else if (config.workspaceFile && !alreadySaved && config.autoMount.length > 0) {
@@ -159,6 +161,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         config.autoMount,
         blocked,
         managedExcludes,
+        config.excludeFilePattern,
       );
       await context.workspaceState.update(managedExcludesKey, managedExcludes);
     } catch (err) {
@@ -175,6 +178,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
       config.autoMount,
       blocked,
       managedExcludes,
+      config.excludeFilePattern,
     );
     await context.workspaceState.update(managedExcludesKey, managedExcludes);
   }
@@ -228,13 +232,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         if (updated.workspace && updated.autoMount.length > 0) {
           addVaultWorkspaceFolder(tracker.context.physicalPath, tracker.context.name);
           void excludeVaultFromGitDetection(tracker.context.physicalPath);
-          runSync(updated.autoMount);
+          runSync(updated.autoMount, updated.excludeFilePattern);
         } else {
           runClear();
           void includeVaultInGitDetection(tracker.context.physicalPath);
         }
       } else if (
-        e.affectsConfiguration(CONFIG_KEY.autoMount) &&
+        (e.affectsConfiguration(CONFIG_KEY.autoMount) ||
+          e.affectsConfiguration(CONFIG_KEY.excludeFilePattern)) &&
         (updated.workspace || updated.workspaceFile)
       ) {
         if (updated.autoMount.length === 0) {
@@ -245,7 +250,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             addVaultWorkspaceFolder(tracker.context.physicalPath, tracker.context.name);
             void excludeVaultFromGitDetection(tracker.context.physicalPath);
           }
-          runSync(updated.autoMount);
+          runSync(updated.autoMount, updated.excludeFilePattern);
         }
       }
     }),
