@@ -36,6 +36,7 @@ import {
   openWorkspaceFile,
   removeVaultWorkspaceFolders,
   syncFilesExclude,
+  type SyncFilesExcludeOptions,
 } from "./workspace-folder.js";
 
 interface FolderEntry {
@@ -310,6 +311,46 @@ describe("syncFilesExclude", () => {
   let mockUpdate: ReturnType<typeof vi.fn>;
   let mockInspect: ReturnType<typeof vi.fn>;
 
+  const VAULT_ROOT = [
+    ".obsidian",
+    ".trash",
+    ".vscode",
+    "00-inbox",
+    "10-projects",
+    "20-areas",
+    "30-resources",
+  ];
+
+  const PROJECTS = [
+    makeDirent("obsidian-vfs", true),
+    makeDirent("website", true),
+    makeDirent("overview.md", false),
+    makeDirent("roadmap.canvas", false),
+    makeDirent("photo.png", false),
+  ];
+
+  const AREAS = [
+    makeDirent("career", true),
+    makeDirent("finance", true),
+    makeDirent("notes.base", false),
+  ];
+
+  const CAREER = [makeDirent("2024", true), makeDirent("2023", true), makeDirent("goals.md", false)];
+
+  function folderExcludeKeys(): string[] {
+    const call = mockUpdate.mock.calls.find(
+      (c: unknown[]) => c[2] === vscode.ConfigurationTarget.WorkspaceFolder,
+    );
+    return call ? Object.keys(call[1] as Record<string, boolean>) : [];
+  }
+
+  function workspaceExcludeKeys(): string[] {
+    const call = mockUpdate.mock.calls.find(
+      (c: unknown[]) => c[2] === vscode.ConfigurationTarget.Workspace,
+    );
+    return call ? Object.keys(call[1] as Record<string, boolean>) : [];
+  }
+
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.clearAllMocks();
@@ -328,434 +369,258 @@ describe("syncFilesExclude", () => {
       inspect: mockInspect,
       update: mockUpdate,
     });
+    vi.mocked(readdir).mockResolvedValue([] as never);
   });
 
-  describe("tier separation", () => {
-    it("splits dotfiles to WorkspaceFolder and non-dotfiles to Workspace", async () => {
-      vi.mocked(readdir).mockResolvedValueOnce([
-        "Notes",
-        ".obsidian",
-        ".trash",
-        "Private",
-      ] as unknown as Awaited<ReturnType<typeof readdir>>);
+  describe("pattern routing", () => {
+    interface RoutingCase {
+      name: string;
+      autoMount: string[];
+      blocked?: string[];
+      options?: Partial<SyncFilesExcludeOptions>;
+      readdirResults: (string[] | ReturnType<typeof makeDirent>[])[];
+      folderScoped: string[];
+      workspaceScoped: string[];
+    }
 
-      const result = await syncFilesExclude("/vault", ["Notes"], [], [], defaultSyncOptions);
+    const cases: RoutingCase[] = [
+      {
+        name: "dotfiles → folder, unmounted dirs → workspace",
+        autoMount: ["00-inbox"],
+        readdirResults: [VAULT_ROOT, []],
+        folderScoped: [".obsidian", ".trash"],
+        workspaceScoped: ["10-projects", "20-areas", "30-resources"],
+      },
+      {
+        name: "blocked paths → folder tier",
+        autoMount: ["20-areas"],
+        blocked: ["20-areas/career", "20-areas/finance"],
+        readdirResults: [VAULT_ROOT, AREAS],
+        folderScoped: [".obsidian", ".trash", "20-areas/career", "20-areas/finance"],
+        workspaceScoped: ["00-inbox", "10-projects", "30-resources", "20-areas/*.base"],
+      },
+      {
+        name: "partial mount — sibling dirs + file globs",
+        autoMount: ["10-projects/obsidian-vfs"],
+        readdirResults: [VAULT_ROOT, PROJECTS],
+        folderScoped: [".obsidian", ".trash"],
+        workspaceScoped: [
+          "00-inbox",
+          "20-areas",
+          "30-resources",
+          "10-projects/website",
+          "10-projects/*.md",
+          "10-projects/*.canvas",
+        ],
+      },
+      {
+        name: "full mount — file globs at entry root",
+        autoMount: ["10-projects"],
+        readdirResults: [VAULT_ROOT, PROJECTS],
+        folderScoped: [".obsidian", ".trash"],
+        workspaceScoped: [
+          "00-inbox",
+          "20-areas",
+          "30-resources",
+          "10-projects/*.md",
+          "10-projects/*.canvas",
+        ],
+      },
+      {
+        name: "nested partial mount — globs at each level",
+        autoMount: ["20-areas/career/2024"],
+        readdirResults: [VAULT_ROOT, AREAS, CAREER],
+        folderScoped: [".obsidian", ".trash"],
+        workspaceScoped: [
+          "00-inbox",
+          "10-projects",
+          "30-resources",
+          "20-areas/finance",
+          "20-areas/*.base",
+          "20-areas/career/2023",
+          "20-areas/career/*.md",
+        ],
+      },
+      {
+        name: "excludeDotfiles: false",
+        autoMount: ["00-inbox"],
+        options: { excludeDotfiles: false },
+        readdirResults: [VAULT_ROOT, []],
+        folderScoped: [],
+        workspaceScoped: ["10-projects", "20-areas", "30-resources"],
+      },
+      {
+        name: "narrow dotfilePattern — selective hiding",
+        autoMount: ["00-inbox"],
+        options: { excludeDotfilePattern: "^\\.obsidian$" },
+        readdirResults: [VAULT_ROOT, []],
+        folderScoped: [".obsidian"],
+        workspaceScoped: ["10-projects", "20-areas", "30-resources"],
+      },
+      {
+        name: "excludeBlocked: false",
+        autoMount: ["20-areas"],
+        blocked: ["20-areas/career"],
+        options: { excludeBlocked: false },
+        readdirResults: [VAULT_ROOT, AREAS],
+        folderScoped: [".obsidian", ".trash"],
+        workspaceScoped: ["00-inbox", "10-projects", "30-resources", "20-areas/*.base"],
+      },
+      {
+        name: "excludeUnmountedFolders: false — dirs visible, file globs remain",
+        autoMount: ["10-projects/obsidian-vfs"],
+        options: { excludeUnmountedFolders: false },
+        readdirResults: [VAULT_ROOT, PROJECTS],
+        folderScoped: [".obsidian", ".trash"],
+        workspaceScoped: [
+          "00-inbox",
+          "20-areas",
+          "30-resources",
+          "10-projects/*.md",
+          "10-projects/*.canvas",
+        ],
+      },
+      {
+        name: "excludeUnmountedFiles: false — no file globs, dirs still excluded",
+        autoMount: ["10-projects/obsidian-vfs"],
+        options: { excludeUnmountedFiles: false },
+        readdirResults: [VAULT_ROOT, PROJECTS],
+        folderScoped: [".obsidian", ".trash"],
+        workspaceScoped: ["00-inbox", "20-areas", "30-resources", "10-projects/website"],
+      },
+      {
+        name: "both folder and file toggles off",
+        autoMount: ["10-projects/obsidian-vfs"],
+        options: { excludeUnmountedFolders: false, excludeUnmountedFiles: false },
+        readdirResults: [VAULT_ROOT, PROJECTS],
+        folderScoped: [".obsidian", ".trash"],
+        workspaceScoped: ["00-inbox", "20-areas", "30-resources"],
+      },
+    ];
 
-      expect(result).toContain(".obsidian");
-      expect(result).toContain(".trash");
-      expect(result).toContain("Private");
-      expect(result).not.toContain("Notes");
-      expect(mockUpdate).toHaveBeenCalledWith(
-        "exclude",
-        expect.objectContaining({ ".obsidian": true, ".trash": true }),
-        vscode.ConfigurationTarget.WorkspaceFolder,
-      );
-      expect(mockUpdate).toHaveBeenCalledWith(
-        "exclude",
-        expect.objectContaining({ Private: true }),
-        vscode.ConfigurationTarget.Workspace,
-      );
-    });
-
-    it("skips .vscode from files.exclude patterns", async () => {
-      vi.mocked(readdir).mockResolvedValueOnce([
-        "Notes",
-        ".vscode",
-        ".obsidian",
-        "Private",
-      ] as unknown as Awaited<ReturnType<typeof readdir>>);
-
-      const result = await syncFilesExclude("/vault", ["Notes"], [], [], defaultSyncOptions);
-
-      expect(result).not.toContain(".vscode");
-      const folderCall = mockUpdate.mock.calls.find(
-        (c: unknown[]) => c[2] === vscode.ConfigurationTarget.WorkspaceFolder,
-      );
-      expect(folderCall?.[1]).not.toHaveProperty(".vscode");
-      const wsCall = mockUpdate.mock.calls.find(
-        (c: unknown[]) => c[2] === vscode.ConfigurationTarget.Workspace,
-      );
-      expect(wsCall?.[1]).not.toHaveProperty(".vscode");
-    });
-
-    it("writes only workspace-scoped patterns when vault is not a workspace folder", async () => {
-      workspace.workspaceFolders = [
-        { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
-      ];
-      vi.mocked(readdir).mockResolvedValueOnce([
-        "Notes",
-        ".obsidian",
-        "Private",
-      ] as unknown as Awaited<ReturnType<typeof readdir>>);
-
-      const result = await syncFilesExclude("/vault", ["Notes"], [], [], defaultSyncOptions);
-
-      expect(result).toContain(".obsidian");
-      expect(result).toContain("Private");
-      expect(mockUpdate).not.toHaveBeenCalledWith(
-        "exclude",
-        expect.anything(),
-        vscode.ConfigurationTarget.WorkspaceFolder,
-      );
-      expect(mockUpdate).toHaveBeenCalledWith(
-        "exclude",
-        expect.objectContaining({ ".obsidian": true, Private: true }),
-        vscode.ConfigurationTarget.Workspace,
-      );
-    });
-
-    it("preserves existing .vscode entry in vault folder-scoped patterns", async () => {
-      vi.mocked(readdir).mockResolvedValueOnce(["Notes", ".obsidian"] as unknown as Awaited<
-        ReturnType<typeof readdir>
-      >);
-      mockInspect.mockReturnValue({
-        workspaceFolderValue: { ".vscode": true, ".obsidian": true },
-        workspaceValue: undefined,
+    for (const tc of cases) {
+      it(tc.name, async () => {
+        for (const entries of tc.readdirResults) {
+          vi.mocked(readdir).mockResolvedValueOnce(entries as never);
+        }
+        const result = await syncFilesExclude("/vault", tc.autoMount, tc.blocked ?? [], [], {
+          ...defaultSyncOptions,
+          ...tc.options,
+        });
+        expect(result.sort()).toEqual([...tc.folderScoped, ...tc.workspaceScoped].sort());
+        expect(folderExcludeKeys().sort()).toEqual(tc.folderScoped.sort());
+        expect(workspaceExcludeKeys().sort()).toEqual(tc.workspaceScoped.sort());
       });
-
-      await syncFilesExclude("/vault", ["Notes"], [], [], defaultSyncOptions);
-
-      const folderCall = mockUpdate.mock.calls.find(
-        (c: unknown[]) => c[2] === vscode.ConfigurationTarget.WorkspaceFolder,
-      );
-      expect(folderCall?.[1]).toHaveProperty(".vscode");
-      expect(folderCall?.[1]).toHaveProperty(".obsidian");
-    });
+    }
   });
 
-  describe("blocked paths", () => {
-    it("writes blocked paths to WorkspaceFolder tier", async () => {
-      vi.mocked(readdir).mockResolvedValueOnce([
-        "20-areas",
-        "30-resources",
-        "00-inbox",
-      ] as unknown as Awaited<ReturnType<typeof readdir>>);
+  it("writes only workspace-scoped patterns when vault is not a workspace folder", async () => {
+    workspace.workspaceFolders = [
+      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
+    ];
+    vi.mocked(readdir).mockResolvedValueOnce(["Notes", ".obsidian", "Private"] as unknown as Awaited<
+      ReturnType<typeof readdir>
+    >);
 
-      const result = await syncFilesExclude(
-        "/vault",
-        ["20-areas", "30-resources"],
-        ["20-areas/career", "30-resources/hardware"],
-        [],
-        defaultSyncOptions,
-      );
+    const result = await syncFilesExclude("/vault", ["Notes"], [], [], defaultSyncOptions);
 
-      expect(result).toContain("00-inbox");
-      expect(result).toContain("20-areas/career");
-      expect(result).toContain("30-resources/hardware");
-      expect(result).not.toContain("20-areas");
-      expect(result).not.toContain("30-resources");
-      expect(mockUpdate).toHaveBeenCalledWith(
-        "exclude",
-        expect.objectContaining({
-          "20-areas/career": true,
-          "30-resources/hardware": true,
-        }),
-        vscode.ConfigurationTarget.WorkspaceFolder,
-      );
-      expect(mockUpdate).toHaveBeenCalledWith(
-        "exclude",
-        expect.objectContaining({ "00-inbox": true }),
-        vscode.ConfigurationTarget.Workspace,
-      );
-    });
-
-    it("adds blocked paths directly as folder-scoped exclude patterns", async () => {
-      vi.mocked(readdir).mockResolvedValueOnce(["Notes", "Areas"] as unknown as Awaited<
-        ReturnType<typeof readdir>
-      >);
-
-      const result = await syncFilesExclude(
-        "/vault",
-        ["Notes", "Areas"],
-        ["Areas/private"],
-        [],
-        defaultSyncOptions,
-      );
-
-      expect(result).toContain("Areas/private");
-      expect(result).not.toContain("Areas");
-      expect(mockUpdate).toHaveBeenCalledWith(
-        "exclude",
-        expect.objectContaining({ "Areas/private": true }),
-        vscode.ConfigurationTarget.WorkspaceFolder,
-      );
-    });
+    expect(result).toContain(".obsidian");
+    expect(result).toContain("Private");
+    expect(mockUpdate).not.toHaveBeenCalledWith(
+      "exclude",
+      expect.anything(),
+      vscode.ConfigurationTarget.WorkspaceFolder,
+    );
+    expect(mockUpdate).toHaveBeenCalledWith(
+      "exclude",
+      expect.objectContaining({ ".obsidian": true, Private: true }),
+      vscode.ConfigurationTarget.Workspace,
+    );
   });
 
-  describe("sub-path exclusions", () => {
-    it("preserves autoMount entries with nested paths", async () => {
-      vi.mocked(readdir)
-        .mockResolvedValueOnce(["docs", "Notes", ".obsidian"] as unknown as Awaited<
-          ReturnType<typeof readdir>
-        >)
-        .mockResolvedValueOnce([]);
-
-      const result = await syncFilesExclude(
-        "/vault",
-        ["docs/readme.md", "Notes"],
-        [],
-        [],
-        defaultSyncOptions,
-      );
-
-      expect(result).toContain(".obsidian");
-      expect(result).not.toContain("docs");
-      expect(result).not.toContain("Notes");
+  it("preserves existing .vscode entry in vault folder-scoped patterns", async () => {
+    vi.mocked(readdir).mockResolvedValueOnce(["Notes", ".obsidian"] as unknown as Awaited<
+      ReturnType<typeof readdir>
+    >);
+    mockInspect.mockReturnValue({
+      workspaceFolderValue: { ".vscode": true, ".obsidian": true },
+      workspaceValue: undefined,
     });
 
-    it("computes sub-path exclusions for partially-mounted directories", async () => {
-      vi.mocked(readdir)
-        .mockResolvedValueOnce(["20-areas", "00-inbox"] as unknown as Awaited<
-          ReturnType<typeof readdir>
-        >)
-        .mockResolvedValueOnce([
-          makeDirent("career", true),
-          makeDirent("idea", true),
-          makeDirent("otaviof", true),
-          makeDirent("readme.md", false),
-        ] as unknown as Awaited<ReturnType<typeof readdir>>);
+    await syncFilesExclude("/vault", ["Notes"], [], [], defaultSyncOptions);
 
-      const result = await syncFilesExclude("/vault", ["20-areas/idea"], [], [], defaultSyncOptions);
+    const folderCall = mockUpdate.mock.calls.find(
+      (c: unknown[]) => c[2] === vscode.ConfigurationTarget.WorkspaceFolder,
+    );
+    expect(folderCall?.[1]).toHaveProperty(".vscode");
+    expect(folderCall?.[1]).toHaveProperty(".obsidian");
+  });
 
-      expect(result).toContain("20-areas/career");
-      expect(result).toContain("20-areas/otaviof");
-      expect(result).toContain("00-inbox");
-      expect(result).not.toContain("20-areas/idea");
-      expect(result).not.toContain("20-areas");
-      expect(result).toContain("20-areas/*.md");
-    });
-
-    it("excludes files matching excludeUnmountedFilePattern via extension globs", async () => {
-      vi.mocked(readdir)
-        .mockResolvedValueOnce(["10-projects"] as unknown as Awaited<ReturnType<typeof readdir>>)
-        .mockResolvedValueOnce([
-          makeDirent("obsidian-vfs", true),
-          makeDirent("rhtap", true),
-          makeDirent("calunga", true),
-          makeDirent("rhtap.base", false),
-          makeDirent("calunga.base", false),
-        ] as unknown as Awaited<ReturnType<typeof readdir>>);
-
-      const result = await syncFilesExclude(
-        "/vault",
-        ["10-projects/obsidian-vfs"],
-        [],
-        [],
-        defaultSyncOptions,
-      );
-
-      expect(result).toContain("10-projects/rhtap");
-      expect(result).toContain("10-projects/calunga");
-      expect(result).toContain("10-projects/*.base");
-      expect(result).not.toContain("10-projects/rhtap.base");
-      expect(result).not.toContain("10-projects/calunga.base");
-      expect(result).not.toContain("10-projects/obsidian-vfs");
-    });
-
-    it("skips files when excludeUnmountedFiles is false", async () => {
-      vi.mocked(readdir)
-        .mockResolvedValueOnce(["10-projects"] as unknown as Awaited<ReturnType<typeof readdir>>)
-        .mockResolvedValueOnce([
-          makeDirent("obsidian-vfs", true),
-          makeDirent("rhtap.base", false),
-        ] as unknown as Awaited<ReturnType<typeof readdir>>);
-
-      const result = await syncFilesExclude("/vault", ["10-projects/obsidian-vfs"], [], [], {
-        ...defaultSyncOptions,
-        excludeUnmountedFiles: false,
-      });
-
-      expect(result).not.toContain("10-projects/*.base");
-      expect(result).not.toContain("10-projects/rhtap.base");
-    });
-
-    it("leaves non-matching files visible", async () => {
-      vi.mocked(readdir)
-        .mockResolvedValueOnce(["10-projects"] as unknown as Awaited<ReturnType<typeof readdir>>)
-        .mockResolvedValueOnce([
-          makeDirent("obsidian-vfs", true),
-          makeDirent("rhtap.base", false),
-          makeDirent("photo.png", false),
-        ] as unknown as Awaited<ReturnType<typeof readdir>>);
-
-      const result = await syncFilesExclude(
-        "/vault",
-        ["10-projects/obsidian-vfs"],
-        [],
-        [],
-        defaultSyncOptions,
-      );
-
-      expect(result).toContain("10-projects/*.base");
-      expect(result).not.toContain("10-projects/*.png");
-      expect(result).not.toContain("10-projects/photo.png");
-    });
-
-    it("handles invalid unmounted file regex gracefully", async () => {
-      vi.mocked(readdir)
-        .mockResolvedValueOnce(["10-projects"] as unknown as Awaited<ReturnType<typeof readdir>>)
-        .mockResolvedValueOnce([
-          makeDirent("obsidian-vfs", true),
-          makeDirent("rhtap.base", false),
-        ] as unknown as Awaited<ReturnType<typeof readdir>>);
-
-      const result = await syncFilesExclude("/vault", ["10-projects/obsidian-vfs"], [], [], {
-        ...defaultSyncOptions,
-        excludeUnmountedFilePattern: "[invalid",
-      });
-
-      expect(result).not.toContain("10-projects/*.base");
-    });
-
-    it("generates extension globs at each nested partial-mount level", async () => {
-      vi.mocked(readdir)
-        .mockResolvedValueOnce(["10-projects"] as unknown as Awaited<ReturnType<typeof readdir>>)
-        .mockResolvedValueOnce([
-          makeDirent("active", true),
-          makeDirent("archived", true),
-          makeDirent("overview.base", false),
-        ] as unknown as Awaited<ReturnType<typeof readdir>>)
-        .mockResolvedValueOnce([
-          makeDirent("2024", true),
-          makeDirent("2023", true),
-          makeDirent("summary.md", false),
-        ] as unknown as Awaited<ReturnType<typeof readdir>>);
-
-      const result = await syncFilesExclude("/vault", ["10-projects/active/2024"], [], [], {
-        ...defaultSyncOptions,
-        excludeUnmountedFilePattern: "\\.(base|md)$",
-      });
-
-      expect(result).toContain("10-projects/archived");
-      expect(result).toContain("10-projects/*.base");
-      expect(result).toContain("10-projects/active/2023");
-      expect(result).toContain("10-projects/active/*.md");
-      expect(result).not.toContain("10-projects/active/2024");
-    });
-
-    it("writes file extension globs to workspace-scoped tier", async () => {
-      vi.mocked(readdir)
-        .mockResolvedValueOnce(["10-projects"] as unknown as Awaited<ReturnType<typeof readdir>>)
-        .mockResolvedValueOnce([
-          makeDirent("obsidian-vfs", true),
-          makeDirent("rhtap.base", false),
-        ] as unknown as Awaited<ReturnType<typeof readdir>>);
-
-      await syncFilesExclude("/vault", ["10-projects/obsidian-vfs"], [], [], defaultSyncOptions);
-
-      const wsCall = mockUpdate.mock.calls.find(
-        (c: unknown[]) => c[2] === vscode.ConfigurationTarget.Workspace,
-      );
-      expect(wsCall?.[1]).toHaveProperty("10-projects/*.base", true);
-      const folderCall = mockUpdate.mock.calls.find(
-        (c: unknown[]) => c[2] === vscode.ConfigurationTarget.WorkspaceFolder,
-      );
-      expect(folderCall?.[1]).not.toHaveProperty("10-projects/*.base");
-    });
-
-    it("removes file extension globs when parent becomes fully mounted", async () => {
-      vi.mocked(readdir).mockResolvedValueOnce([
-        ".obsidian",
-        "10-projects",
-        "00-inbox",
+  it("handles invalid unmounted file regex gracefully", async () => {
+    vi.mocked(readdir)
+      .mockResolvedValueOnce(["10-projects"] as unknown as Awaited<ReturnType<typeof readdir>>)
+      .mockResolvedValueOnce([
+        makeDirent("obsidian-vfs", true),
+        makeDirent("rhtap.base", false),
       ] as unknown as Awaited<ReturnType<typeof readdir>>);
-      mockInspect.mockReturnValue({
-        workspaceFolderValue: { ".obsidian": true },
-        workspaceValue: {
-          "10-projects/rhtap": true,
-          "10-projects/calunga": true,
-          "10-projects/*.base": true,
-        },
-      });
 
-      const result = await syncFilesExclude(
-        "/vault",
-        ["10-projects"],
-        [],
-        [".obsidian", "10-projects/*.base", "10-projects/rhtap", "10-projects/calunga"],
-        defaultSyncOptions,
-      );
-
-      expect(result).not.toContain("10-projects/*.base");
-      expect(result).not.toContain("10-projects/rhtap");
-      const wsCall = mockUpdate.mock.calls.find(
-        (c: unknown[]) => c[2] === vscode.ConfigurationTarget.Workspace,
-      );
-      expect(wsCall?.[1]).not.toHaveProperty("10-projects/*.base");
-      expect(wsCall?.[1]).not.toHaveProperty("10-projects/rhtap");
-      const folderCall = mockUpdate.mock.calls.find(
-        (c: unknown[]) => c[2] === vscode.ConfigurationTarget.WorkspaceFolder,
-      );
-      expect(folderCall?.[1]).toHaveProperty(".obsidian", true);
+    const result = await syncFilesExclude("/vault", ["10-projects/obsidian-vfs"], [], [], {
+      ...defaultSyncOptions,
+      excludeUnmountedFilePattern: "[invalid",
     });
 
-    it("handles deeply nested partial mounts", async () => {
-      vi.mocked(readdir)
-        .mockResolvedValueOnce(["10-projects"] as unknown as Awaited<ReturnType<typeof readdir>>)
-        .mockResolvedValueOnce([
-          makeDirent("active", true),
-          makeDirent("archived", true),
-        ] as unknown as Awaited<ReturnType<typeof readdir>>)
-        .mockResolvedValueOnce([
-          makeDirent("2024", true),
-          makeDirent("2023", true),
-        ] as unknown as Awaited<ReturnType<typeof readdir>>);
+    expect(result).not.toContain("10-projects/*.base");
+  });
 
-      const result = await syncFilesExclude(
-        "/vault",
-        ["10-projects/active/2024"],
-        [],
-        [],
-        defaultSyncOptions,
-      );
-
-      expect(result).toContain("10-projects/archived");
-      expect(result).toContain("10-projects/active/2023");
-      expect(result).not.toContain("10-projects/active/2024");
-      expect(result).not.toContain("10-projects");
+  it("removes file extension globs when parent becomes fully mounted", async () => {
+    vi.mocked(readdir).mockResolvedValueOnce([
+      ".obsidian",
+      "10-projects",
+      "00-inbox",
+    ] as unknown as Awaited<ReturnType<typeof readdir>>);
+    mockInspect.mockReturnValue({
+      workspaceFolderValue: { ".obsidian": true },
+      workspaceValue: {
+        "10-projects/rhtap": true,
+        "10-projects/calunga": true,
+        "10-projects/*.base": true,
+      },
     });
 
-    it("excludes matching files at fully-mounted entry root", async () => {
-      vi.mocked(readdir)
-        .mockResolvedValueOnce(["10-projects", "00-inbox"] as unknown as Awaited<
-          ReturnType<typeof readdir>
-        >)
-        .mockResolvedValueOnce([
-          makeDirent("obsidian-vfs", true),
-          makeDirent("rhtap.base", false),
-          makeDirent("calunga.base", false),
-          makeDirent("photo.png", false),
-        ] as unknown as Awaited<ReturnType<typeof readdir>>);
+    const result = await syncFilesExclude(
+      "/vault",
+      ["10-projects"],
+      [],
+      [".obsidian", "10-projects/*.base", "10-projects/rhtap", "10-projects/calunga"],
+      defaultSyncOptions,
+    );
 
-      const result = await syncFilesExclude(
-        "/vault",
-        ["10-projects"],
-        [],
-        [],
-        defaultSyncOptions,
-      );
+    expect(result).not.toContain("10-projects/*.base");
+    expect(result).not.toContain("10-projects/rhtap");
+    const wsCall = mockUpdate.mock.calls.find(
+      (c: unknown[]) => c[2] === vscode.ConfigurationTarget.Workspace,
+    );
+    expect(wsCall?.[1]).not.toHaveProperty("10-projects/*.base");
+    expect(wsCall?.[1]).not.toHaveProperty("10-projects/rhtap");
+    const folderCall = mockUpdate.mock.calls.find(
+      (c: unknown[]) => c[2] === vscode.ConfigurationTarget.WorkspaceFolder,
+    );
+    expect(folderCall?.[1]).toHaveProperty(".obsidian", true);
+  });
 
-      expect(result).toContain("00-inbox");
-      expect(result).toContain("10-projects/*.base");
-      expect(result).not.toContain("10-projects/*.png");
-      expect(result).not.toContain("10-projects");
+  it("skips file scan at fully-mounted entry when excludeUnmountedFiles is false", async () => {
+    vi.mocked(readdir).mockResolvedValueOnce(["10-projects", "00-inbox"] as unknown as Awaited<
+      ReturnType<typeof readdir>
+    >);
+
+    const result = await syncFilesExclude("/vault", ["10-projects"], [], [], {
+      ...defaultSyncOptions,
+      excludeUnmountedFiles: false,
     });
 
-    it("skips file scan at fully-mounted entry when excludeUnmountedFiles is false", async () => {
-      vi.mocked(readdir)
-        .mockResolvedValueOnce(["10-projects", "00-inbox"] as unknown as Awaited<
-          ReturnType<typeof readdir>
-        >);
-
-      const result = await syncFilesExclude("/vault", ["10-projects"], [], [], {
-        ...defaultSyncOptions,
-        excludeUnmountedFiles: false,
-      });
-
-      expect(result).toContain("00-inbox");
-      expect(result).not.toContain("10-projects");
-      expect(readdir).toHaveBeenCalledTimes(1);
-    });
+    expect(result).toContain("00-inbox");
+    expect(result).not.toContain("10-projects");
+    expect(readdir).toHaveBeenCalledTimes(1);
   });
 
   describe("stale pattern cleanup", () => {
@@ -935,136 +800,6 @@ describe("syncFilesExclude", () => {
         { "editor.fontSize": true },
         vscode.ConfigurationTarget.WorkspaceFolder,
       );
-    });
-  });
-
-  describe("vault toggle options", () => {
-    it("does not exclude dotfiles when excludeDotfiles is false", async () => {
-      vi.mocked(readdir).mockResolvedValueOnce([
-        "Notes",
-        ".obsidian",
-        ".trash",
-        "Private",
-      ] as unknown as Awaited<ReturnType<typeof readdir>>);
-
-      const result = await syncFilesExclude("/vault", ["Notes"], [], [], {
-        ...defaultSyncOptions,
-        excludeDotfiles: false,
-      });
-
-      expect(result).not.toContain(".obsidian");
-      expect(result).not.toContain(".trash");
-      expect(result).toContain("Private");
-    });
-
-    it("hides only matching dotfiles when excludeDotfilePattern is narrow", async () => {
-      vi.mocked(readdir).mockResolvedValueOnce([
-        "Notes",
-        ".obsidian",
-        ".trash",
-        ".gitignore",
-      ] as unknown as Awaited<ReturnType<typeof readdir>>);
-
-      const result = await syncFilesExclude("/vault", ["Notes"], [], [], {
-        ...defaultSyncOptions,
-        excludeDotfilePattern: "^\\.(obsidian|trash)",
-      });
-
-      expect(result).toContain(".obsidian");
-      expect(result).toContain(".trash");
-      expect(result).not.toContain(".gitignore");
-    });
-
-    it("falls back to hiding all dotfiles on invalid excludeDotfilePattern", async () => {
-      vi.mocked(readdir).mockResolvedValueOnce([
-        "Notes",
-        ".obsidian",
-        ".trash",
-      ] as unknown as Awaited<ReturnType<typeof readdir>>);
-
-      const result = await syncFilesExclude("/vault", ["Notes"], [], [], {
-        ...defaultSyncOptions,
-        excludeDotfilePattern: "[invalid",
-      });
-
-      expect(result).toContain(".obsidian");
-      expect(result).toContain(".trash");
-    });
-
-    it("does not exclude blocked paths when excludeBlocked is false", async () => {
-      vi.mocked(readdir).mockResolvedValueOnce(["20-areas", "00-inbox"] as unknown as Awaited<
-        ReturnType<typeof readdir>
-      >);
-
-      const result = await syncFilesExclude("/vault", ["20-areas"], ["20-areas/career"], [], {
-        ...defaultSyncOptions,
-        excludeBlocked: false,
-      });
-
-      expect(result).not.toContain("20-areas/career");
-    });
-  });
-
-  describe("workspace toggle options", () => {
-    it("does not exclude sibling directories when excludeUnmountedFolders is false", async () => {
-      vi.mocked(readdir)
-        .mockResolvedValueOnce(["20-areas", "00-inbox"] as unknown as Awaited<
-          ReturnType<typeof readdir>
-        >)
-        .mockResolvedValueOnce([
-          makeDirent("career", true),
-          makeDirent("idea", true),
-          makeDirent("readme.md", false),
-        ] as unknown as Awaited<ReturnType<typeof readdir>>);
-
-      const result = await syncFilesExclude("/vault", ["20-areas/idea"], [], [], {
-        ...defaultSyncOptions,
-        excludeUnmountedFolders: false,
-      });
-
-      expect(result).not.toContain("20-areas/career");
-      expect(result).toContain("00-inbox");
-      expect(result).toContain("20-areas/*.md");
-    });
-
-    it("does not generate file extension globs when excludeUnmountedFiles is false", async () => {
-      vi.mocked(readdir)
-        .mockResolvedValueOnce(["10-projects"] as unknown as Awaited<ReturnType<typeof readdir>>)
-        .mockResolvedValueOnce([
-          makeDirent("obsidian-vfs", true),
-          makeDirent("rhtap", true),
-          makeDirent("rhtap.base", false),
-        ] as unknown as Awaited<ReturnType<typeof readdir>>);
-
-      const result = await syncFilesExclude("/vault", ["10-projects/obsidian-vfs"], [], [], {
-        ...defaultSyncOptions,
-        excludeUnmountedFiles: false,
-      });
-
-      expect(result).toContain("10-projects/rhtap");
-      expect(result).not.toContain("10-projects/*.base");
-    });
-
-    it("produces no sub-exclusions when both folder and file toggles are off", async () => {
-      vi.mocked(readdir)
-        .mockResolvedValueOnce(["20-areas", "00-inbox"] as unknown as Awaited<
-          ReturnType<typeof readdir>
-        >)
-        .mockResolvedValueOnce([
-          makeDirent("career", true),
-          makeDirent("idea", true),
-          makeDirent("readme.md", false),
-        ] as unknown as Awaited<ReturnType<typeof readdir>>);
-
-      const result = await syncFilesExclude("/vault", ["20-areas/idea"], [], [], {
-        ...defaultSyncOptions,
-        excludeUnmountedFolders: false,
-        excludeUnmountedFiles: false,
-      });
-
-      expect(result).toContain("00-inbox");
-      expect(result).not.toContain("20-areas/career");
-      expect(result).not.toContain("20-areas/*.md");
     });
   });
 });
