@@ -1,22 +1,38 @@
 import * as vscode from "vscode";
-import { DEFAULT_TIMEOUT_MS, bootstrapTracker, resolveCliPath } from "@obsidian-vfs/core";
+import { bootstrapTracker, resolveCliPath } from "@obsidian-vfs/core";
 import type { BootstrapResult, VFSResult } from "@obsidian-vfs/core";
 
-import { CONFIG_SECTION, DEFAULT_EXCLUDE_FILE_PATTERN } from "./types.js";
+import { CONFIG_PROP, CONFIG_SECTION } from "./types.js";
 import type { ExtensionConfig } from "./types.js";
 
-/** Read extension configuration from VSCode settings. */
+/** Read extension configuration from VSCode settings. Defaults come from `package.json`. */
 export function readConfig(): ExtensionConfig {
   const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
   return {
-    cliPath: resolveCliPath({ userPath: cfg.get<string>("cliPath", "") }),
-    timeoutMs: cfg.get<number>("timeoutMs", DEFAULT_TIMEOUT_MS),
-    autoMount: cfg.get<string[]>("autoMount", []),
-    excludeFilePattern: cfg.get<string>("excludeFilePattern", DEFAULT_EXCLUDE_FILE_PATTERN),
-    explorer: cfg.get<boolean>("explorer", true),
-    statusBar: cfg.get<boolean>("statusBar", true),
-    workspace: cfg.get<boolean>("workspace", true),
-    workspaceFile: cfg.get<boolean>("workspaceFile", false),
+    cliPath: resolveCliPath({ userPath: cfg.get<string>(CONFIG_PROP.cliPath)! }),
+    timeoutMs: cfg.get<number>(CONFIG_PROP.timeoutMs)!,
+    autoMount: cfg.get<string[]>(CONFIG_PROP.autoMount)!,
+    depthLimit: cfg.get<number>(CONFIG_PROP.depthLimit)!,
+    // Vault
+    vaultGitIgnore: cfg.get<boolean>(CONFIG_PROP.vaultGitIgnore)!,
+    vaultExcludeBlocked: cfg.get<boolean>(CONFIG_PROP.vaultExcludeBlocked)!,
+    vaultExcludeDotfiles: cfg.get<boolean>(CONFIG_PROP.vaultExcludeDotfiles)!,
+    vaultExcludeDotfilePattern: cfg.get<string>(CONFIG_PROP.vaultExcludeDotfilePattern)!,
+    // Status Bar
+    statusBarEnabled: cfg.get<boolean>(CONFIG_PROP.statusBarEnabled)!,
+    // Explorer
+    explorerEnabled: cfg.get<boolean>(CONFIG_PROP.explorerEnabled)!,
+    explorerTitle: cfg.get<string>(CONFIG_PROP.explorerTitle)!,
+    // Workspace
+    workspaceEnabled: cfg.get<boolean>(CONFIG_PROP.workspaceEnabled)!,
+    workspaceCodeWorkspaceFile: cfg.get<boolean>(CONFIG_PROP.workspaceCodeWorkspaceFile)!,
+    workspaceExcludeUnmountedFolders: cfg.get<boolean>(
+      CONFIG_PROP.workspaceExcludeUnmountedFolders,
+    )!,
+    workspaceExcludeUnmountedFiles: cfg.get<boolean>(CONFIG_PROP.workspaceExcludeUnmountedFiles)!,
+    workspaceExcludeUnmountedFilePattern: cfg.get<string>(
+      CONFIG_PROP.workspaceExcludeUnmountedFilePattern,
+    )!,
   };
 }
 

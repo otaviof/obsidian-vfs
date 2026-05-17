@@ -2,7 +2,7 @@ import * as vscode from "vscode";
 import type { LocalIndexTracker } from "@obsidian-vfs/core";
 import { buildObsUri } from "@obsidian-vfs/core";
 
-import { COMMAND, CONFIG_KEY, CONFIG_SECTION } from "./types.js";
+import { COMMAND, CONFIG_KEY, CONFIG_PROP, CONFIG_SECTION } from "./types.js";
 import { SCHEME, toFileUri, toVaultPath, toVaultPathFromFile } from "./uri-adapter.js";
 import type { VaultTreeDataProvider } from "./vault-tree-provider.js";
 import { readAutoMount } from "./vault-tree-provider.js";
@@ -33,7 +33,7 @@ async function mountCommand(
   const updated = [...mounted, folder];
   await vscode.workspace
     .getConfiguration(CONFIG_SECTION)
-    .update("autoMount", updated, vscode.ConfigurationTarget.Workspace);
+    .update(CONFIG_PROP.autoMount, updated, vscode.ConfigurationTarget.Workspace);
 
   treeProvider.refresh();
 }
@@ -65,7 +65,7 @@ async function mountNoteCommand(
   const updated = [...mounted, picked.description];
   await vscode.workspace
     .getConfiguration(CONFIG_SECTION)
-    .update("autoMount", updated, vscode.ConfigurationTarget.Workspace);
+    .update(CONFIG_PROP.autoMount, updated, vscode.ConfigurationTarget.Workspace);
 
   treeProvider.refresh();
 }
@@ -86,7 +86,7 @@ async function unmountCommand(treeProvider: VaultTreeDataProvider): Promise<void
   const updated = mounted.filter((f) => f !== picked);
   await vscode.workspace
     .getConfiguration(CONFIG_SECTION)
-    .update("autoMount", updated, vscode.ConfigurationTarget.Workspace);
+    .update(CONFIG_PROP.autoMount, updated, vscode.ConfigurationTarget.Workspace);
 
   treeProvider.refresh();
 }

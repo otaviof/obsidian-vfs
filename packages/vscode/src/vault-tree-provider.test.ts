@@ -8,6 +8,7 @@ vi.mock("vscode", () =>
 
 import * as vscode from "vscode";
 
+import { CONFIG_PROP } from "./types.js";
 import { VaultTreeDataProvider, VaultTreeItem, readAutoMount } from "./vault-tree-provider.js";
 
 describe("VaultTreeItem", () => {
@@ -61,7 +62,7 @@ describe("VaultTreeDataProvider", () => {
   it("returns configured autoMount folders as roots", async () => {
     vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
       get: vi.fn((_key: string, defaultValue: unknown) => {
-        if (_key === "autoMount") return ["10-projects", "20-areas"];
+        if (_key === CONFIG_PROP.autoMount) return ["10-projects", "20-areas"];
         return defaultValue;
       }),
     } as never);
@@ -87,7 +88,7 @@ describe("VaultTreeDataProvider", () => {
   it("renders file-type root entries with no collapse arrow", async () => {
     vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
       get: vi.fn((_key: string, defaultValue: unknown) => {
-        if (_key === "autoMount") return ["10-projects", "notes/todo.md"];
+        if (_key === CONFIG_PROP.autoMount) return ["10-projects", "notes/todo.md"];
         return defaultValue;
       }),
     } as never);
@@ -122,7 +123,7 @@ describe("VaultTreeDataProvider", () => {
   it("falls back to directory when stat fails", async () => {
     vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
       get: vi.fn((_key: string, defaultValue: unknown) => {
-        if (_key === "autoMount") return ["missing-entry"];
+        if (_key === CONFIG_PROP.autoMount) return ["missing-entry"];
         return defaultValue;
       }),
     } as never);
@@ -221,7 +222,7 @@ describe("VaultTreeDataProvider", () => {
   it("returns empty tree when disabled", async () => {
     vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
       get: vi.fn((_key: string, defaultValue: unknown) => {
-        if (_key === "autoMount") return ["10-projects"];
+        if (_key === CONFIG_PROP.autoMount) return ["10-projects"];
         return defaultValue;
       }),
     } as never);
@@ -325,7 +326,7 @@ describe("readAutoMount", () => {
   it("reads autoMount from workspace configuration", () => {
     vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
       get: vi.fn((_key: string, defaultValue: unknown) => {
-        if (_key === "autoMount") return ["a", "b"];
+        if (_key === CONFIG_PROP.autoMount) return ["a", "b"];
         return defaultValue;
       }),
     } as never);

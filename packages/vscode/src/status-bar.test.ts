@@ -7,6 +7,7 @@ vi.mock("vscode", () => createVscodeMock({ window: true, statusBar: true }));
 import * as vscode from "vscode";
 
 import { StatusBarManager } from "./status-bar.js";
+import { COMMAND } from "./types.js";
 
 describe("StatusBarManager", () => {
   afterEach(() => {
@@ -26,7 +27,7 @@ describe("StatusBarManager", () => {
       show: ReturnType<typeof vi.fn>;
     };
     expect(item.text).toBe("$(book) MyVault (full)");
-    expect(item.command).toBe("obsidianVFS.mount");
+    expect(item.command).toBe(COMMAND.mount);
     expect(item.show).not.toHaveBeenCalled();
 
     manager.dispose();

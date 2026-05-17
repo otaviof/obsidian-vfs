@@ -20,7 +20,7 @@ vi.mock("./vault-tree-provider.js", () => ({
 import * as vscode from "vscode";
 
 import { registerCommands } from "./commands.js";
-import { COMMAND } from "./types.js";
+import { COMMAND, CONFIG_PROP } from "./types.js";
 import { SCHEME } from "./uri-adapter.js";
 import { readAutoMount } from "./vault-tree-provider.js";
 
@@ -123,7 +123,7 @@ describe("mount command", () => {
       expect.anything(),
     );
     expect(update).toHaveBeenCalledWith(
-      "autoMount",
+      CONFIG_PROP.autoMount,
       ["10-projects"],
       vscode.ConfigurationTarget.Workspace,
     );
@@ -264,7 +264,7 @@ describe("mountNote command", () => {
       expect.objectContaining({ matchOnDescription: true }),
     );
     expect(update).toHaveBeenCalledWith(
-      "autoMount",
+      CONFIG_PROP.autoMount,
       ["docs/overview.md"],
       vscode.ConfigurationTarget.Workspace,
     );
@@ -373,7 +373,7 @@ describe("unmount command", () => {
     await handler();
 
     expect(update).toHaveBeenCalledWith(
-      "autoMount",
+      CONFIG_PROP.autoMount,
       ["20-areas"],
       vscode.ConfigurationTarget.Workspace,
     );

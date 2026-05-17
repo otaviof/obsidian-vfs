@@ -2,7 +2,7 @@
   "name": "obsidian-vfs",
   "displayName": "Obsidian VFS",
   "description": "Browse, search, and edit your Obsidian vault directly in VSCode via a virtual file system (obs://)",
-  "version": "0.3.5",
+  "version": "1.0.0",
   "private": true,
   "publisher": "otaviof",
   "engines": {
@@ -101,11 +101,6 @@
           "default": 10000,
           "description": "CLI operation timeout in milliseconds"
         },
-        "obsidianVFS.treeViewTitle": {
-          "type": "string",
-          "default": "",
-          "description": "Custom title for the Explorer tree view (defaults to \"obs://<vault_name>\")"
-        },
         "obsidianVFS.autoMount": {
           "type": "array",
           "items": {
@@ -121,30 +116,65 @@
           "maximum": 10,
           "description": "Maximum directory depth when listing vault folders and notes (0 = unlimited, 1 = top-level only)"
         },
-        "obsidianVFS.explorer": {
+        "obsidianVFS.vault.gitIgnore": {
           "type": "boolean",
           "default": true,
-          "description": "Show the Obsidian VFS tree view in the Explorer sidebar"
+          "markdownDescription": "Add the vault to `git.ignoredRepositories` so VS Code's Git extension skips it. Takes effect when `workspace.enabled` is true."
         },
-        "obsidianVFS.statusBar": {
+        "obsidianVFS.vault.excludeBlocked": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Hide `blocked` folders (from `.obsidian/obsidian-vfs.json`) via `files.exclude` patterns in the vault's `.vscode/settings.json`."
+        },
+        "obsidianVFS.vault.excludeDotfiles": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Hide dotfiles and dotdirs at the vault root (`.obsidian`, `.trash`, etc.) via `files.exclude` patterns. Controlled by `vault.excludeDotfilePattern`."
+        },
+        "obsidianVFS.vault.excludeDotfilePattern": {
+          "type": "string",
+          "default": "^\\.",
+          "markdownDescription": "Regex tested against entry names at the vault root. Only dotfiles matching this pattern are hidden when `vault.excludeDotfiles` is enabled. Default `^\\\\.` matches all dotfiles. Example: `^\\\\.(obsidian|trash)` to hide only `.obsidian` and `.trash`."
+        },
+        "obsidianVFS.statusBar.enabled": {
           "type": "boolean",
           "default": true,
           "description": "Show vault name and mode in the status bar"
         },
-        "obsidianVFS.excludeFilePattern": {
-          "type": "string",
-          "default": "\\.(md|base|canvas)$",
-          "markdownDescription": "Regex pattern tested against file basenames (not including parent directories) at partially-mounted vault levels. Matching files are hidden from Explorer via `files.exclude` glob patterns scoped to the vault folder. Set to empty string to disable. Examples: `\\.(md|base|canvas|pdf)$` (with attachments), `\\.base$` (single extension), `^README` (by name prefix)."
+        "obsidianVFS.explorer.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the Obsidian VFS tree view in the Explorer sidebar"
         },
-        "obsidianVFS.workspace": {
+        "obsidianVFS.explorer.title": {
+          "type": "string",
+          "default": "",
+          "description": "Custom title for the Explorer tree view (defaults to \"obs://<vault_name>\")"
+        },
+        "obsidianVFS.workspace.enabled": {
           "type": "boolean",
           "default": true,
           "description": "Add the vault as a file:// workspace folder for Quick Open (Cmd+P) and Search (Ctrl+Shift+F). Non-autoMount content is hidden via files.exclude patterns managed by the extension. Requires at least one local folder open and at least one autoMount entry."
         },
-        "obsidianVFS.workspaceFile": {
+        "obsidianVFS.workspace.codeWorkspaceFile": {
           "type": "boolean",
           "default": false,
-          "description": "Generate a .code-workspace file named after the project. Avoids the 'Untitled (Workspace)' label caused by dynamic workspace folder injection. The file contains a file:// vault folder entry and the extension's files.exclude patterns are written to its settings section. Opening the file reloads the window."
+          "description": "Generate a .code-workspace file named after the project. Avoids the 'Untitled (Workspace)' label caused by dynamic workspace folder injection. The file contains a file:// vault folder entry; files.exclude patterns are written to its settings section. Opening the file reloads the window."
+        },
+        "obsidianVFS.workspace.excludeUnmountedFolders": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Hide sibling directories at partially-mounted vault levels that are not in `autoMount`. When disabled, all directories are visible in Explorer and Quick Open."
+        },
+        "obsidianVFS.workspace.excludeUnmountedFiles": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Hide files at partially-mounted vault levels matching `workspace.excludeUnmountedFilePattern`. When disabled, all files are visible regardless of the pattern."
+        },
+        "obsidianVFS.workspace.excludeUnmountedFilePattern": {
+          "type": "string",
+          "default": "\\.(md|base|canvas)$",
+          "markdownDescription": "Regex pattern tested against file basenames at partially-mounted vault levels. Matching files are hidden from Explorer via `files.exclude` glob patterns scoped to the vault folder. Set to empty string to disable. Examples: `\\.(md|base|canvas|pdf)$` (with attachments), `\\.base$` (single extension), `^README` (by name prefix)."
         }
       }
     }

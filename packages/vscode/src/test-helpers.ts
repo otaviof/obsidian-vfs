@@ -4,7 +4,56 @@ import { vi } from "vitest";
 import type { LocalIndexTracker } from "@obsidian-vfs/core";
 import { makeLocalIndexTrackerWith } from "@obsidian-vfs/core/testing";
 
+import packageJson from "../package.json";
 import { SCHEME } from "./scheme.js";
+import { CONFIG_PROP, CONFIG_SECTION } from "./types.js";
+import type { ExtensionConfig } from "./types.js";
+import type { SyncFilesExcludeOptions } from "./workspace-folder.js";
+
+const configProperties = packageJson.contributes.configuration.properties as Record<
+  string,
+  { default: unknown }
+>;
+
+/** Read a setting's default value from `package.json`. */
+function configDefault<T>(prop: string): T {
+  return configProperties[`${CONFIG_SECTION}.${prop}`].default as T;
+}
+
+/** Default `SyncFilesExcludeOptions` derived from `package.json` defaults. */
+export const defaultSyncOptions: SyncFilesExcludeOptions = {
+  excludeBlocked: configDefault(CONFIG_PROP.vaultExcludeBlocked),
+  excludeDotfiles: configDefault(CONFIG_PROP.vaultExcludeDotfiles),
+  excludeDotfilePattern: configDefault(CONFIG_PROP.vaultExcludeDotfilePattern),
+  excludeUnmountedFolders: configDefault(CONFIG_PROP.workspaceExcludeUnmountedFolders),
+  excludeUnmountedFiles: configDefault(CONFIG_PROP.workspaceExcludeUnmountedFiles),
+  excludeUnmountedFilePattern: configDefault(CONFIG_PROP.workspaceExcludeUnmountedFilePattern),
+};
+
+/** Build a fake `ExtensionConfig` with defaults from `package.json`. */
+export function fakeExtensionConfig(overrides?: Partial<ExtensionConfig>): ExtensionConfig {
+  return {
+    cliPath: configDefault(CONFIG_PROP.cliPath),
+    timeoutMs: configDefault(CONFIG_PROP.timeoutMs),
+    autoMount: configDefault(CONFIG_PROP.autoMount),
+    depthLimit: configDefault(CONFIG_PROP.depthLimit),
+    vaultGitIgnore: configDefault(CONFIG_PROP.vaultGitIgnore),
+    vaultExcludeBlocked: configDefault(CONFIG_PROP.vaultExcludeBlocked),
+    vaultExcludeDotfiles: configDefault(CONFIG_PROP.vaultExcludeDotfiles),
+    vaultExcludeDotfilePattern: configDefault(CONFIG_PROP.vaultExcludeDotfilePattern),
+    statusBarEnabled: configDefault(CONFIG_PROP.statusBarEnabled),
+    explorerEnabled: configDefault(CONFIG_PROP.explorerEnabled),
+    explorerTitle: configDefault(CONFIG_PROP.explorerTitle),
+    workspaceEnabled: configDefault(CONFIG_PROP.workspaceEnabled),
+    workspaceCodeWorkspaceFile: configDefault(CONFIG_PROP.workspaceCodeWorkspaceFile),
+    workspaceExcludeUnmountedFolders: configDefault(CONFIG_PROP.workspaceExcludeUnmountedFolders),
+    workspaceExcludeUnmountedFiles: configDefault(CONFIG_PROP.workspaceExcludeUnmountedFiles),
+    workspaceExcludeUnmountedFilePattern: configDefault(
+      CONFIG_PROP.workspaceExcludeUnmountedFilePattern,
+    ),
+    ...overrides,
+  };
+}
 
 /** Reusable `EventEmitter` mock matching VSCode's `EventEmitter` contract. */
 export function createMockEventEmitter(): new () => {
@@ -141,7 +190,12 @@ export function createVscodeMock(
   if (parts.workspace) {
     mock.workspace = {
       getConfiguration: vi.fn().mockReturnValue({
-        get: vi.fn((_key: string, defaultValue: unknown) => defaultValue),
+        get: vi.fn((key: string, defaultValue?: unknown) => {
+          if (defaultValue !== undefined) return defaultValue;
+          const fqKey = `${CONFIG_SECTION}.${key}`;
+          if (fqKey in configProperties) return configProperties[fqKey].default;
+          return undefined;
+        }),
       }),
       registerFileSystemProvider: vi.fn(() => ({ dispose: vi.fn() })),
       updateWorkspaceFolders: vi.fn(),

@@ -103,14 +103,24 @@ export function addVaultWorkspaceFolder(
   return { status: "added" };
 }
 
+/** Options controlling which vault entries are hidden via `files.exclude`. */
+export interface SyncFilesExcludeOptions {
+  readonly excludeBlocked: boolean;
+  readonly excludeDotfiles: boolean;
+  readonly excludeDotfilePattern: string;
+  readonly excludeUnmountedFolders: boolean;
+  readonly excludeUnmountedFiles: boolean;
+  readonly excludeUnmountedFilePattern: string;
+}
+
 /**
  * Scan the vault root and update `files.exclude` to hide non-autoMount entries
  * and blocked paths. Patterns are split into two tiers:
  *
  * - **Folder-scoped** (`WorkspaceFolder` → `<vault>/.vscode/settings.json`):
- *   dotfiles and `blocked` paths — vault-global, independent of `autoMount`.
- * - **Workspace-scoped** (`Workspace`): remaining non-autoMount top-level
- *   directories — workspace-specific, varies per `autoMount` config.
+ *   dotfiles and `blocked` paths only — vault-global, independent of `autoMount`.
+ * - **Workspace-scoped** (`Workspace`): non-autoMount top-level directories,
+ *   sub-path exclusions, and file extension globs — varies per `autoMount` config.
  *
  * Returns all managed pattern keys (both tiers combined).
  */
@@ -119,7 +129,7 @@ export async function syncFilesExclude(
   autoMount: readonly string[],
   blocked: readonly string[],
   previouslyManaged: readonly string[],
-  excludeFilePattern = "",
+  options: SyncFilesExcludeOptions,
 ): Promise<string[]> {
   let entries: string[];
   try {
@@ -130,11 +140,20 @@ export async function syncFilesExclude(
   const mountTree = buildMountTree(autoMount);
 
   let fileRegex: RegExp | null = null;
-  if (excludeFilePattern) {
+  if (options.excludeUnmountedFiles && options.excludeUnmountedFilePattern) {
     try {
-      fileRegex = new RegExp(excludeFilePattern);
+      fileRegex = new RegExp(options.excludeUnmountedFilePattern);
     } catch {
       // Invalid regex — skip file exclusion
+    }
+  }
+
+  let dotfileRegex: RegExp | null = null;
+  if (options.excludeDotfiles && options.excludeDotfilePattern) {
+    try {
+      dotfileRegex = new RegExp(options.excludeDotfilePattern);
+    } catch {
+      // Invalid regex — fall back to hiding all dotfiles
     }
   }
 
@@ -144,7 +163,9 @@ export async function syncFilesExclude(
   for (const entry of entries) {
     if (entry === ".vscode") continue;
     if (entry.startsWith(".")) {
-      folderScoped.push(entry);
+      if (options.excludeDotfiles && (!dotfileRegex || dotfileRegex.test(entry))) {
+        folderScoped.push(entry);
+      }
       continue;
     }
 
@@ -152,19 +173,24 @@ export async function syncFilesExclude(
     if (node === undefined) {
       workspaceScoped.push(entry);
     } else if (node !== null) {
-      const subExclusions = await enumeratePartialMounts(physicalPath, entry, node, fileRegex);
-      for (const ex of subExclusions) {
-        if (ex.includes("*")) {
-          folderScoped.push(ex);
-        } else {
-          workspaceScoped.push(ex);
-        }
-      }
+      const subExclusions = await enumeratePartialMounts(
+        physicalPath,
+        entry,
+        node,
+        fileRegex,
+        options.excludeUnmountedFolders,
+      );
+      workspaceScoped.push(...subExclusions);
+    } else if (fileRegex) {
+      const globs = await scanFileExclusions(physicalPath, entry, fileRegex);
+      workspaceScoped.push(...globs);
     }
   }
 
-  for (const b of blocked) {
-    if (!folderScoped.includes(b)) folderScoped.push(b);
+  if (options.excludeBlocked) {
+    for (const b of blocked) {
+      if (!folderScoped.includes(b)) folderScoped.push(b);
+    }
   }
 
   const allManaged = [...folderScoped, ...workspaceScoped];
@@ -181,6 +207,12 @@ export async function syncFilesExclude(
     for (const key of previouslyManaged) {
       if (!managedSet.has(key)) delete updated[key];
     }
+    // Reconcile: remove vault sub-path patterns orphaned by state drift
+    for (const key of Object.keys(current)) {
+      if (managedSet.has(key) || !key.includes("/")) continue;
+      const root = key.split("/")[0];
+      if (entries.includes(root)) delete updated[key];
+    }
     for (const entry of folderScoped) {
       updated[entry] = true;
     }
@@ -191,14 +223,20 @@ export async function syncFilesExclude(
     workspaceScoped.push(...folderScoped);
   }
 
-  // Tier 2: workspace-scoped patterns (non-autoMount non-dotfile dirs,
-  // plus folderScoped fallback when vault is not a workspace folder)
+  // Tier 2: workspace-scoped patterns (non-autoMount dirs, sub-path exclusions,
+  // file extension globs, plus folderScoped fallback when vault is not a workspace folder)
   const wsConfig = vscode.workspace.getConfiguration("files");
   const wsCurrent = wsConfig.inspect<Record<string, boolean>>("exclude")?.workspaceValue ?? {};
   const wsUpdated = { ...wsCurrent };
 
   for (const key of previouslyManaged) {
     if (!managedSet.has(key)) delete wsUpdated[key];
+  }
+  // Reconcile: remove vault sub-path patterns orphaned by state drift
+  for (const key of Object.keys(wsCurrent)) {
+    if (managedSet.has(key) || !key.includes("/")) continue;
+    const root = key.split("/")[0];
+    if (entries.includes(root)) delete wsUpdated[key];
   }
   for (const entry of workspaceScoped) {
     wsUpdated[entry] = true;
@@ -351,6 +389,7 @@ async function enumeratePartialMounts(
   prefix: string,
   node: MountNode,
   fileRegex: RegExp | null,
+  excludeFolders: boolean,
 ): Promise<string[]> {
   const excluded: string[] = [];
   let children: Dirent[];
@@ -380,9 +419,11 @@ async function enumeratePartialMounts(
 
     const childNode = node.get(child.name);
     if (childNode === undefined) {
-      excluded.push(childPath);
+      if (excludeFolders) excluded.push(childPath);
     } else if (childNode !== null) {
-      excluded.push(...(await enumeratePartialMounts(basePath, childPath, childNode, fileRegex)));
+      excluded.push(
+        ...(await enumeratePartialMounts(basePath, childPath, childNode, fileRegex, excludeFolders)),
+      );
     }
   }
 
@@ -391,6 +432,29 @@ async function enumeratePartialMounts(
   }
 
   return excluded;
+}
+
+/** Shallow scan for files matching `fileRegex`, returning `prefix/*ext` globs. */
+async function scanFileExclusions(
+  basePath: string,
+  prefix: string,
+  fileRegex: RegExp,
+): Promise<string[]> {
+  let children: Dirent[];
+  try {
+    children = await readdir(path.join(basePath, prefix), { withFileTypes: true });
+  } catch {
+    return [];
+  }
+  const extensions = new Set<string>();
+  for (const child of children) {
+    if (child.isDirectory() || child.name.startsWith(".")) continue;
+    if (fileRegex.test(child.name)) {
+      const ext = path.extname(child.name);
+      if (ext) extensions.add(ext);
+    }
+  }
+  return Array.from(extensions, (ext) => `${prefix}/*${ext}`);
 }
 
 async function cleanStaleNonVaultExcludes(

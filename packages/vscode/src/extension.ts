@@ -3,7 +3,8 @@ import path from "node:path";
 import * as vscode from "vscode";
 
 import { bootstrapFromConfig, readConfig } from "./bootstrap.js";
-import { CONFIG_KEY, CONFIG_SECTION } from "./types.js";
+import { CONFIG_KEY, CONFIG_PROP, CONFIG_SECTION } from "./types.js";
+import type { ExtensionConfig } from "./types.js";
 import { SCHEME } from "./uri-adapter.js";
 import { registerCommands } from "./commands.js";
 import { ObsidianFileSystemProvider } from "./file-system-provider.js";
@@ -23,6 +24,194 @@ import {
   removeVaultWorkspaceFolders,
   syncFilesExclude,
 } from "./workspace-folder.js";
+import type { SyncFilesExcludeOptions } from "./workspace-folder.js";
+
+const MANAGED_EXCLUDES_KEY = "managedFilesExclude";
+
+/** Mutable state for managed `files.exclude` patterns. */
+interface ExcludeState {
+  managedExcludes: string[];
+  excludeSync: Promise<void>;
+}
+
+/** Shared context passed to workspace activation and config change helpers. */
+interface WorkspaceContext {
+  readonly physicalPath: string;
+  readonly vaultName: string;
+  readonly blocked: readonly string[];
+  readonly extensionContext: vscode.ExtensionContext;
+  readonly outputChannel: vscode.OutputChannel;
+  readonly state: ExcludeState;
+}
+
+function buildSyncOptions(config: ExtensionConfig): SyncFilesExcludeOptions {
+  return {
+    excludeBlocked: config.vaultExcludeBlocked,
+    excludeDotfiles: config.vaultExcludeDotfiles,
+    excludeDotfilePattern: config.vaultExcludeDotfilePattern,
+    excludeUnmountedFolders: config.workspaceExcludeUnmountedFolders,
+    excludeUnmountedFiles: config.workspaceExcludeUnmountedFiles,
+    excludeUnmountedFilePattern: config.workspaceExcludeUnmountedFilePattern,
+  };
+}
+
+/** Sync `files.exclude` patterns immediately, updating both tiers and persisting state. */
+async function syncExcludesNow(ctx: WorkspaceContext, config: ExtensionConfig): Promise<void> {
+  ctx.state.managedExcludes = await syncFilesExclude(
+    ctx.physicalPath,
+    config.autoMount,
+    ctx.blocked,
+    ctx.state.managedExcludes,
+    buildSyncOptions(config),
+  );
+  await ctx.extensionContext.workspaceState.update(MANAGED_EXCLUDES_KEY, ctx.state.managedExcludes);
+}
+
+/** Enqueue a `files.exclude` sync that runs after any in-flight sync completes. */
+function scheduleSync(ctx: WorkspaceContext, config: ExtensionConfig): void {
+  ctx.state.excludeSync = ctx.state.excludeSync.then(() => syncExcludesNow(ctx, config));
+}
+
+/** Enqueue removal of all managed `files.exclude` patterns. */
+function scheduleClear(ctx: WorkspaceContext): void {
+  ctx.state.excludeSync = ctx.state.excludeSync.then(async () => {
+    await clearManagedExcludes(ctx.physicalPath, ctx.state.managedExcludes);
+    ctx.state.managedExcludes = [];
+    await ctx.extensionContext.workspaceState.update(MANAGED_EXCLUDES_KEY, []);
+  });
+}
+
+/** Add the vault as a workspace folder and sync `files.exclude` based on the active mode. */
+async function activateWorkspaceFolder(
+  ctx: WorkspaceContext,
+  config: ExtensionConfig,
+): Promise<void> {
+  const alreadySaved = vscode.workspace.workspaceFile?.scheme === "file";
+
+  if (config.workspaceCodeWorkspaceFile && alreadySaved && config.autoMount.length > 0) {
+    if (config.vaultGitIgnore) await excludeVaultFromGitDetection(ctx.physicalPath);
+    await syncExcludesNow(ctx, config);
+    return;
+  }
+
+  if (config.workspaceCodeWorkspaceFile && !alreadySaved && config.autoMount.length > 0) {
+    try {
+      if (config.vaultGitIgnore) await excludeVaultFromGitDetection(ctx.physicalPath);
+      const wfResult = generateWorkspaceFile(ctx.physicalPath, ctx.vaultName);
+      ctx.outputChannel.appendLine(
+        `Workspace file: ${wfResult.status} — ${wfResult.fileUri.fsPath}`,
+      );
+      const action = await vscode.window.showInformationMessage(
+        `Workspace file ${wfResult.status === "created" ? "created" : "found"}: ${path.basename(wfResult.fileUri.fsPath)}. Open it? This will reload the window.`,
+        "Open",
+        "Not Now",
+      );
+      if (action === "Open") {
+        await openWorkspaceFile(wfResult.fileUri);
+        return;
+      }
+      const addResult = addVaultWorkspaceFolder(ctx.physicalPath, ctx.vaultName);
+      const detail = "reason" in addResult ? ` — ${addResult.reason}` : "";
+      ctx.outputChannel.appendLine(`Workspace folder: ${addResult.status}${detail}`);
+      await syncExcludesNow(ctx, config);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      ctx.outputChannel.appendLine(`Workspace file: skipped — ${msg}`);
+    }
+    return;
+  }
+
+  if (config.workspaceEnabled && config.autoMount.length > 0) {
+    const wfResult = addVaultWorkspaceFolder(ctx.physicalPath, ctx.vaultName);
+    const detail = "reason" in wfResult ? ` — ${wfResult.reason}` : "";
+    ctx.outputChannel.appendLine(`Workspace folder: ${wfResult.status}${detail}`);
+    if (config.vaultGitIgnore) await excludeVaultFromGitDetection(ctx.physicalPath);
+    await syncExcludesNow(ctx, config);
+  }
+}
+
+/** React to `onDidChangeConfiguration` events — toggle components and re-sync patterns. */
+function handleConfigChange(
+  e: vscode.ConfigurationChangeEvent,
+  ctx: WorkspaceContext,
+  treeProvider: VaultTreeDataProvider,
+  statusBar: StatusBarManager,
+  provider: ObsidianFileSystemProvider,
+): void {
+  const updated = readConfig();
+
+  if (e.affectsConfiguration(CONFIG_KEY.explorerEnabled)) {
+    treeProvider.enabled = updated.explorerEnabled;
+  }
+  if (e.affectsConfiguration(CONFIG_KEY.statusBarEnabled)) {
+    if (updated.statusBarEnabled) statusBar.show();
+    else statusBar.hide();
+  }
+  if (e.affectsConfiguration(CONFIG_KEY.autoMount)) {
+    provider.setAutoMount(updated.autoMount);
+  }
+  if (e.affectsConfiguration(CONFIG_KEY.vaultGitIgnore)) {
+    if (updated.vaultGitIgnore && (updated.workspaceEnabled || updated.workspaceCodeWorkspaceFile)) {
+      void excludeVaultFromGitDetection(ctx.physicalPath);
+    } else {
+      void includeVaultInGitDetection(ctx.physicalPath);
+    }
+  }
+  if (e.affectsConfiguration(CONFIG_KEY.workspaceCodeWorkspaceFile)) {
+    const wfAlreadySaved = vscode.workspace.workspaceFile?.scheme === "file";
+    if (updated.workspaceCodeWorkspaceFile && !wfAlreadySaved && updated.autoMount.length > 0) {
+      try {
+        const wfResult = generateWorkspaceFile(ctx.physicalPath, ctx.vaultName);
+        ctx.outputChannel.appendLine(
+          `Workspace file: ${wfResult.status} — ${wfResult.fileUri.fsPath}`,
+        );
+        void vscode.window
+          .showInformationMessage(
+            `Workspace file ${wfResult.status === "created" ? "created" : "found"}: ${path.basename(wfResult.fileUri.fsPath)}. Open it? This will reload the window.`,
+            "Open",
+            "Not Now",
+          )
+          .then((action) => {
+            if (action === "Open") void openWorkspaceFile(wfResult.fileUri);
+          });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        ctx.outputChannel.appendLine(`Workspace file: skipped — ${msg}`);
+      }
+    }
+  }
+  if (e.affectsConfiguration(CONFIG_KEY.workspaceEnabled) && !updated.workspaceCodeWorkspaceFile) {
+    removeVaultWorkspaceFolders(ctx.physicalPath);
+    if (updated.workspaceEnabled && updated.autoMount.length > 0) {
+      addVaultWorkspaceFolder(ctx.physicalPath, ctx.vaultName);
+      if (updated.vaultGitIgnore) void excludeVaultFromGitDetection(ctx.physicalPath);
+      scheduleSync(ctx, updated);
+    } else {
+      scheduleClear(ctx);
+      void includeVaultInGitDetection(ctx.physicalPath);
+    }
+  } else if (
+    (e.affectsConfiguration(CONFIG_KEY.autoMount) ||
+      e.affectsConfiguration(CONFIG_KEY.workspaceExcludeUnmountedFilePattern) ||
+      e.affectsConfiguration(CONFIG_KEY.workspaceExcludeUnmountedFolders) ||
+      e.affectsConfiguration(CONFIG_KEY.workspaceExcludeUnmountedFiles) ||
+      e.affectsConfiguration(CONFIG_KEY.vaultExcludeBlocked) ||
+      e.affectsConfiguration(CONFIG_KEY.vaultExcludeDotfiles) ||
+      e.affectsConfiguration(CONFIG_KEY.vaultExcludeDotfilePattern)) &&
+    (updated.workspaceEnabled || updated.workspaceCodeWorkspaceFile)
+  ) {
+    if (updated.autoMount.length === 0) {
+      removeVaultWorkspaceFolders(ctx.physicalPath);
+      scheduleClear(ctx);
+    } else {
+      if (!hasVaultWorkspaceFolder(ctx.physicalPath)) {
+        addVaultWorkspaceFolder(ctx.physicalPath, ctx.vaultName);
+        if (updated.vaultGitIgnore) void excludeVaultFromGitDetection(ctx.physicalPath);
+      }
+      scheduleSync(ctx, updated);
+    }
+  }
+}
 
 /** Activate the Obsidian VFS extension. */
 export async function activate(context: vscode.ExtensionContext): Promise<void> {
@@ -45,16 +234,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const provider = new ObsidianFileSystemProvider(tracker, config.autoMount);
   context.subscriptions.push(provider);
-
   context.subscriptions.push(
     vscode.workspace.registerFileSystemProvider(SCHEME, provider, {
       isCaseSensitive: true,
       isReadonly: false,
     }),
   );
-
-  const watcher = provider.watch(vscode.Uri.from({ scheme: SCHEME, path: "/" }));
-  context.subscriptions.push(watcher);
+  context.subscriptions.push(provider.watch(vscode.Uri.from({ scheme: SCHEME, path: "/" })));
 
   const treeProvider = new VaultTreeDataProvider(tracker);
   context.subscriptions.push(treeProvider);
@@ -65,14 +251,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   });
   const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
   treeView.title =
-    cfg.get<string>("treeViewTitle", "") || `${FOLDER_NAME_PREFIX}${tracker.context.name}`;
+    cfg.get<string>(CONFIG_PROP.explorerTitle, "") || `${FOLDER_NAME_PREFIX}${tracker.context.name}`;
   context.subscriptions.push(treeView);
-
   context.subscriptions.push(
     treeView.onDidChangeVisibility((e) => {
-      if (e.visible) {
-        treeProvider.refresh();
-      }
+      if (e.visible) treeProvider.refresh();
     }),
   );
 
@@ -92,168 +275,27 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     ),
   );
 
-  treeProvider.enabled = config.explorer;
-  if (config.statusBar) {
-    statusBar.show();
-  }
+  treeProvider.enabled = config.explorerEnabled;
+  if (config.statusBarEnabled) statusBar.show();
 
-  const managedExcludesKey = "managedFilesExclude";
-  let managedExcludes: string[] = context.workspaceState.get<string[]>(managedExcludesKey, []);
-  let excludeSync: Promise<void> = Promise.resolve();
-
-  const { blocked } = tracker.context.vfsConfig;
-
-  const runSync = (autoMount: readonly string[], excludeFilePattern: string): void => {
-    excludeSync = excludeSync.then(async () => {
-      const keys = await syncFilesExclude(
-        tracker.context.physicalPath,
-        autoMount,
-        blocked,
-        managedExcludes,
-        excludeFilePattern,
-      );
-      managedExcludes = keys;
-      await context.workspaceState.update(managedExcludesKey, keys);
-    });
+  const wsCtx: WorkspaceContext = {
+    physicalPath: tracker.context.physicalPath,
+    vaultName: tracker.context.name,
+    blocked: tracker.context.vfsConfig.blocked,
+    extensionContext: context,
+    outputChannel,
+    state: {
+      managedExcludes: context.workspaceState.get<string[]>(MANAGED_EXCLUDES_KEY, []),
+      excludeSync: Promise.resolve(),
+    },
   };
 
-  const runClear = (): void => {
-    excludeSync = excludeSync.then(async () => {
-      await clearManagedExcludes(tracker.context.physicalPath, managedExcludes);
-      managedExcludes = [];
-      await context.workspaceState.update(managedExcludesKey, []);
-    });
-  };
-
-  const alreadySaved = vscode.workspace.workspaceFile?.scheme === "file";
-
-  if (config.workspaceFile && alreadySaved && config.autoMount.length > 0) {
-    await excludeVaultFromGitDetection(tracker.context.physicalPath);
-    managedExcludes = await syncFilesExclude(
-      tracker.context.physicalPath,
-      config.autoMount,
-      blocked,
-      managedExcludes,
-      config.excludeFilePattern,
-    );
-    await context.workspaceState.update(managedExcludesKey, managedExcludes);
-  } else if (config.workspaceFile && !alreadySaved && config.autoMount.length > 0) {
-    try {
-      await excludeVaultFromGitDetection(tracker.context.physicalPath);
-
-      const wfResult = generateWorkspaceFile(tracker.context.physicalPath, tracker.context.name);
-      outputChannel.appendLine(`Workspace file: ${wfResult.status} — ${wfResult.fileUri.fsPath}`);
-
-      const action = await vscode.window.showInformationMessage(
-        `Workspace file ${wfResult.status === "created" ? "created" : "found"}: ${path.basename(wfResult.fileUri.fsPath)}. Open it? This will reload the window.`,
-        "Open",
-        "Not Now",
-      );
-      if (action === "Open") {
-        await openWorkspaceFile(wfResult.fileUri);
-        return;
-      }
-      const addResult = addVaultWorkspaceFolder(tracker.context.physicalPath, tracker.context.name);
-      const detail = "reason" in addResult ? ` — ${addResult.reason}` : "";
-      outputChannel.appendLine(`Workspace folder: ${addResult.status}${detail}`);
-      managedExcludes = await syncFilesExclude(
-        tracker.context.physicalPath,
-        config.autoMount,
-        blocked,
-        managedExcludes,
-        config.excludeFilePattern,
-      );
-      await context.workspaceState.update(managedExcludesKey, managedExcludes);
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      outputChannel.appendLine(`Workspace file: skipped — ${msg}`);
-    }
-  } else if (config.workspace && config.autoMount.length > 0) {
-    const wfResult = addVaultWorkspaceFolder(tracker.context.physicalPath, tracker.context.name);
-    const detail = "reason" in wfResult ? ` — ${wfResult.reason}` : "";
-    outputChannel.appendLine(`Workspace folder: ${wfResult.status}${detail}`);
-    await excludeVaultFromGitDetection(tracker.context.physicalPath);
-    managedExcludes = await syncFilesExclude(
-      tracker.context.physicalPath,
-      config.autoMount,
-      blocked,
-      managedExcludes,
-      config.excludeFilePattern,
-    );
-    await context.workspaceState.update(managedExcludesKey, managedExcludes);
-  }
+  await activateWorkspaceFolder(wsCtx, config);
 
   context.subscriptions.push(
-    vscode.workspace.onDidChangeConfiguration((e) => {
-      const updated = readConfig();
-      if (e.affectsConfiguration(CONFIG_KEY.explorer)) {
-        treeProvider.enabled = updated.explorer;
-      }
-      if (e.affectsConfiguration(CONFIG_KEY.statusBar)) {
-        if (updated.statusBar) {
-          statusBar.show();
-        } else {
-          statusBar.hide();
-        }
-      }
-      if (e.affectsConfiguration(CONFIG_KEY.autoMount)) {
-        provider.setAutoMount(updated.autoMount);
-      }
-      if (e.affectsConfiguration(CONFIG_KEY.workspaceFile)) {
-        const wfAlreadySaved = vscode.workspace.workspaceFile?.scheme === "file";
-        if (updated.workspaceFile && !wfAlreadySaved && updated.autoMount.length > 0) {
-          try {
-            const wfResult = generateWorkspaceFile(
-              tracker.context.physicalPath,
-              tracker.context.name,
-            );
-            outputChannel.appendLine(
-              `Workspace file: ${wfResult.status} — ${wfResult.fileUri.fsPath}`,
-            );
-            void vscode.window
-              .showInformationMessage(
-                `Workspace file ${wfResult.status === "created" ? "created" : "found"}: ${path.basename(wfResult.fileUri.fsPath)}. Open it? This will reload the window.`,
-                "Open",
-                "Not Now",
-              )
-              .then((action) => {
-                if (action === "Open") {
-                  void openWorkspaceFile(wfResult.fileUri);
-                }
-              });
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            outputChannel.appendLine(`Workspace file: skipped — ${msg}`);
-          }
-        }
-      }
-      if (e.affectsConfiguration(CONFIG_KEY.workspace) && !updated.workspaceFile) {
-        removeVaultWorkspaceFolders(tracker.context.physicalPath);
-        if (updated.workspace && updated.autoMount.length > 0) {
-          addVaultWorkspaceFolder(tracker.context.physicalPath, tracker.context.name);
-          void excludeVaultFromGitDetection(tracker.context.physicalPath);
-          runSync(updated.autoMount, updated.excludeFilePattern);
-        } else {
-          runClear();
-          void includeVaultInGitDetection(tracker.context.physicalPath);
-        }
-      } else if (
-        (e.affectsConfiguration(CONFIG_KEY.autoMount) ||
-          e.affectsConfiguration(CONFIG_KEY.excludeFilePattern)) &&
-        (updated.workspace || updated.workspaceFile)
-      ) {
-        if (updated.autoMount.length === 0) {
-          removeVaultWorkspaceFolders(tracker.context.physicalPath);
-          runClear();
-        } else {
-          if (!hasVaultWorkspaceFolder(tracker.context.physicalPath)) {
-            addVaultWorkspaceFolder(tracker.context.physicalPath, tracker.context.name);
-            void excludeVaultFromGitDetection(tracker.context.physicalPath);
-          }
-          runSync(updated.autoMount, updated.excludeFilePattern);
-        }
-      }
-    }),
+    vscode.workspace.onDidChangeConfiguration((e) =>
+      handleConfigChange(e, wsCtx, treeProvider, statusBar, provider),
+    ),
   );
 }
 

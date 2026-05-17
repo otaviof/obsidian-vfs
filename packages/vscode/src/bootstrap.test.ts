@@ -16,6 +16,7 @@ import { bootstrapTracker, resolveCliPath } from "@obsidian-vfs/core";
 import * as vscode from "vscode";
 
 import { bootstrapFromConfig, readConfig } from "./bootstrap.js";
+import { CONFIG_PROP } from "./types.js";
 
 const mockBootstrap = vi.mocked(bootstrapTracker);
 
@@ -30,9 +31,9 @@ describe("readConfig", () => {
   it("reads values from VSCode configuration", () => {
     vi.mocked(vscode.workspace.getConfiguration).mockReturnValueOnce({
       get: vi.fn((key: string) => {
-        if (key === "cliPath") return "/usr/bin/obsidian";
-        if (key === "timeoutMs") return 5000;
-        if (key === "autoMount") return ["10-projects", "20-areas"];
+        if (key === CONFIG_PROP.cliPath) return "/usr/bin/obsidian";
+        if (key === CONFIG_PROP.timeoutMs) return 5000;
+        if (key === CONFIG_PROP.autoMount) return ["10-projects", "20-areas"];
         return undefined;
       }),
     } as never);

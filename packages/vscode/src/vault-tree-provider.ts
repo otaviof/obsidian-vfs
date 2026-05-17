@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import type { LocalIndexTracker, VFSFileType } from "@obsidian-vfs/core";
 
-import { CONFIG_SECTION } from "./types.js";
+import { CONFIG_PROP, CONFIG_SECTION } from "./types.js";
 import { toFileUri } from "./uri-adapter.js";
 
 /** Context value for tree items, used in `when` clauses for context menus. */
@@ -123,7 +123,7 @@ export class VaultTreeDataProvider
 
 /** Read `obsidianVFS.autoMount` from workspace-scoped settings. */
 export function readAutoMount(): string[] {
-  return vscode.workspace.getConfiguration(CONFIG_SECTION).get<string[]>("autoMount", []);
+  return vscode.workspace.getConfiguration(CONFIG_SECTION).get<string[]>(CONFIG_PROP.autoMount, []);
 }
 
 /** Sort directory entries: folders first, then alphabetical. */
