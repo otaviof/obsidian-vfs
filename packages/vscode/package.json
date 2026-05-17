@@ -136,6 +136,16 @@
           "default": "^\\.",
           "markdownDescription": "Regex tested against entry names at the vault root. Only dotfiles matching this pattern are hidden when `vault.excludeDotfiles` is enabled. Default `^\\\\.` matches all dotfiles. Example: `^\\\\.(obsidian|trash)` to hide only `.obsidian` and `.trash`."
         },
+        "obsidianVFS.vault.mode": {
+          "type": "string",
+          "enum": [
+            "rw",
+            "ro",
+            "partial"
+          ],
+          "default": "rw",
+          "markdownDescription": "Vault access mode controlling write operations through the `obs://` file system.\n- `rw`: Read-write — all writes permitted (default).\n- `ro`: Read-only — no writes allowed.\n- `partial`: Only writes to `autoMount` paths are allowed; everything else is read-only.\n\nThis setting protects tree view operations, drag-and-drop, and `obs://` editor saves. The `file://` workspace folder (used for Quick Open and Search) is not affected."
+        },
         "obsidianVFS.statusBar.enabled": {
           "type": "boolean",
           "default": true,

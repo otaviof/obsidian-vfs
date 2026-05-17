@@ -41,6 +41,7 @@ export function fakeExtensionConfig(overrides?: Partial<ExtensionConfig>): Exten
     vaultExcludeBlocked: configDefault(CONFIG_PROP.vaultExcludeBlocked),
     vaultExcludeDotfiles: configDefault(CONFIG_PROP.vaultExcludeDotfiles),
     vaultExcludeDotfilePattern: configDefault(CONFIG_PROP.vaultExcludeDotfilePattern),
+    vaultMode: configDefault(CONFIG_PROP.vaultMode),
     statusBarEnabled: configDefault(CONFIG_PROP.statusBarEnabled),
     explorerEnabled: configDefault(CONFIG_PROP.explorerEnabled),
     explorerTitle: configDefault(CONFIG_PROP.explorerTitle),
@@ -165,6 +166,7 @@ export function createVscodeMock(
       createOutputChannel: vi.fn(() => outputChannel),
       showQuickPick: vi.fn(),
       showInformationMessage: vi.fn(),
+      showErrorMessage: vi.fn(),
       activeTextEditor: undefined,
     };
     if (parts.statusBar) {

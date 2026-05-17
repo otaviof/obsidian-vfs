@@ -40,7 +40,12 @@ export class VaultTreeDragAndDropController implements vscode.TreeDragAndDropCon
         path: `/${destPath}`,
       });
 
-      await vscode.workspace.fs.copy(sourceUri, destUri, { overwrite: false });
+      try {
+        await vscode.workspace.fs.copy(sourceUri, destUri, { overwrite: false });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        void vscode.window.showErrorMessage(`Failed to copy ${fileName}: ${msg}`);
+      }
     }
   }
 

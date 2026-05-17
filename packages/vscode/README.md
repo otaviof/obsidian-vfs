@@ -54,6 +54,7 @@ Controls vault-side `files.exclude` policy written to `<vault>/.vscode/settings.
 
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
+| `obsidianVFS.vault.mode` | `"rw" \| "ro" \| "partial"` | `"rw"` | Write access mode: `"rw"` (read-write, all writes allowed), `"ro"` (read-only, no writes through `obs://`), `"partial"` (writes only to `autoMount` paths) |
 | `obsidianVFS.vault.gitIgnore` | `boolean` | `true` | Add the vault to `git.ignoredRepositories` so VS Code's Git extension skips it |
 | `obsidianVFS.vault.excludeBlocked` | `boolean` | `true` | Hide `blocked` folders (from `.obsidian/obsidian-vfs.json`) via `files.exclude` |
 | `obsidianVFS.vault.excludeDotfiles` | `boolean` | `true` | Hide dotfiles and dotdirs at the vault root (`.obsidian`, `.trash`, etc.) |
@@ -122,6 +123,7 @@ This matches the tree view — only mounted paths appear in both views.
 
 - **Vault `.vscode/` directory:** The extension creates `.vscode/settings.json` inside the vault for vault-global `files.exclude` patterns (dotfiles and `blocked` paths). These patterns are independent of `autoMount` and apply to any workspace that includes the vault. The `.vscode/` directory itself is never managed by the extension — if you want to hide it, add `.vscode` to your own `files.exclude`. When `obsidianVFS.workspace.enabled` is disabled, all managed patterns are removed from both folder and workspace settings. If your vault is git-tracked, consider adding `.vscode/` to the vault's `.gitignore`.
 - **Not a security boundary:** `files.exclude` hides content from Explorer and Quick Open but does not enforce access restrictions. The `obs://` `FileSystemProvider`'s path security (`allowed`/`blocked` lists in `.obsidian-vfs.json`) applies to tree view, wikilink, and drag-and-drop operations.
+- **Write protection covers `obs://` only:** `vault.mode` (`"ro"` / `"partial"`) guards write operations through the `obs://` `FileSystemProvider` — tree view sidebar, drag-and-drop into the tree, and `obs://` editor saves. The `file://` workspace folder (Explorer panel, Quick Open, Search) bypasses the provider and remains writable regardless of vault mode. This gap closes when VS Code stabilizes `FileSearchProvider`/`TextSearchProvider`, allowing a single `obs://` workspace folder.
 - **Temporary workaround:** `files.exclude` is used because VS Code's [`FileSearchProvider`/`TextSearchProvider`](https://github.com/microsoft/vscode/issues/73524) APIs are still proposed (unstable). When stabilized, the extension can switch to a single `obs://` workspace folder with native search, eliminating the `files.exclude` patterns entirely.
 - **Title bar:** Adding the vault as a workspace folder creates a multi-root workspace. VS Code may show "UNTITLED (WORKSPACE)" in the title bar.
 

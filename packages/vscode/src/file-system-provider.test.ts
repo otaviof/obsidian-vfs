@@ -865,4 +865,119 @@ describe("ObsidianFileSystemProvider", () => {
       expect(() => provider.dispose()).not.toThrow();
     });
   });
+
+  describe("write protection", () => {
+    it("writeFile throws NoPermissions in ro mode", async () => {
+      const tracker = mockLocalIndexTracker();
+      const provider = new ObsidianFileSystemProvider(tracker, [], "ro");
+
+      await expect(
+        provider.writeFile(fakeUri("/note.md") as never, new Uint8Array(), {
+          create: true,
+          overwrite: true,
+        }),
+      ).rejects.toThrow("NoPermissions");
+    });
+
+    it("writeFile throws NoPermissions in partial mode for unmounted path", async () => {
+      const tracker = mockLocalIndexTracker();
+      const provider = new ObsidianFileSystemProvider(tracker, ["Notes"], "partial");
+
+      await expect(
+        provider.writeFile(fakeUri("/Archive/old.md") as never, new Uint8Array(), {
+          create: true,
+          overwrite: true,
+        }),
+      ).rejects.toThrow("NoPermissions");
+    });
+
+    it("writeFile succeeds in partial mode for mounted path", async () => {
+      const tracker = mockLocalIndexTracker({
+        stat: vi.fn().mockResolvedValue({
+          ok: false,
+          error: { code: "FILE_NOT_FOUND", message: "nope" },
+        }),
+      });
+      const provider = new ObsidianFileSystemProvider(tracker, ["Notes"], "partial");
+      mockValidatePathForWrite.mockResolvedValueOnce({ ok: true, value: "/vault/Notes/new.md" });
+      mockFsWriteFile.mockResolvedValueOnce(undefined);
+
+      await provider.writeFile(fakeUri("/Notes/new.md") as never, new Uint8Array(), {
+        create: true,
+        overwrite: false,
+      });
+
+      expect(mockFsWriteFile).toHaveBeenCalledWith("/vault/Notes/new.md", expect.any(Uint8Array));
+    });
+
+    it("createDirectory throws NoPermissions in ro mode", async () => {
+      const tracker = mockLocalIndexTracker();
+      const provider = new ObsidianFileSystemProvider(tracker, [], "ro");
+
+      await expect(provider.createDirectory(fakeUri("/newdir") as never)).rejects.toThrow(
+        "NoPermissions",
+      );
+    });
+
+    it("delete throws NoPermissions in ro mode", async () => {
+      const tracker = mockLocalIndexTracker();
+      const provider = new ObsidianFileSystemProvider(tracker, [], "ro");
+
+      await expect(
+        provider.delete(fakeUri("/note.md") as never, { recursive: false }),
+      ).rejects.toThrow("NoPermissions");
+    });
+
+    it("rename throws NoPermissions in ro mode", async () => {
+      const tracker = mockLocalIndexTracker();
+      const provider = new ObsidianFileSystemProvider(tracker, [], "ro");
+
+      await expect(
+        provider.rename(fakeUri("/old.md") as never, fakeUri("/new.md") as never, {
+          overwrite: true,
+        }),
+      ).rejects.toThrow("NoPermissions");
+    });
+
+    it("rename in partial mode blocks destination outside mount", async () => {
+      const tracker = mockLocalIndexTracker();
+      const provider = new ObsidianFileSystemProvider(tracker, ["Notes"], "partial");
+      mockValidatePath.mockResolvedValueOnce({ ok: true, value: "/vault/Notes/old.md" });
+
+      await expect(
+        provider.rename(fakeUri("/Notes/old.md") as never, fakeUri("/Archive/moved.md") as never, {
+          overwrite: true,
+        }),
+      ).rejects.toThrow("NoPermissions");
+    });
+
+    it("setVaultMode changes behavior at runtime", async () => {
+      const tracker = mockLocalIndexTracker();
+      const provider = new ObsidianFileSystemProvider(tracker, [], "rw");
+
+      // Should succeed in rw mode
+      mockValidatePathForWrite.mockResolvedValueOnce({ ok: true, value: "/vault/note.md" });
+      const statMock = vi.fn().mockResolvedValue({
+        ok: true,
+        value: { type: "file", mtime: 0, ctime: 0, size: 0 },
+      });
+      (tracker as unknown as Record<string, unknown>).stat = statMock;
+      mockFsWriteFile.mockResolvedValueOnce(undefined);
+
+      await provider.writeFile(fakeUri("/note.md") as never, new Uint8Array(), {
+        create: true,
+        overwrite: true,
+      });
+      expect(mockFsWriteFile).toHaveBeenCalled();
+
+      // Switch to ro
+      provider.setVaultMode("ro");
+      await expect(
+        provider.writeFile(fakeUri("/note.md") as never, new Uint8Array(), {
+          create: true,
+          overwrite: true,
+        }),
+      ).rejects.toThrow("NoPermissions");
+    });
+  });
 });

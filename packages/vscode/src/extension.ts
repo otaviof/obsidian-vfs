@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import * as vscode from "vscode";
+import { VAULT_MODE } from "@obsidian-vfs/core";
 
 import { bootstrapFromConfig, readConfig } from "./bootstrap.js";
 import { CONFIG_KEY, CONFIG_PROP, CONFIG_SECTION } from "./types.js";
@@ -32,6 +33,11 @@ const MANAGED_EXCLUDES_KEY = "managedFilesExclude";
 interface ExcludeState {
   managedExcludes: string[];
   excludeSync: Promise<void>;
+}
+
+/** Wrapper for the file system provider registration to allow re-registration on mode change. */
+interface ProviderRegistration {
+  current: vscode.Disposable;
 }
 
 /** Shared context passed to workspace activation and config change helpers. */
@@ -137,6 +143,7 @@ function handleConfigChange(
   treeProvider: VaultTreeDataProvider,
   statusBar: StatusBarManager,
   provider: ObsidianFileSystemProvider,
+  providerReg: ProviderRegistration,
 ): void {
   const updated = readConfig();
 
@@ -149,6 +156,16 @@ function handleConfigChange(
   }
   if (e.affectsConfiguration(CONFIG_KEY.autoMount)) {
     provider.setAutoMount(updated.autoMount);
+  }
+  if (e.affectsConfiguration(CONFIG_KEY.vaultMode)) {
+    provider.setVaultMode(updated.vaultMode);
+    statusBar.setVaultMode(updated.vaultMode);
+    providerReg.current.dispose();
+    providerReg.current = vscode.workspace.registerFileSystemProvider(SCHEME, provider, {
+      isCaseSensitive: true,
+      isReadonly: updated.vaultMode === VAULT_MODE.RO,
+    });
+    ctx.extensionContext.subscriptions.push(providerReg.current);
   }
   if (e.affectsConfiguration(CONFIG_KEY.vaultGitIgnore)) {
     if (updated.vaultGitIgnore && (updated.workspaceEnabled || updated.workspaceCodeWorkspaceFile)) {
@@ -232,14 +249,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   const config = readConfig();
 
-  const provider = new ObsidianFileSystemProvider(tracker, config.autoMount);
+  const provider = new ObsidianFileSystemProvider(tracker, config.autoMount, config.vaultMode);
   context.subscriptions.push(provider);
-  context.subscriptions.push(
-    vscode.workspace.registerFileSystemProvider(SCHEME, provider, {
+  const providerReg: ProviderRegistration = {
+    current: vscode.workspace.registerFileSystemProvider(SCHEME, provider, {
       isCaseSensitive: true,
-      isReadonly: false,
+      isReadonly: config.vaultMode === VAULT_MODE.RO,
     }),
-  );
+  };
+  context.subscriptions.push(providerReg.current);
   context.subscriptions.push(provider.watch(vscode.Uri.from({ scheme: SCHEME, path: "/" })));
 
   const treeProvider = new VaultTreeDataProvider(tracker);
@@ -262,6 +280,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   registerCommands(context, tracker, treeProvider, outputChannel);
 
   const statusBar = new StatusBarManager(tracker);
+  statusBar.setVaultMode(config.vaultMode);
   context.subscriptions.push(statusBar);
 
   const wikilinkProvider = new WikilinkDocumentLinkProvider(tracker);
@@ -294,7 +313,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) =>
-      handleConfigChange(e, wsCtx, treeProvider, statusBar, provider),
+      handleConfigChange(e, wsCtx, treeProvider, statusBar, provider, providerReg),
     ),
   );
 }

@@ -1,8 +1,9 @@
 import { realpath } from "node:fs/promises";
 import path from "node:path";
 
-import { ERR, ERRNO } from "./types.js";
-import type { VFSResult } from "./types.js";
+import { ERR, ERRNO, VAULT_MODE } from "./types.js";
+import type { VFSResult, VaultMode } from "./types.js";
+import { buildMountTree } from "./mount-tree.js";
 
 /**
  * Immutable parameters for path security checks — vault root, folder allowlist,
@@ -118,6 +119,43 @@ export async function checkSymlink(
       error: { code: ERR.PERMISSION_DENIED, message: `Cannot resolve path: ${absolutePath}` },
     };
   }
+}
+
+/**
+ * Check whether a write to `virtualPath` is permitted under the given
+ * vault mode. Returns `PERMISSION_DENIED` when the write is blocked.
+ *
+ * - `"rw"`: always permits.
+ * - `"ro"`: always rejects.
+ * - `"partial"`: permits if `virtualPath` falls within an `autoMount` entry.
+ */
+export function checkVaultMode(
+  virtualPath: string,
+  mode: VaultMode,
+  autoMount: readonly string[],
+): VFSResult<string> {
+  if (mode === VAULT_MODE.RW) return { ok: true, value: virtualPath };
+  if (mode === VAULT_MODE.RO) {
+    return {
+      ok: false,
+      error: { code: ERR.PERMISSION_DENIED, message: "Vault is read-only" },
+    };
+  }
+  const tree = buildMountTree(autoMount);
+  const segments = virtualPath.split("/").filter(Boolean);
+  let node: ReturnType<typeof buildMountTree> | null = tree;
+  for (const seg of segments) {
+    if (node === null) return { ok: true, value: virtualPath };
+    const child = node.get(seg);
+    if (child === undefined) {
+      return {
+        ok: false,
+        error: { code: ERR.PERMISSION_DENIED, message: "Path not within mounted folders" },
+      };
+    }
+    node = child;
+  }
+  return { ok: true, value: virtualPath };
 }
 
 /**

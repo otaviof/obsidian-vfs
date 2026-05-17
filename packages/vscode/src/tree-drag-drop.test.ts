@@ -7,6 +7,7 @@ vi.mock("vscode", () =>
     uri: true,
     workspace: true,
     treeView: true,
+    window: true,
   }),
 );
 
@@ -118,5 +119,17 @@ describe("VaultTreeDragAndDropController", () => {
 
     const destUri = mockWorkspaceFsCopy.mock.calls[0][1] as { path: string };
     expect(destUri.path).toBe("/doc.md");
+  });
+
+  it("shows error message when copy fails", async () => {
+    const controller = new VaultTreeDragAndDropController("MyVault");
+    const dt = fakeDataTransfer("file:///local/doc.md");
+    mockWorkspaceFsCopy.mockRejectedValueOnce(new Error("NoPermissions: obs://MyVault/doc.md"));
+
+    await controller.handleDrop(undefined, dt, token);
+
+    expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+      expect.stringContaining("Failed to copy doc.md"),
+    );
   });
 });

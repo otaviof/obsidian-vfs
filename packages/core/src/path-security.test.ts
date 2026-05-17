@@ -5,10 +5,12 @@ import {
   checkAllowedFolder,
   checkBlockedFolder,
   checkSymlink,
+  checkVaultMode,
   isAllowedPath,
   validatePath,
   validatePathForWrite,
 } from "./path-security.js";
+import type { VaultMode } from "./types.js";
 import { mockFsFunction } from "./test-helpers.js";
 
 vi.mock("node:fs/promises", () => ({
@@ -407,5 +409,114 @@ describe("validatePathForWrite", () => {
     realpathMock.mockRejectedValueOnce(enoent).mockResolvedValueOnce("/vault/notes");
     const result = await validatePathForWrite("notes/new.md", EMPTY_OPTS);
     expect(result).toEqual({ ok: true, value: "/vault/notes/new.md" });
+  });
+});
+
+describe("checkVaultMode", () => {
+  it.each<{
+    name: string;
+    path: string;
+    mode: VaultMode;
+    autoMount: string[];
+    ok: boolean;
+    message?: string;
+  }>([
+    { name: "rw permits any path", path: "any/path.md", mode: "rw", autoMount: [], ok: true },
+    {
+      name: "rw permits path even with autoMount set",
+      path: "unmounted/file.md",
+      mode: "rw",
+      autoMount: ["Notes"],
+      ok: true,
+    },
+    {
+      name: "ro denies any path",
+      path: "Notes/file.md",
+      mode: "ro",
+      autoMount: [],
+      ok: false,
+      message: "Vault is read-only",
+    },
+    {
+      name: "ro denies with autoMount set",
+      path: "Notes/file.md",
+      mode: "ro",
+      autoMount: ["Notes"],
+      ok: false,
+      message: "Vault is read-only",
+    },
+    {
+      name: "partial with exact match permits write",
+      path: "Notes/file.md",
+      mode: "partial",
+      autoMount: ["Notes"],
+      ok: true,
+    },
+    {
+      name: "partial with nested mount permits write",
+      path: "20-areas/idea/plan.md",
+      mode: "partial",
+      autoMount: ["20-areas/idea"],
+      ok: true,
+    },
+    {
+      name: "partial with parent of mount denies write",
+      path: "20-areas/work/plan.md",
+      mode: "partial",
+      autoMount: ["20-areas/idea"],
+      ok: false,
+      message: "Path not within mounted folders",
+    },
+    {
+      name: "partial with unmounted path denies write",
+      path: "Archive/old.md",
+      mode: "partial",
+      autoMount: ["Notes"],
+      ok: false,
+      message: "Path not within mounted folders",
+    },
+    {
+      name: "partial with empty autoMount denies all paths",
+      path: "any/path.md",
+      mode: "partial",
+      autoMount: [],
+      ok: false,
+      message: "Path not within mounted folders",
+    },
+    {
+      name: "partial with root-level file not in mount denies write",
+      path: "readme.md",
+      mode: "partial",
+      autoMount: ["Notes"],
+      ok: false,
+      message: "Path not within mounted folders",
+    },
+    {
+      name: "partial permits writing to mounted dir itself",
+      path: "Notes",
+      mode: "partial",
+      autoMount: ["Notes"],
+      ok: true,
+    },
+    {
+      name: "partial permits deeply nested path in mount",
+      path: "Notes/deep/nested/file.md",
+      mode: "partial",
+      autoMount: ["Notes"],
+      ok: true,
+    },
+    {
+      name: "partial with multiple mounts permits any mounted path",
+      path: "Projects/active/todo.md",
+      mode: "partial",
+      autoMount: ["Notes", "Projects"],
+      ok: true,
+    },
+  ])("$name", ({ path, mode, autoMount, ok, message }) => {
+    const result = checkVaultMode(path, mode, autoMount);
+    expect(result.ok).toBe(ok);
+    if (!ok && message) {
+      expect((result as { ok: false; error: { message: string } }).error.message).toBe(message);
+    }
   });
 });

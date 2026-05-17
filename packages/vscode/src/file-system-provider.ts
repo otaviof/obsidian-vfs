@@ -1,12 +1,19 @@
 import { mkdir, rename as fsRename, rm, writeFile as fsWriteFile } from "node:fs/promises";
 import path from "node:path";
 import * as vscode from "vscode";
-import { readVirtualFile, validatePath, validatePathForWrite } from "@obsidian-vfs/core";
+import {
+  checkVaultMode,
+  readVirtualFile,
+  validatePath,
+  validatePathForWrite,
+  VAULT_MODE,
+} from "@obsidian-vfs/core";
 import type {
   FileChangeEvent,
   FileChangeType,
   LocalIndexTracker,
   PathSecurityOptions,
+  VaultMode,
   VFSFileType,
 } from "@obsidian-vfs/core";
 
@@ -35,11 +42,17 @@ export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
   readonly #tracker: LocalIndexTracker;
   readonly #securityOptions: PathSecurityOptions;
   #autoMount: ReadonlySet<string>;
+  #vaultMode: VaultMode;
+  #autoMountPaths: readonly string[];
 
   readonly #onDidChangeFile = new vscode.EventEmitter<vscode.FileChangeEvent[]>();
   readonly onDidChangeFile = this.#onDidChangeFile.event;
 
-  constructor(tracker: LocalIndexTracker, autoMount: readonly string[] = []) {
+  constructor(
+    tracker: LocalIndexTracker,
+    autoMount: readonly string[] = [],
+    vaultMode: VaultMode = VAULT_MODE.RW,
+  ) {
     this.#tracker = tracker;
     this.#securityOptions = {
       vaultRoot: tracker.context.physicalPath,
@@ -47,9 +60,12 @@ export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
       blocked: tracker.context.vfsConfig.blocked,
     };
     this.#autoMount = new Set(autoMount.map((e) => e.split("/")[0]));
+    this.#autoMountPaths = autoMount;
+    this.#vaultMode = vaultMode;
   }
 
   setAutoMount(entries: readonly string[]): void {
+    this.#autoMountPaths = entries;
     const updated = new Set(entries.map((e) => e.split("/")[0]));
     const vaultName = this.#tracker.context.name;
     const previous = this.#autoMount;
@@ -69,6 +85,15 @@ export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
     if (events.length > 0) {
       this.#onDidChangeFile.fire(events);
     }
+  }
+
+  setVaultMode(mode: VaultMode): void {
+    this.#vaultMode = mode;
+  }
+
+  #guardWrite(vaultPath: string, uri: vscode.Uri): void {
+    const result = checkVaultMode(vaultPath, this.#vaultMode, this.#autoMountPaths);
+    if (!result.ok) throwVFSError(result, uri);
   }
 
   async stat(uri: vscode.Uri): Promise<vscode.FileStat> {
@@ -110,6 +135,7 @@ export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
     options: { readonly create: boolean; readonly overwrite: boolean },
   ): Promise<void> {
     const vaultPath = toVaultPath(uri);
+    this.#guardWrite(vaultPath, uri);
     const pathResult = await validatePathForWrite(vaultPath, this.#securityOptions);
     if (!pathResult.ok) throwVFSError(pathResult, uri);
 
@@ -128,6 +154,7 @@ export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
 
   async createDirectory(uri: vscode.Uri): Promise<void> {
     const vaultPath = toVaultPath(uri);
+    this.#guardWrite(vaultPath, uri);
     const pathResult = await validatePathForWrite(vaultPath, this.#securityOptions);
     if (!pathResult.ok) throwVFSError(pathResult, uri);
     await mkdir(pathResult.value, { recursive: true });
@@ -145,6 +172,7 @@ export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
 
   async delete(uri: vscode.Uri, options: { readonly recursive: boolean }): Promise<void> {
     const vaultPath = toVaultPath(uri);
+    this.#guardWrite(vaultPath, uri);
     const pathResult = await validatePath(vaultPath, this.#securityOptions);
     if (!pathResult.ok) throwVFSError(pathResult, uri);
     await rm(pathResult.value, { recursive: options.recursive });
@@ -157,10 +185,12 @@ export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
   ): Promise<void> {
     if (oldUri.scheme === SCHEME && newUri.scheme === SCHEME) {
       const oldVaultPath = toVaultPath(oldUri);
+      this.#guardWrite(oldVaultPath, oldUri);
       const oldPathResult = await validatePath(oldVaultPath, this.#securityOptions);
       if (!oldPathResult.ok) throwVFSError(oldPathResult, oldUri);
 
       const newVaultPath = toVaultPath(newUri);
+      this.#guardWrite(newVaultPath, newUri);
       const newPathResult = await validatePathForWrite(newVaultPath, this.#securityOptions);
       if (!newPathResult.ok) throwVFSError(newPathResult, newUri);
 

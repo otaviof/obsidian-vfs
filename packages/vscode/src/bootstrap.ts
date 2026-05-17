@@ -1,6 +1,6 @@
 import * as vscode from "vscode";
-import { bootstrapTracker, resolveCliPath } from "@obsidian-vfs/core";
-import type { BootstrapResult, VFSResult } from "@obsidian-vfs/core";
+import { bootstrapTracker, resolveCliPath, VAULT_MODE } from "@obsidian-vfs/core";
+import type { BootstrapResult, VaultMode, VFSResult } from "@obsidian-vfs/core";
 
 import { CONFIG_PROP, CONFIG_SECTION } from "./types.js";
 import type { ExtensionConfig } from "./types.js";
@@ -18,6 +18,7 @@ export function readConfig(): ExtensionConfig {
     vaultExcludeBlocked: cfg.get<boolean>(CONFIG_PROP.vaultExcludeBlocked)!,
     vaultExcludeDotfiles: cfg.get<boolean>(CONFIG_PROP.vaultExcludeDotfiles)!,
     vaultExcludeDotfilePattern: cfg.get<string>(CONFIG_PROP.vaultExcludeDotfilePattern)!,
+    vaultMode: cfg.get<VaultMode>(CONFIG_PROP.vaultMode, VAULT_MODE.RW),
     // Status Bar
     statusBarEnabled: cfg.get<boolean>(CONFIG_PROP.statusBarEnabled)!,
     // Explorer

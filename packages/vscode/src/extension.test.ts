@@ -25,6 +25,7 @@ vi.mock("./file-system-provider.js", () => ({
     this.watch = vi.fn(() => ({ dispose: vi.fn() }));
     this.dispose = vi.fn();
     this.setAutoMount = vi.fn();
+    this.setVaultMode = vi.fn();
   }),
 }));
 
@@ -47,6 +48,7 @@ vi.mock("./status-bar.js", () => ({
   StatusBarManager: vi.fn().mockImplementation(function (this: Record<string, unknown>) {
     this.show = vi.fn();
     this.hide = vi.fn();
+    this.setVaultMode = vi.fn();
     this.dispose = vi.fn();
   }),
 }));
@@ -135,8 +137,12 @@ type ConfigChangeListener = (e: { affectsConfiguration: (key: string) => boolean
 interface SetupResult {
   listener: ConfigChangeListener;
   treeProvider: { enabled: boolean; refresh: ReturnType<typeof vi.fn> };
-  statusBar: { show: ReturnType<typeof vi.fn>; hide: ReturnType<typeof vi.fn> };
-  provider: { setAutoMount: ReturnType<typeof vi.fn> };
+  statusBar: {
+    show: ReturnType<typeof vi.fn>;
+    hide: ReturnType<typeof vi.fn>;
+    setVaultMode: ReturnType<typeof vi.fn>;
+  };
+  provider: { setAutoMount: ReturnType<typeof vi.fn>; setVaultMode: ReturnType<typeof vi.fn> };
 }
 
 async function setupConfigListener(): Promise<SetupResult> {
@@ -217,11 +223,12 @@ describe("activate", () => {
   it("wires all components on successful bootstrap", async () => {
     const tracker = trackerFixture();
     bootstrapOk(tracker);
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig());
 
     const ctx = fakeContext();
     await activate(ctx as never);
 
-    expect(ObsidianFileSystemProvider).toHaveBeenCalledWith(tracker, []);
+    expect(ObsidianFileSystemProvider).toHaveBeenCalledWith(tracker, [], "rw");
     expect(vscode.workspace.registerFileSystemProvider).toHaveBeenCalledWith(
       SCHEME,
       expect.anything(),
@@ -406,6 +413,45 @@ describe("activate", () => {
 
     expect(mockExcludeGit).not.toHaveBeenCalled();
     expect(mockSyncExclude).toHaveBeenCalled();
+  });
+
+  it("passes vaultMode to provider constructor", async () => {
+    bootstrapOk();
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ vaultMode: "ro" }));
+
+    await activate(fakeContext() as never);
+
+    expect(ObsidianFileSystemProvider).toHaveBeenCalledWith(expect.anything(), [], "ro");
+  });
+
+  it("registers provider with isReadonly true when vaultMode is ro", async () => {
+    bootstrapOk();
+    mockReadConfig.mockReturnValueOnce(
+      fakeExtensionConfig({ vaultMode: "ro", workspaceEnabled: false }),
+    );
+
+    await activate(fakeContext() as never);
+
+    expect(vscode.workspace.registerFileSystemProvider).toHaveBeenCalledWith(
+      SCHEME,
+      expect.anything(),
+      { isCaseSensitive: true, isReadonly: true },
+    );
+  });
+
+  it("registers provider with isReadonly false for rw and partial modes", async () => {
+    bootstrapOk();
+    mockReadConfig.mockReturnValueOnce(
+      fakeExtensionConfig({ vaultMode: "partial", workspaceEnabled: false }),
+    );
+
+    await activate(fakeContext() as never);
+
+    expect(vscode.workspace.registerFileSystemProvider).toHaveBeenCalledWith(
+      SCHEME,
+      expect.anything(),
+      { isCaseSensitive: true, isReadonly: false },
+    );
   });
 });
 
@@ -800,6 +846,33 @@ describe("configuration change listener", () => {
 
     expect(mockAddWF).not.toHaveBeenCalled();
     expect(mockRemoveWF).not.toHaveBeenCalled();
+  });
+
+  it("updates provider and status bar when vaultMode changes", async () => {
+    const setup = await setupConfigListener();
+    mockReadConfig.mockReturnValueOnce(
+      fakeExtensionConfig({ vaultMode: "ro", workspaceEnabled: false }),
+    );
+
+    fireConfigChange(setup, CONFIG_KEY.vaultMode);
+
+    expect(setup.provider.setVaultMode).toHaveBeenCalledWith("ro");
+    expect(setup.statusBar.setVaultMode).toHaveBeenCalledWith("ro");
+  });
+
+  it("re-registers provider with isReadonly when vaultMode changes to ro", async () => {
+    const setup = await setupConfigListener();
+    mockReadConfig.mockReturnValueOnce(
+      fakeExtensionConfig({ vaultMode: "ro", workspaceEnabled: false }),
+    );
+
+    fireConfigChange(setup, CONFIG_KEY.vaultMode);
+
+    expect(vscode.workspace.registerFileSystemProvider).toHaveBeenCalledWith(
+      SCHEME,
+      expect.anything(),
+      { isCaseSensitive: true, isReadonly: true },
+    );
   });
 });
 

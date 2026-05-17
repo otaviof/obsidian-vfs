@@ -13,6 +13,7 @@ export type {
   MentionResult,
   ResolutionResult,
   VaultContext,
+  VaultMode,
   VFSConfig,
   VFSError,
   VFSFileStat,
@@ -20,7 +21,7 @@ export type {
   VFSResult,
   WikilinkResolution,
 } from "./types.js";
-export { ERR, ERRNO } from "./types.js";
+export { ERR, ERRNO, VAULT_MODE } from "./types.js";
 
 /**
  * Parsed `obs://` URI components.
@@ -88,6 +89,7 @@ export {
   canonicalizePath,
   isAllowedPath,
   checkBlockedFolder,
+  checkVaultMode,
 } from "./path-security.js";
 
 /**

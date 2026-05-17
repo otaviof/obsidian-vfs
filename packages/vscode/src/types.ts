@@ -20,6 +20,7 @@ export const CONFIG_PROP = {
   vaultExcludeBlocked: `${CONFIG_GROUP.vault}.excludeBlocked`,
   vaultExcludeDotfiles: `${CONFIG_GROUP.vault}.excludeDotfiles`,
   vaultExcludeDotfilePattern: `${CONFIG_GROUP.vault}.excludeDotfilePattern`,
+  vaultMode: `${CONFIG_GROUP.vault}.mode`,
   // Status Bar
   statusBarEnabled: `${CONFIG_GROUP.statusBar}.enabled`,
   // Explorer
@@ -50,6 +51,8 @@ export const COMMAND = {
   copyPath: `${CONFIG_SECTION}.copyPath`,
 } as const;
 
+import type { VaultMode } from "@obsidian-vfs/core";
+
 /** VSCode extension configuration read from `obsidianVFS` settings. */
 export interface ExtensionConfig {
   readonly cliPath: string;
@@ -61,6 +64,7 @@ export interface ExtensionConfig {
   readonly vaultExcludeBlocked: boolean;
   readonly vaultExcludeDotfiles: boolean;
   readonly vaultExcludeDotfilePattern: string;
+  readonly vaultMode: VaultMode;
   // Status Bar
   readonly statusBarEnabled: boolean;
   // Explorer

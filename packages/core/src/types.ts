@@ -79,6 +79,16 @@ export interface Disposable {
   dispose(): void;
 }
 
+/** Vault access mode constants. */
+export const VAULT_MODE = {
+  RW: "rw",
+  RO: "ro",
+  PARTIAL: "partial",
+} as const;
+
+/** Vault access mode controlling write operations through the obs:// FileSystemProvider. */
+export type VaultMode = (typeof VAULT_MODE)[keyof typeof VAULT_MODE];
+
 /**
  * Filesystem entry type for directory enumeration.
  */
