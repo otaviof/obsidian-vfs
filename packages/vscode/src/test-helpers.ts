@@ -165,6 +165,7 @@ export function createVscodeMock(
     mock.window = {
       createOutputChannel: vi.fn(() => outputChannel),
       showQuickPick: vi.fn(),
+      showInputBox: vi.fn(),
       showInformationMessage: vi.fn(),
       showErrorMessage: vi.fn(),
       activeTextEditor: undefined,

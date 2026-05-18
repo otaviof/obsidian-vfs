@@ -17,7 +17,26 @@ vi.mock("./vault-tree-provider.js", () => ({
   VaultTreeDataProvider: vi.fn(),
 }));
 
+vi.mock("node:fs", () => ({
+  constants: { COPYFILE_EXCL: 1 },
+}));
+
+vi.mock("node:fs/promises", () => ({
+  copyFile: vi.fn().mockResolvedValue(undefined),
+  unlink: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@obsidian-vfs/core", async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return {
+    ...actual,
+    validatePathForWrite: vi.fn().mockResolvedValue({ ok: true, value: "/vault/dest/file.md" }),
+  };
+});
+
 import * as vscode from "vscode";
+import { copyFile, unlink } from "node:fs/promises";
+import { validatePathForWrite } from "@obsidian-vfs/core";
 
 import { registerCommands } from "./commands.js";
 import { COMMAND, CONFIG_PROP } from "./types.js";
@@ -57,19 +76,37 @@ function invokeCommand(
   return { handler, tree, channel };
 }
 
+function invokeCommandWithUri(
+  commandName: string,
+  tracker: ReturnType<typeof mockLocalIndexTracker>,
+): {
+  handler: (uri?: vscode.Uri) => Promise<void>;
+  tree: { refresh: ReturnType<typeof vi.fn> };
+  channel: { appendLine: ReturnType<typeof vi.fn>; dispose: ReturnType<typeof vi.fn> };
+} {
+  const ctx = fakeContext();
+  const tree = fakeTreeProvider();
+  const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
+  registerCommands(ctx as never, tracker, tree as never, channel);
+  const handler = vi
+    .mocked(vscode.commands.registerCommand)
+    .mock.calls.find((c) => c[0] === commandName)![1] as (uri?: vscode.Uri) => Promise<void>;
+  return { handler, tree, channel };
+}
+
 describe("registerCommands", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("registers six commands", () => {
+  it("registers eight commands", () => {
     const ctx = fakeContext();
     const tracker = mockLocalIndexTracker();
     const tree = fakeTreeProvider();
     const channel = { appendLine: vi.fn(), dispose: vi.fn() } as never;
     registerCommands(ctx as never, tracker, tree as never, channel);
 
-    expect(vscode.commands.registerCommand).toHaveBeenCalledTimes(6);
+    expect(vscode.commands.registerCommand).toHaveBeenCalledTimes(8);
     expect(vscode.commands.registerCommand).toHaveBeenCalledWith(
       COMMAND.mount,
       expect.any(Function),
@@ -92,6 +129,14 @@ describe("registerCommands", () => {
     );
     expect(vscode.commands.registerCommand).toHaveBeenCalledWith(
       COMMAND.copyPath,
+      expect.any(Function),
+    );
+    expect(vscode.commands.registerCommand).toHaveBeenCalledWith(
+      COMMAND.moveIntoVault,
+      expect.any(Function),
+    );
+    expect(vscode.commands.registerCommand).toHaveBeenCalledWith(
+      COMMAND.duplicateIntoVault,
       expect.any(Function),
     );
   });
@@ -678,4 +723,412 @@ describe("copyPath command", () => {
       configurable: true,
     });
   });
+});
+
+function describeVaultTransferCommand(
+  name: string,
+  commandKey: keyof typeof COMMAND,
+  opts: {
+    successMessage: string;
+    errorMessage: string;
+    deletesSource: boolean;
+  },
+): void {
+  describe(`${name} command`, () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      Object.defineProperty(vscode.window, "activeTextEditor", {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
+    });
+
+    it("shows info message when no file selected", async () => {
+      Object.defineProperty(vscode.window, "activeTextEditor", {
+        value: undefined,
+        writable: true,
+        configurable: true,
+      });
+
+      const tracker = mockLocalIndexTracker();
+      const { handler } = invokeCommandWithUri(COMMAND[commandKey], tracker);
+      await handler();
+
+      expect(vscode.window.showInformationMessage).toHaveBeenCalledWith("No file selected");
+      expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+    });
+
+    it("shows error when vault mode is read-only", async () => {
+      vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+        get: vi.fn((key: string) => {
+          if (key === CONFIG_PROP.vaultMode) return "ro";
+          return undefined;
+        }),
+        update: vi.fn(),
+      } as never);
+
+      Object.defineProperty(vscode.window, "activeTextEditor", {
+        value: { document: { uri: { scheme: "file", fsPath: "/project/file.md" } } },
+        writable: true,
+        configurable: true,
+      });
+
+      const tracker = mockLocalIndexTracker();
+      const { handler } = invokeCommandWithUri(COMMAND[commandKey], tracker);
+      await handler();
+
+      expect(vscode.window.showErrorMessage).toHaveBeenCalledWith("Vault is in read-only mode.");
+      expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+    });
+
+    it("shows info message when no mounted folders available", async () => {
+      mockReadAutoMount.mockReturnValue([]);
+      setupConfigMock();
+
+      Object.defineProperty(vscode.window, "activeTextEditor", {
+        value: { document: { uri: { scheme: "file", fsPath: "/project/file.md" } } },
+        writable: true,
+        configurable: true,
+      });
+
+      const tracker = mockLocalIndexTracker();
+      const { handler } = invokeCommandWithUri(COMMAND[commandKey], tracker);
+      await handler();
+
+      expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
+        "No mounted folders available. Mount a folder first.",
+      );
+      expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+    });
+
+    it("shows info message when only note entries mounted", async () => {
+      mockReadAutoMount.mockReturnValue(["notes/index.md", "docs/readme.md"]);
+      setupConfigMock();
+
+      Object.defineProperty(vscode.window, "activeTextEditor", {
+        value: { document: { uri: { scheme: "file", fsPath: "/project/file.md" } } },
+        writable: true,
+        configurable: true,
+      });
+
+      const tracker = mockLocalIndexTracker();
+      const { handler } = invokeCommandWithUri(COMMAND[commandKey], tracker);
+      await handler();
+
+      expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
+        "No mounted folders available. Mount a folder first.",
+      );
+      expect(vscode.window.showQuickPick).not.toHaveBeenCalled();
+    });
+
+    it("does nothing when user cancels folder QuickPick", async () => {
+      mockReadAutoMount.mockReturnValue(["30-resources"]);
+      setupConfigMock();
+
+      Object.defineProperty(vscode.window, "activeTextEditor", {
+        value: { document: { uri: { scheme: "file", fsPath: "/project/file.md" } } },
+        writable: true,
+        configurable: true,
+      });
+
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce(undefined);
+
+      const tracker = mockLocalIndexTracker();
+      const { handler } = invokeCommandWithUri(COMMAND[commandKey], tracker);
+      await handler();
+
+      expect(vscode.window.showQuickPick).toHaveBeenCalled();
+      expect(vscode.window.showInputBox).not.toHaveBeenCalled();
+    });
+
+    it("does nothing when user cancels filename InputBox", async () => {
+      mockReadAutoMount.mockReturnValue(["30-resources"]);
+      setupConfigMock();
+
+      Object.defineProperty(vscode.window, "activeTextEditor", {
+        value: { document: { uri: { scheme: "file", fsPath: "/project/file.md" } } },
+        writable: true,
+        configurable: true,
+      });
+
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
+        label: "30-resources",
+        description: "30-resources",
+      });
+      vi.mocked(vscode.window.showInputBox).mockResolvedValueOnce(undefined);
+
+      const tracker = mockLocalIndexTracker();
+      const { handler } = invokeCommandWithUri(COMMAND[commandKey], tracker);
+      await handler();
+
+      expect(vscode.window.showInputBox).toHaveBeenCalled();
+      expect(copyFile).not.toHaveBeenCalled();
+    });
+
+    it("shows error when file already exists at destination", async () => {
+      mockReadAutoMount.mockReturnValue(["30-resources"]);
+      setupConfigMock();
+
+      Object.defineProperty(vscode.window, "activeTextEditor", {
+        value: { document: { uri: { scheme: "file", fsPath: "/project/meeting.md" } } },
+        writable: true,
+        configurable: true,
+      });
+
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
+        label: "30-resources",
+        description: "30-resources",
+      });
+      vi.mocked(vscode.window.showInputBox).mockResolvedValueOnce("meeting.md");
+
+      const tracker = mockLocalIndexTracker({
+        stat: vi.fn().mockResolvedValue({
+          ok: true,
+          value: { type: "file", mtime: 0, ctime: 0, size: 0 },
+        }),
+      });
+      const { handler } = invokeCommandWithUri(COMMAND[commandKey], tracker);
+      await handler();
+
+      expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+        '"meeting.md" already exists in "30-resources/"',
+      );
+      expect(copyFile).not.toHaveBeenCalled();
+    });
+
+    it("shows error when validatePathForWrite rejects destination", async () => {
+      mockReadAutoMount.mockReturnValue(["30-resources"]);
+      setupConfigMock();
+
+      Object.defineProperty(vscode.window, "activeTextEditor", {
+        value: { document: { uri: { scheme: "file", fsPath: "/project/file.md" } } },
+        writable: true,
+        configurable: true,
+      });
+
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
+        label: "30-resources",
+        description: "30-resources",
+      });
+      vi.mocked(vscode.window.showInputBox).mockResolvedValueOnce("file.md");
+
+      const tracker = mockLocalIndexTracker({
+        stat: vi.fn().mockResolvedValue({
+          ok: false,
+          error: { code: "FILE_NOT_FOUND", message: "not found" },
+        }),
+      });
+
+      vi.mocked(validatePathForWrite).mockResolvedValueOnce({
+        ok: false,
+        error: { code: "PERMISSION_DENIED", message: "Path resolves outside vault root" },
+      } as never);
+
+      const { handler } = invokeCommandWithUri(COMMAND[commandKey], tracker);
+      await handler();
+
+      expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(
+        "Path resolves outside vault root",
+      );
+      expect(copyFile).not.toHaveBeenCalled();
+    });
+
+    it("shows error when copyFile throws", async () => {
+      mockReadAutoMount.mockReturnValue(["30-resources"]);
+      setupConfigMock();
+
+      Object.defineProperty(vscode.window, "activeTextEditor", {
+        value: { document: { uri: { scheme: "file", fsPath: "/project/file.md" } } },
+        writable: true,
+        configurable: true,
+      });
+
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
+        label: "30-resources",
+        description: "30-resources",
+      });
+      vi.mocked(vscode.window.showInputBox).mockResolvedValueOnce("file.md");
+
+      const tracker = mockLocalIndexTracker({
+        stat: vi.fn().mockResolvedValue({
+          ok: false,
+          error: { code: "FILE_NOT_FOUND", message: "not found" },
+        }),
+      });
+
+      vi.mocked(validatePathForWrite).mockResolvedValueOnce({
+        ok: true,
+        value: "/vault/30-resources/file.md",
+      } as never);
+      vi.mocked(copyFile).mockRejectedValueOnce(new Error("EACCES: permission denied"));
+
+      const { handler } = invokeCommandWithUri(COMMAND[commandKey], tracker);
+      await handler();
+
+      expect(vscode.window.showErrorMessage).toHaveBeenCalledWith(opts.errorMessage);
+    });
+
+    it("successfully copies file and shows success message", async () => {
+      mockReadAutoMount.mockReturnValue(["30-resources", "notes/index.md"]);
+      setupConfigMock();
+
+      Object.defineProperty(vscode.window, "activeTextEditor", {
+        value: { document: { uri: { scheme: "file", fsPath: "/project/meeting.md" } } },
+        writable: true,
+        configurable: true,
+      });
+
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
+        label: "30-resources",
+        description: "30-resources",
+      });
+      vi.mocked(vscode.window.showInputBox).mockResolvedValueOnce("meeting.md");
+      vi.mocked(vscode.window.showInformationMessage).mockResolvedValueOnce(undefined);
+
+      const tracker = mockLocalIndexTracker({
+        stat: vi.fn().mockResolvedValue({
+          ok: false,
+          error: { code: "FILE_NOT_FOUND", message: "not found" },
+        }),
+      });
+
+      vi.mocked(validatePathForWrite).mockResolvedValueOnce({
+        ok: true,
+        value: "/vault/30-resources/meeting.md",
+      } as never);
+      vi.mocked(copyFile).mockResolvedValueOnce(undefined);
+
+      const { handler } = invokeCommandWithUri(COMMAND[commandKey], tracker);
+      await handler();
+
+      expect(copyFile).toHaveBeenCalledWith(
+        "/project/meeting.md",
+        "/vault/30-resources/meeting.md",
+        1,
+      );
+      if (opts.deletesSource) {
+        expect(unlink).toHaveBeenCalledWith("/project/meeting.md");
+      } else {
+        expect(unlink).not.toHaveBeenCalled();
+      }
+      expect(vscode.window.showInformationMessage).toHaveBeenCalledWith(
+        opts.successMessage,
+        "Open in Vault",
+      );
+    });
+
+    it("opens file when user clicks Open in Vault", async () => {
+      mockReadAutoMount.mockReturnValue(["30-resources"]);
+      setupConfigMock();
+
+      Object.defineProperty(vscode.window, "activeTextEditor", {
+        value: { document: { uri: { scheme: "file", fsPath: "/project/meeting.md" } } },
+        writable: true,
+        configurable: true,
+      });
+
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
+        label: "30-resources",
+        description: "30-resources",
+      });
+      vi.mocked(vscode.window.showInputBox).mockResolvedValueOnce("meeting.md");
+      vi.mocked(vscode.window.showInformationMessage).mockResolvedValueOnce(
+        "Open in Vault" as string & vscode.MessageItem,
+      );
+
+      const tracker = mockLocalIndexTracker({
+        stat: vi.fn().mockResolvedValue({
+          ok: false,
+          error: { code: "FILE_NOT_FOUND", message: "not found" },
+        }),
+      });
+
+      vi.mocked(validatePathForWrite).mockResolvedValueOnce({
+        ok: true,
+        value: "/vault/30-resources/meeting.md",
+      } as never);
+
+      const { handler } = invokeCommandWithUri(COMMAND[commandKey], tracker);
+      await handler();
+
+      expect(vscode.commands.executeCommand).toHaveBeenCalledWith(
+        "vscode.open",
+        expect.objectContaining({ scheme: "file", fsPath: "/vault/30-resources/meeting.md" }),
+      );
+    });
+
+    it("uses resourceUri when invoked from context menu", async () => {
+      mockReadAutoMount.mockReturnValue(["30-resources"]);
+      setupConfigMock();
+
+      const contextMenuUri = vscode.Uri.file("/workspace/doc.md");
+
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce({
+        label: "30-resources",
+        description: "30-resources",
+      });
+      vi.mocked(vscode.window.showInputBox).mockResolvedValueOnce("doc.md");
+      vi.mocked(vscode.window.showInformationMessage).mockResolvedValueOnce(undefined);
+
+      const tracker = mockLocalIndexTracker({
+        stat: vi.fn().mockResolvedValue({
+          ok: false,
+          error: { code: "FILE_NOT_FOUND", message: "not found" },
+        }),
+      });
+
+      vi.mocked(validatePathForWrite).mockResolvedValueOnce({
+        ok: true,
+        value: "/vault/30-resources/doc.md",
+      } as never);
+
+      const { handler } = invokeCommandWithUri(COMMAND[commandKey], tracker);
+      await handler(contextMenuUri);
+
+      expect(copyFile).toHaveBeenCalledWith("/workspace/doc.md", "/vault/30-resources/doc.md", 1);
+      if (opts.deletesSource) {
+        expect(unlink).toHaveBeenCalledWith("/workspace/doc.md");
+      } else {
+        expect(unlink).not.toHaveBeenCalled();
+      }
+    });
+
+    it("filters mounted folders from Quick Pick items", async () => {
+      mockReadAutoMount.mockReturnValue(["30-resources", "notes/index.md", "10-projects/active"]);
+      setupConfigMock();
+
+      Object.defineProperty(vscode.window, "activeTextEditor", {
+        value: { document: { uri: { scheme: "file", fsPath: "/project/file.md" } } },
+        writable: true,
+        configurable: true,
+      });
+
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce(undefined);
+
+      const tracker = mockLocalIndexTracker();
+      const { handler } = invokeCommandWithUri(COMMAND[commandKey], tracker);
+      await handler();
+
+      expect(vscode.window.showQuickPick).toHaveBeenCalledWith(
+        [
+          { label: "30-resources", description: "30-resources" },
+          { label: "active", description: "10-projects/active" },
+        ],
+        expect.objectContaining({ placeHolder: "Select destination folder" }),
+      );
+    });
+  });
+}
+
+describeVaultTransferCommand("moveIntoVault", "moveIntoVault", {
+  successMessage: 'Moved "meeting.md" to "30-resources/"',
+  errorMessage: "Failed to move file: EACCES: permission denied",
+  deletesSource: true,
+});
+
+describeVaultTransferCommand("duplicateIntoVault", "duplicateIntoVault", {
+  successMessage: 'Duplicated "meeting.md" to "30-resources/"',
+  errorMessage: "Failed to duplicate file: EACCES: permission denied",
+  deletesSource: false,
 });

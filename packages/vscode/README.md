@@ -16,6 +16,8 @@ Browse, search, and edit your [Obsidian](https://obsidian.md) vault directly in 
 - **Search notes** via Quick Pick across all vault Markdown files
 - **Open in Obsidian**, jump to the current file in the Obsidian app
 - **Copy path** as `obs://` URI to the clipboard (`Shift+Alt+Cmd+C` on `obs://` files)
+- **Move into Vault** — move files from your project into mounted vault folders
+- **Duplicate into Vault** — duplicate files from your project into mounted vault folders
 - **Auto-mount** configured folders on startup
 - **Status bar** showing vault name and connection mode (`full` / `degraded`)
 - **Workspace folder**, vault browsable in Explorer with Quick Open (`Cmd+P`) and Search (`Ctrl+Shift+F`) support
@@ -34,6 +36,8 @@ Available via the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`):
 | `Obsidian VFS: Open in Obsidian` | Open the active vault file in the Obsidian app (works from both `obs://` and `file://` documents) |
 | `Obsidian VFS: Search Notes` | Quick Pick search across all vault Markdown files |
 | `Obsidian VFS: Copy Path` | Copy the active file's `obs://` URI to the clipboard (`Shift+Alt+Cmd+C` on `obs://` files) |
+| `Obsidian VFS: Move into Vault` | Move a file from the current project into a mounted vault folder (Explorer context menu, editor title, or Command Palette) |
+| `Obsidian VFS: Duplicate into Vault` | Duplicate a file from the current project into a mounted vault folder (Explorer context menu, editor title, or Command Palette) |
 
 ## Settings
 
@@ -57,7 +61,7 @@ Controls vault-side `files.exclude` policy written to `<vault>/.vscode/settings.
 | `obsidianVFS.vault.mode` | `"rw" \| "ro" \| "partial"` | `"rw"` | Write access mode: `"rw"` (read-write, all writes allowed), `"ro"` (read-only, no writes through `obs://`), `"partial"` (writes only to `autoMount` paths) |
 | `obsidianVFS.vault.gitIgnore` | `boolean` | `true` | Add the vault to `git.ignoredRepositories` so VS Code's Git extension skips it |
 | `obsidianVFS.vault.excludeBlocked` | `boolean` | `true` | Hide `blocked` folders (from `.obsidian/obsidian-vfs.json`) via `files.exclude` |
-| `obsidianVFS.vault.excludeDotfiles` | `boolean` | `true` | Hide dotfiles and dotdirs at the vault root (`.obsidian`, `.trash`, etc.) |
+| `obsidianVFS.vault.excludeDotfiles` | `boolean` | `true` | Hide dot-files and dot-directories at the vault root (`.obsidian`, `.trash`, etc.) |
 | `obsidianVFS.vault.excludeDotfilePattern` | `string` | `^\\.` | Regex for dotfile names to hide (e.g., `^\\.(obsidian\|trash)` to only hide those two) |
 
 #### Status Bar

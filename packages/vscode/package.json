@@ -2,7 +2,7 @@
   "name": "obsidian-vfs",
   "displayName": "Obsidian VFS",
   "description": "Browse, search, and edit your Obsidian vault directly in VSCode via a virtual file system (obs://)",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "publisher": "otaviof",
   "engines": {
@@ -55,6 +55,14 @@
       {
         "command": "obsidianVFS.copyPath",
         "title": "Obsidian VFS: Copy Path"
+      },
+      {
+        "command": "obsidianVFS.moveIntoVault",
+        "title": "Obsidian VFS: Move into Vault"
+      },
+      {
+        "command": "obsidianVFS.duplicateIntoVault",
+        "title": "Obsidian VFS: Duplicate into Vault"
       }
     ],
     "keybindings": [
@@ -85,6 +93,30 @@
           "command": "obsidianVFS.openInObsidian",
           "when": "viewItem == obsFile",
           "group": "navigation"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "obsidianVFS.moveIntoVault",
+          "when": "resourceScheme == file",
+          "group": "2_obsidianVFS"
+        },
+        {
+          "command": "obsidianVFS.duplicateIntoVault",
+          "when": "resourceScheme == file",
+          "group": "2_obsidianVFS"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "obsidianVFS.moveIntoVault",
+          "when": "resourceScheme == file",
+          "group": "2_obsidianVFS"
+        },
+        {
+          "command": "obsidianVFS.duplicateIntoVault",
+          "when": "resourceScheme == file",
+          "group": "2_obsidianVFS"
         }
       ]
     },

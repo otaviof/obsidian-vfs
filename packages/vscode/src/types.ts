@@ -49,6 +49,8 @@ export const COMMAND = {
   openInObsidian: `${CONFIG_SECTION}.openInObsidian`,
   searchNotes: `${CONFIG_SECTION}.searchNotes`,
   copyPath: `${CONFIG_SECTION}.copyPath`,
+  moveIntoVault: `${CONFIG_SECTION}.moveIntoVault`,
+  duplicateIntoVault: `${CONFIG_SECTION}.duplicateIntoVault`,
 } as const;
 
 import type { VaultMode } from "@obsidian-vfs/core";
