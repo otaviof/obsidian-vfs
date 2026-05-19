@@ -44,6 +44,7 @@ export function fakeExtensionConfig(overrides?: Partial<ExtensionConfig>): Exten
     vaultMode: configDefault(CONFIG_PROP.vaultMode),
     statusBarEnabled: configDefault(CONFIG_PROP.statusBarEnabled),
     explorerEnabled: configDefault(CONFIG_PROP.explorerEnabled),
+    explorerContextMenu: configDefault(CONFIG_PROP.explorerContextMenu),
     explorerTitle: configDefault(CONFIG_PROP.explorerTitle),
     workspaceEnabled: configDefault(CONFIG_PROP.workspaceEnabled),
     workspaceCodeWorkspaceFile: configDefault(CONFIG_PROP.workspaceCodeWorkspaceFile),

@@ -91,31 +91,31 @@
       "view/item/context": [
         {
           "command": "obsidianVFS.openInObsidian",
-          "when": "viewItem == obsFile",
+          "when": "viewItem == obsFile && obsidianVFS.explorer.contextMenu",
           "group": "navigation"
         }
       ],
       "explorer/context": [
         {
           "command": "obsidianVFS.moveIntoVault",
-          "when": "resourceScheme == file",
+          "when": "resourceScheme == file && obsidianVFS.explorer.contextMenu",
           "group": "2_obsidianVFS"
         },
         {
           "command": "obsidianVFS.duplicateIntoVault",
-          "when": "resourceScheme == file",
+          "when": "resourceScheme == file && obsidianVFS.explorer.contextMenu",
           "group": "2_obsidianVFS"
         }
       ],
       "editor/title": [
         {
           "command": "obsidianVFS.moveIntoVault",
-          "when": "resourceScheme == file",
+          "when": "resourceScheme == file && obsidianVFS.explorer.contextMenu",
           "group": "2_obsidianVFS"
         },
         {
           "command": "obsidianVFS.duplicateIntoVault",
-          "when": "resourceScheme == file",
+          "when": "resourceScheme == file && obsidianVFS.explorer.contextMenu",
           "group": "2_obsidianVFS"
         }
       ]
@@ -187,6 +187,11 @@
           "type": "boolean",
           "default": true,
           "description": "Show the Obsidian VFS tree view in the Explorer sidebar"
+        },
+        "obsidianVFS.explorer.contextMenu": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show Obsidian VFS items in right-click context menus (Explorer, editor title, tree view)"
         },
         "obsidianVFS.explorer.title": {
           "type": "string",

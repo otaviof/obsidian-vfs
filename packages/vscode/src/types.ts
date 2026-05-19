@@ -25,6 +25,7 @@ export const CONFIG_PROP = {
   statusBarEnabled: `${CONFIG_GROUP.statusBar}.enabled`,
   // Explorer
   explorerEnabled: `${CONFIG_GROUP.explorer}.enabled`,
+  explorerContextMenu: `${CONFIG_GROUP.explorer}.contextMenu`,
   explorerTitle: `${CONFIG_GROUP.explorer}.title`,
   // Workspace
   workspaceEnabled: `${CONFIG_GROUP.workspace}.enabled`,
@@ -71,6 +72,7 @@ export interface ExtensionConfig {
   readonly statusBarEnabled: boolean;
   // Explorer
   readonly explorerEnabled: boolean;
+  readonly explorerContextMenu: boolean;
   readonly explorerTitle: string;
   // Workspace
   readonly workspaceEnabled: boolean;

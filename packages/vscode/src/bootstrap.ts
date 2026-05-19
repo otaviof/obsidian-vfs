@@ -23,6 +23,7 @@ export function readConfig(): ExtensionConfig {
     statusBarEnabled: cfg.get<boolean>(CONFIG_PROP.statusBarEnabled)!,
     // Explorer
     explorerEnabled: cfg.get<boolean>(CONFIG_PROP.explorerEnabled)!,
+    explorerContextMenu: cfg.get<boolean>(CONFIG_PROP.explorerContextMenu)!,
     explorerTitle: cfg.get<string>(CONFIG_PROP.explorerTitle)!,
     // Workspace
     workspaceEnabled: cfg.get<boolean>(CONFIG_PROP.workspaceEnabled)!,

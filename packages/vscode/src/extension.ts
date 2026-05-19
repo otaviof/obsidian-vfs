@@ -29,6 +29,7 @@ import {
 import type { SyncFilesExcludeOptions } from "./workspace-folder.js";
 
 const MANAGED_EXCLUDES_KEY = "managedFilesExclude";
+const CONTEXT_KEY_MENU_ENABLED = "obsidianVFS.explorer.contextMenu";
 
 /** Mutable state for managed `files.exclude` patterns. */
 interface ExcludeState {
@@ -249,6 +250,13 @@ function handleConfigChange(
   if (e.affectsConfiguration(CONFIG_KEY.explorerEnabled)) {
     treeProvider.enabled = updated.explorerEnabled;
   }
+  if (e.affectsConfiguration(CONFIG_KEY.explorerContextMenu)) {
+    void vscode.commands.executeCommand(
+      "setContext",
+      CONTEXT_KEY_MENU_ENABLED,
+      updated.explorerContextMenu,
+    );
+  }
   if (e.affectsConfiguration(CONFIG_KEY.statusBarEnabled)) {
     if (updated.statusBarEnabled) statusBar.show();
     else statusBar.hide();
@@ -396,6 +404,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   );
 
   treeProvider.enabled = config.explorerEnabled;
+  await vscode.commands.executeCommand(
+    "setContext",
+    CONTEXT_KEY_MENU_ENABLED,
+    config.explorerContextMenu,
+  );
   if (config.statusBarEnabled) statusBar.show();
 
   const wsCtx: WorkspaceContext = {

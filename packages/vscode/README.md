@@ -75,6 +75,7 @@ Controls vault-side `files.exclude` policy written to `<vault>/.vscode/settings.
 | Setting | Type | Default | Description |
 |---------|------|---------|-------------|
 | `obsidianVFS.explorer.enabled` | `boolean` | `true` | Show the Obsidian VFS tree view in the Explorer sidebar |
+| `obsidianVFS.explorer.contextMenu` | `boolean` | `true` | Show Obsidian VFS items in right-click context menus (Explorer, editor title, tree view) |
 | `obsidianVFS.explorer.title` | `string` | `""` | Custom title for the Explorer tree view (defaults to `obs://<vault>`) |
 
 #### Workspace
