@@ -86,13 +86,26 @@ export function createMockFileSystemError(): Record<
   };
 }
 
-/** Mock factory for `vscode.Uri.from` and `vscode.Uri.file`. */
+/** Mock factory for `vscode.Uri.from`, `vscode.Uri.file`, and `vscode.Uri.joinPath`. */
 export function createMockUri(): {
   from: Mock;
   file: Mock;
   parse: Mock;
+  joinPath: Mock;
 } {
   return {
+    joinPath: vi.fn(
+      (base: { scheme: string; authority: string; path: string }, ...segments: string[]) => {
+        const joined = [base.path, ...segments].join("/");
+        return {
+          scheme: base.scheme,
+          authority: base.authority ?? "",
+          path: joined,
+          fsPath: joined,
+          toString: () => `${base.scheme}://${base.authority ?? ""}${joined}`,
+        };
+      },
+    ),
     from: vi.fn((c: { scheme: string; authority?: string; path: string }) => ({
       scheme: c.scheme,
       authority: c.authority ?? "",
@@ -199,10 +212,13 @@ export function createVscodeMock(
           if (fqKey in configProperties) return configProperties[fqKey].default;
           return undefined;
         }),
+        inspect: vi.fn(() => ({})),
+        update: vi.fn().mockResolvedValue(undefined),
       }),
       registerFileSystemProvider: vi.fn(() => ({ dispose: vi.fn() })),
       updateWorkspaceFolders: vi.fn(),
       onDidChangeConfiguration: vi.fn(() => ({ dispose: vi.fn() })),
+      onDidChangeWorkspaceFolders: vi.fn(() => ({ dispose: vi.fn() })),
       workspaceFolders: undefined,
       fs: {
         readFile: vi.fn(),

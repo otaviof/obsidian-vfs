@@ -12,6 +12,7 @@ vi.mock("vscode", () =>
     languages: true,
     statusBar: true,
     treeView: true,
+    configurationTarget: true,
   }),
 );
 
@@ -113,6 +114,8 @@ const mockSyncExclude = vi.mocked(syncFilesExclude);
 const mockClearExclude = vi.mocked(clearManagedExcludes);
 const mockGenerateWF = vi.mocked(generateWorkspaceFile);
 const mockOpenWF = vi.mocked(openWorkspaceFile);
+// eslint-disable-next-line @typescript-eslint/unbound-method
+const mockFsReadFile = vi.mocked(vscode.workspace.fs.readFile);
 
 function trackerFixture() {
   return {
@@ -261,9 +264,23 @@ describe("activate", () => {
     );
   });
 
-  it("adds workspace folder and syncs excludes when workspace is true with autoMount", async () => {
+  it("adds workspace folder and defers sync when status is added", async () => {
     bootstrapOk();
     mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ autoMount: ["Notes"] }));
+    mockAddWF.mockReturnValueOnce({ status: "added" });
+
+    await activate(fakeContext() as never);
+
+    expect(mockAddWF).toHaveBeenCalledWith("/vault", "MyVault");
+    expect(mockExcludeGit).toHaveBeenCalledWith("/vault");
+    expect(mockSyncExclude).not.toHaveBeenCalled();
+    expect(vscode.workspace.onDidChangeWorkspaceFolders).toHaveBeenCalled();
+  });
+
+  it("adds workspace folder and syncs immediately when already present", async () => {
+    bootstrapOk();
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ autoMount: ["Notes"] }));
+    mockAddWF.mockReturnValueOnce({ status: "already-present" });
     mockSyncExclude.mockResolvedValueOnce([".obsidian", ".trash"]);
 
     const ctx = fakeContext();
@@ -408,6 +425,7 @@ describe("activate", () => {
     mockReadConfig.mockReturnValueOnce(
       fakeExtensionConfig({ autoMount: ["Notes"], vaultGitIgnore: false }),
     );
+    mockAddWF.mockReturnValueOnce({ status: "already-present" });
 
     await activate(fakeContext() as never);
 
@@ -455,6 +473,239 @@ describe("activate", () => {
   });
 });
 
+describe("migrateStrandedAutoMount", () => {
+  function settingsJson(autoMount: string[]): Uint8Array {
+    const json = JSON.stringify({ "obsidianVFS.autoMount": autoMount });
+    return new TextEncoder().encode(json);
+  }
+
+  function setupMigration(opts: {
+    wsValue?: string[];
+    globalValue?: string[];
+    fileAutoMount?: string[];
+    folders?: { uri: { scheme: string; path: string } }[] | undefined;
+  }) {
+    const mockUpdate = vi.fn().mockResolvedValue(undefined);
+
+    vi.mocked(vscode.workspace.getConfiguration).mockReturnValue({
+      get: vi.fn((_key: string, defaultValue?: unknown) => defaultValue),
+      inspect: vi.fn(() => ({
+        workspaceValue: opts.wsValue,
+        globalValue: opts.globalValue,
+      })),
+      update: mockUpdate,
+    } as never);
+
+    mockFsReadFile.mockReset();
+    if (opts.fileAutoMount) {
+      mockFsReadFile.mockResolvedValueOnce(settingsJson(opts.fileAutoMount));
+    } else {
+      mockFsReadFile.mockRejectedValueOnce(new Error("ENOENT"));
+    }
+
+    Object.defineProperty(vscode.workspace, "workspaceFolders", {
+      value: opts.folders ?? [{ uri: { scheme: "file", path: "/project" } }],
+      configurable: true,
+    });
+
+    return mockUpdate;
+  }
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+    workspace.workspaceFile = undefined;
+  });
+
+  it("migrates folder-scoped autoMount to workspace scope", async () => {
+    const mockUpdate = setupMigration({
+      fileAutoMount: ["Notes", "Projects"],
+    });
+
+    bootstrapOk();
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ autoMount: ["Notes", "Projects"] }));
+    mockAddWF.mockReturnValueOnce({ status: "already-present" });
+
+    await activate(fakeContext() as never);
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      "autoMount",
+      ["Notes", "Projects"],
+      vscode.ConfigurationTarget.Workspace,
+    );
+  });
+
+  it("merges folder-scoped entries missing from workspace scope", async () => {
+    const mockUpdate = setupMigration({
+      wsValue: ["Notes"],
+      fileAutoMount: ["Notes", "Projects"],
+    });
+
+    bootstrapOk();
+    mockReadConfig.mockReturnValueOnce(
+      fakeExtensionConfig({ autoMount: ["Notes", "Projects"], workspaceEnabled: false }),
+    );
+
+    await activate(fakeContext() as never);
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      "autoMount",
+      ["Notes", "Projects"],
+      vscode.ConfigurationTarget.Workspace,
+    );
+  });
+
+  it("skips migration when folder-scoped entries already in workspace scope", async () => {
+    const mockUpdate = setupMigration({
+      wsValue: ["Notes", "Projects"],
+      fileAutoMount: ["Notes"],
+    });
+
+    bootstrapOk();
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ workspaceEnabled: false }));
+
+    await activate(fakeContext() as never);
+
+    expect(mockUpdate).not.toHaveBeenCalledWith(
+      "autoMount",
+      expect.anything(),
+      vscode.ConfigurationTarget.Workspace,
+    );
+  });
+
+  it("skips migration when global scope has autoMount", async () => {
+    const mockUpdate = setupMigration({
+      globalValue: ["Global"],
+      fileAutoMount: ["Notes"],
+    });
+
+    bootstrapOk();
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ workspaceEnabled: false }));
+
+    await activate(fakeContext() as never);
+
+    expect(mockUpdate).not.toHaveBeenCalledWith(
+      "autoMount",
+      expect.anything(),
+      vscode.ConfigurationTarget.Workspace,
+    );
+  });
+
+  it("skips migration when no workspace folders exist", async () => {
+    const mockUpdate = setupMigration({ folders: undefined });
+
+    Object.defineProperty(vscode.workspace, "workspaceFolders", {
+      value: undefined,
+      configurable: true,
+    });
+
+    bootstrapOk();
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ workspaceEnabled: false }));
+
+    await activate(fakeContext() as never);
+
+    expect(mockUpdate).not.toHaveBeenCalledWith(
+      "autoMount",
+      expect.anything(),
+      vscode.ConfigurationTarget.Workspace,
+    );
+  });
+
+  it("skips previously migrated entries but detects new ones", async () => {
+    const mockUpdate = setupMigration({
+      fileAutoMount: ["Notes", "Projects"],
+    });
+
+    bootstrapOk();
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ workspaceEnabled: false }));
+
+    const ctx = fakeContext();
+    await ctx.workspaceState.update("autoMountMigratedEntries", ["Notes"]);
+    await activate(ctx as never);
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      "autoMount",
+      ["Projects"],
+      vscode.ConfigurationTarget.Workspace,
+    );
+  });
+
+  it("skips migration when all folder entries were previously migrated", async () => {
+    const mockUpdate = setupMigration({
+      fileAutoMount: ["Notes"],
+    });
+
+    bootstrapOk();
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ workspaceEnabled: false }));
+
+    const ctx = fakeContext();
+    await ctx.workspaceState.update("autoMountMigratedEntries", ["Notes", "Projects"]);
+    await activate(ctx as never);
+
+    expect(mockUpdate).not.toHaveBeenCalledWith(
+      "autoMount",
+      expect.anything(),
+      vscode.ConfigurationTarget.Workspace,
+    );
+  });
+
+  it("handles JSONC with comments and URLs in settings.json", async () => {
+    const jsonc = `{
+      // This is a comment
+      "some.url": "http://example.com",
+      "obsidianVFS.autoMount": [
+        "Notes",
+        // "Drafts",
+        "Projects"
+      ]
+    }`;
+
+    const mockUpdate = setupMigration({});
+    mockFsReadFile.mockReset();
+    mockFsReadFile.mockResolvedValueOnce(new TextEncoder().encode(jsonc));
+
+    bootstrapOk();
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ workspaceEnabled: false }));
+
+    await activate(fakeContext() as never);
+
+    expect(mockUpdate).toHaveBeenCalledWith(
+      "autoMount",
+      ["Notes", "Projects"],
+      vscode.ConfigurationTarget.Workspace,
+    );
+  });
+});
+
+describe("orphan vault folder cleanup", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.clearAllMocks();
+    workspace.workspaceFile = undefined;
+  });
+
+  it("removes orphaned vault folder when autoMount is empty", async () => {
+    bootstrapOk();
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ autoMount: [] }));
+    mockHasWF.mockReturnValueOnce(true);
+
+    await activate(fakeContext() as never);
+
+    expect(mockRemoveWF).toHaveBeenCalledWith("/vault");
+    expect(mockClearExclude).toHaveBeenCalled();
+  });
+
+  it("does not remove when autoMount is empty and no vault folder exists", async () => {
+    bootstrapOk();
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ autoMount: [] }));
+    mockHasWF.mockReturnValueOnce(false);
+
+    await activate(fakeContext() as never);
+
+    expect(mockRemoveWF).not.toHaveBeenCalled();
+  });
+});
+
 describe("workspace file activation", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -494,12 +745,30 @@ describe("workspace file activation", () => {
     mockReadConfig.mockReturnValueOnce(
       fakeExtensionConfig({ workspaceCodeWorkspaceFile: true, autoMount: ["Notes"] }),
     );
+    mockHasWF.mockReturnValueOnce(true);
 
     await activate(fakeContext() as never);
 
     expect(mockGenerateWF).not.toHaveBeenCalled();
     expect(mockSyncExclude).toHaveBeenCalled();
     expect(mockExcludeGit).toHaveBeenCalled();
+  });
+
+  it("adds vault workspace folder in saved workspace when missing and defers sync", async () => {
+    workspace.workspaceFile = { scheme: "file" };
+    bootstrapOk();
+    mockReadConfig.mockReturnValueOnce(
+      fakeExtensionConfig({ workspaceCodeWorkspaceFile: true, autoMount: ["Notes"] }),
+    );
+    mockHasWF.mockReturnValueOnce(false);
+    mockAddWF.mockReturnValueOnce({ status: "added" });
+
+    await activate(fakeContext() as never);
+
+    expect(mockAddWF).toHaveBeenCalledWith("/vault", "MyVault");
+    expect(mockExcludeGit).toHaveBeenCalledWith("/vault");
+    expect(mockSyncExclude).not.toHaveBeenCalled();
+    expect(vscode.workspace.onDidChangeWorkspaceFolders).toHaveBeenCalled();
   });
 
   it("opens workspace file when user confirms", async () => {
@@ -568,6 +837,7 @@ describe("workspace file activation", () => {
     mockReadConfig.mockReturnValueOnce(
       fakeExtensionConfig({ workspaceEnabled: true, autoMount: ["Notes"] }),
     );
+    mockAddWF.mockReturnValueOnce({ status: "already-present" });
 
     await activate(fakeContext() as never);
 
@@ -582,6 +852,7 @@ describe("workspace file activation", () => {
     mockReadConfig.mockReturnValueOnce(
       fakeExtensionConfig({ workspaceCodeWorkspaceFile: true, autoMount: ["Notes"] }),
     );
+    mockHasWF.mockReturnValueOnce(true);
 
     await activate(fakeContext() as never);
 

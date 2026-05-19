@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import * as vscode from "vscode";
+import { parse as parseJsonc } from "jsonc-parser";
 import { VAULT_MODE } from "@obsidian-vfs/core";
 
 import { bootstrapFromConfig, readConfig } from "./bootstrap.js";
@@ -50,6 +51,80 @@ interface WorkspaceContext {
   readonly state: ExcludeState;
 }
 
+const AUTOMOUNT_MIGRATED_KEY = "autoMountMigratedEntries";
+const AUTOMOUNT_SETTINGS_KEY = `${CONFIG_SECTION}.${CONFIG_PROP.autoMount}`;
+
+/**
+ * Read `obsidianVFS.autoMount` directly from a folder's `.vscode/settings.json`.
+ *
+ * VSCode's `inspect()` does not report `workspaceFolderValue` for window-scoped
+ * settings, so we read the file ourselves to detect stranded values.
+ */
+async function readFolderAutoMount(
+  folderUri: vscode.Uri,
+  outputChannel?: vscode.OutputChannel,
+): Promise<string[] | undefined> {
+  try {
+    const settingsUri = vscode.Uri.joinPath(folderUri, ".vscode", "settings.json");
+    const raw = await vscode.workspace.fs.readFile(settingsUri);
+    const text = new TextDecoder().decode(raw);
+    const parsed: unknown = parseJsonc(text);
+    if (typeof parsed !== "object" || parsed === null) return undefined;
+    const value = (parsed as Record<string, unknown>)[AUTOMOUNT_SETTINGS_KEY];
+    return Array.isArray(value) ? (value as string[]) : undefined;
+  } catch (err) {
+    if (outputChannel) {
+      const msg = err instanceof Error ? err.message : String(err);
+      outputChannel.appendLine(`autoMount migration: failed to read ${folderUri.fsPath} — ${msg}`);
+    }
+    return undefined;
+  }
+}
+
+/**
+ * Detect autoMount values stranded at folder scope after a single→multi-root
+ * workspace transition and merge them into workspace scope.
+ *
+ * Uses direct file reading because `inspect()` does not report
+ * `workspaceFolderValue` for window-scoped settings (confirmed 2026-05-19).
+ * Previously migrated entries are tracked in `workspaceState` so that entries
+ * the user later removes via the unmount command are not re-added, while
+ * genuinely new entries added to `.vscode/settings.json` are still detected.
+ *
+ * Only the first workspace folder with stranded entries is processed — the
+ * stranding scenario produces exactly one source folder (the original project).
+ */
+async function migrateStrandedAutoMount(
+  context: vscode.ExtensionContext,
+  outputChannel?: vscode.OutputChannel,
+): Promise<void> {
+  const cfg = vscode.workspace.getConfiguration(CONFIG_SECTION);
+  const inspection = cfg.inspect<string[]>(CONFIG_PROP.autoMount);
+
+  if (inspection?.globalValue?.length) return;
+
+  const wsValue = inspection?.workspaceValue ?? [];
+  const previouslyMigrated = context.workspaceState.get<string[]>(AUTOMOUNT_MIGRATED_KEY, []);
+
+  for (const folder of vscode.workspace.workspaceFolders ?? []) {
+    const folderValue = await readFolderAutoMount(folder.uri, outputChannel);
+    if (!folderValue?.length) continue;
+
+    const wsSet = new Set(wsValue);
+    const alreadyHandled = new Set(previouslyMigrated);
+    const missing = folderValue.filter((entry) => !wsSet.has(entry) && !alreadyHandled.has(entry));
+    if (missing.length === 0) continue;
+
+    const merged = [...wsValue, ...missing];
+    await cfg.update(CONFIG_PROP.autoMount, merged, vscode.ConfigurationTarget.Workspace);
+    await context.workspaceState.update(AUTOMOUNT_MIGRATED_KEY, [
+      ...previouslyMigrated,
+      ...folderValue,
+    ]);
+    return;
+  }
+}
+
 function buildSyncOptions(config: ExtensionConfig): SyncFilesExcludeOptions {
   return {
     excludeBlocked: config.vaultExcludeBlocked,
@@ -95,7 +170,20 @@ async function activateWorkspaceFolder(
   const alreadySaved = vscode.workspace.workspaceFile?.scheme === "file";
 
   if (config.workspaceCodeWorkspaceFile && alreadySaved && config.autoMount.length > 0) {
-    if (config.vaultGitIgnore) await excludeVaultFromGitDetection(ctx.physicalPath);
+    if (!hasVaultWorkspaceFolder(ctx.physicalPath)) {
+      const wfResult = addVaultWorkspaceFolder(ctx.physicalPath, ctx.vaultName);
+      if (config.vaultGitIgnore) await excludeVaultFromGitDetection(ctx.physicalPath);
+      if (wfResult.status === "added") {
+        const disposable = vscode.workspace.onDidChangeWorkspaceFolders(() => {
+          disposable.dispose();
+          scheduleSync(ctx, readConfig());
+        });
+        ctx.extensionContext.subscriptions.push(disposable);
+        return;
+      }
+    } else {
+      if (config.vaultGitIgnore) await excludeVaultFromGitDetection(ctx.physicalPath);
+    }
     await syncExcludesNow(ctx, config);
     return;
   }
@@ -132,7 +220,18 @@ async function activateWorkspaceFolder(
     const detail = "reason" in wfResult ? ` — ${wfResult.reason}` : "";
     ctx.outputChannel.appendLine(`Workspace folder: ${wfResult.status}${detail}`);
     if (config.vaultGitIgnore) await excludeVaultFromGitDetection(ctx.physicalPath);
+    if (wfResult.status === "added") {
+      const disposable = vscode.workspace.onDidChangeWorkspaceFolders(() => {
+        disposable.dispose();
+        scheduleSync(ctx, readConfig());
+      });
+      ctx.extensionContext.subscriptions.push(disposable);
+      return;
+    }
     await syncExcludesNow(ctx, config);
+  } else if (config.autoMount.length === 0 && hasVaultWorkspaceFolder(ctx.physicalPath)) {
+    removeVaultWorkspaceFolders(ctx.physicalPath);
+    scheduleClear(ctx);
   }
 }
 
@@ -246,6 +345,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   outputChannel.appendLine(
     `Obsidian VFS: vault "${tracker.context.name}" loaded in ${initMs.toFixed(0)}ms`,
   );
+
+  await migrateStrandedAutoMount(context, outputChannel);
 
   const config = readConfig();
 

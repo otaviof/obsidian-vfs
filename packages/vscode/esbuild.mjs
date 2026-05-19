@@ -8,6 +8,7 @@ await esbuild.build({
   format: "cjs",
   platform: "node",
   target: "node22",
+  mainFields: ["module", "main"],
   sourcemap: true,
   // tsc --noEmit handles type checking; esbuild only bundles. Inline config
   // avoids warnings from the root tsconfig's "target": "es2025" (which
