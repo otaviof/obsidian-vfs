@@ -834,7 +834,9 @@ function describeVaultTransferCommand(
 
       vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce(undefined);
 
-      const tracker = mockLocalIndexTracker();
+      const tracker = mockLocalIndexTracker({
+        listFolders: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+      });
       const { handler } = invokeCommandWithUri(COMMAND[commandKey], tracker);
       await handler();
 
@@ -858,7 +860,9 @@ function describeVaultTransferCommand(
       });
       vi.mocked(vscode.window.showInputBox).mockResolvedValueOnce(undefined);
 
-      const tracker = mockLocalIndexTracker();
+      const tracker = mockLocalIndexTracker({
+        listFolders: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+      });
       const { handler } = invokeCommandWithUri(COMMAND[commandKey], tracker);
       await handler();
 
@@ -883,6 +887,7 @@ function describeVaultTransferCommand(
       vi.mocked(vscode.window.showInputBox).mockResolvedValueOnce("meeting.md");
 
       const tracker = mockLocalIndexTracker({
+        listFolders: vi.fn().mockResolvedValue({ ok: true, value: [] }),
         stat: vi.fn().mockResolvedValue({
           ok: true,
           value: { type: "file", mtime: 0, ctime: 0, size: 0 },
@@ -914,6 +919,7 @@ function describeVaultTransferCommand(
       vi.mocked(vscode.window.showInputBox).mockResolvedValueOnce("file.md");
 
       const tracker = mockLocalIndexTracker({
+        listFolders: vi.fn().mockResolvedValue({ ok: true, value: [] }),
         stat: vi.fn().mockResolvedValue({
           ok: false,
           error: { code: "FILE_NOT_FOUND", message: "not found" },
@@ -951,6 +957,7 @@ function describeVaultTransferCommand(
       vi.mocked(vscode.window.showInputBox).mockResolvedValueOnce("file.md");
 
       const tracker = mockLocalIndexTracker({
+        listFolders: vi.fn().mockResolvedValue({ ok: true, value: [] }),
         stat: vi.fn().mockResolvedValue({
           ok: false,
           error: { code: "FILE_NOT_FOUND", message: "not found" },
@@ -987,6 +994,7 @@ function describeVaultTransferCommand(
       vi.mocked(vscode.window.showInformationMessage).mockResolvedValueOnce(undefined);
 
       const tracker = mockLocalIndexTracker({
+        listFolders: vi.fn().mockResolvedValue({ ok: true, value: [] }),
         stat: vi.fn().mockResolvedValue({
           ok: false,
           error: { code: "FILE_NOT_FOUND", message: "not found" },
@@ -1038,6 +1046,7 @@ function describeVaultTransferCommand(
       );
 
       const tracker = mockLocalIndexTracker({
+        listFolders: vi.fn().mockResolvedValue({ ok: true, value: [] }),
         stat: vi.fn().mockResolvedValue({
           ok: false,
           error: { code: "FILE_NOT_FOUND", message: "not found" },
@@ -1072,6 +1081,7 @@ function describeVaultTransferCommand(
       vi.mocked(vscode.window.showInformationMessage).mockResolvedValueOnce(undefined);
 
       const tracker = mockLocalIndexTracker({
+        listFolders: vi.fn().mockResolvedValue({ ok: true, value: [] }),
         stat: vi.fn().mockResolvedValue({
           ok: false,
           error: { code: "FILE_NOT_FOUND", message: "not found" },
@@ -1106,16 +1116,85 @@ function describeVaultTransferCommand(
 
       vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce(undefined);
 
-      const tracker = mockLocalIndexTracker();
+      const tracker = mockLocalIndexTracker({
+        listFolders: vi.fn().mockResolvedValue({ ok: true, value: [] }),
+      });
+      const { handler } = invokeCommandWithUri(COMMAND[commandKey], tracker);
+      await handler();
+
+      expect(vscode.window.showQuickPick).toHaveBeenCalledWith(
+        [
+          { label: "active", description: "10-projects/active" },
+          { label: "30-resources", description: "30-resources" },
+        ],
+        expect.objectContaining({
+          placeHolder: "Select destination folder",
+          matchOnDescription: true,
+        }),
+      );
+    });
+
+    it("includes subfolders in QuickPick when listFolders succeeds", async () => {
+      mockReadAutoMount.mockReturnValue(["30-resources"]);
+      setupConfigMock();
+
+      Object.defineProperty(vscode.window, "activeTextEditor", {
+        value: { document: { uri: { scheme: "file", fsPath: "/project/file.md" } } },
+        writable: true,
+        configurable: true,
+      });
+
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce(undefined);
+
+      const tracker = mockLocalIndexTracker({
+        listFolders: vi.fn().mockResolvedValue({
+          ok: true,
+          value: ["30-resources", "30-resources/books", "30-resources/papers", "10-projects"],
+        }),
+      });
       const { handler } = invokeCommandWithUri(COMMAND[commandKey], tracker);
       await handler();
 
       expect(vscode.window.showQuickPick).toHaveBeenCalledWith(
         [
           { label: "30-resources", description: "30-resources" },
-          { label: "active", description: "10-projects/active" },
+          { label: "books", description: "30-resources/books" },
+          { label: "papers", description: "30-resources/papers" },
         ],
-        expect.objectContaining({ placeHolder: "Select destination folder" }),
+        expect.objectContaining({
+          placeHolder: "Select destination folder",
+          matchOnDescription: true,
+        }),
+      );
+    });
+
+    it("falls back to mounted folders when listFolders fails", async () => {
+      mockReadAutoMount.mockReturnValue(["30-resources"]);
+      setupConfigMock();
+
+      Object.defineProperty(vscode.window, "activeTextEditor", {
+        value: { document: { uri: { scheme: "file", fsPath: "/project/file.md" } } },
+        writable: true,
+        configurable: true,
+      });
+
+      vi.mocked(vscode.window.showQuickPick).mockResolvedValueOnce(undefined);
+
+      const tracker = mockLocalIndexTracker({
+        listFolders: vi.fn().mockResolvedValue({
+          ok: false,
+          error: { code: "CLI_ERROR", message: "failed" },
+        }),
+      });
+      const { handler } = invokeCommandWithUri(COMMAND[commandKey], tracker);
+      await handler();
+
+      expect(vscode.window.showQuickPick).toHaveBeenCalledWith(
+        [{ label: "30-resources", description: "30-resources" }],
+        expect.objectContaining({
+          placeHolder: "Select destination folder",
+          matchOnDescription: true,
+        }),
       );
     });
   });

@@ -201,20 +201,28 @@ async function transferToVault(
     return;
   }
 
-  const folders = mountedFolders();
-  if (folders.length === 0) {
+  const mounts = mountedFolders();
+  if (mounts.length === 0) {
     await vscode.window.showInformationMessage(
       "No mounted folders available. Mount a folder first.",
     );
     return;
   }
 
-  const items = folders.map((f) => ({
+  let candidates = mounts;
+  const foldersResult = await tracker.listFolders(readDepthLimit());
+  if (foldersResult.ok) {
+    const descendants = foldersResult.value.filter((f) => mounts.some((m) => f.startsWith(`${m}/`)));
+    candidates = [...mounts, ...descendants].sort();
+  }
+
+  const items = candidates.map((f) => ({
     label: f.split("/").pop()!,
     description: f,
   }));
   const picked = await vscode.window.showQuickPick(items, {
     placeHolder: "Select destination folder",
+    matchOnDescription: true,
   });
   if (!picked) return;
 
