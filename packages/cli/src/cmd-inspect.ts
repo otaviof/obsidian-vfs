@@ -1,6 +1,12 @@
 import path from "node:path";
 
-import { SKILL_PREFIX, normalizeMention, resolveSkillMention } from "@obsidian-vfs/core";
+import {
+  SKILL_PREFIX,
+  URI_PREFIX,
+  normalizeMention,
+  resolveObsUri,
+  resolveSkillMention,
+} from "@obsidian-vfs/core";
 import type { VFSError } from "@obsidian-vfs/core";
 
 import type { InspectArgs, InspectOutput } from "./types.js";
@@ -27,7 +33,8 @@ function emitError(error: VFSError, json: boolean): number {
 
 /** Execute the inspect command. */
 export async function run(args: InspectArgs): Promise<number> {
-  const mention = normalizeMention(args.mention);
+  const isObsUri = args.mention.startsWith(URI_PREFIX);
+  const mention = isObsUri ? args.mention : normalizeMention(args.mention);
 
   const boot = await bootstrapTracker();
   if (!boot.ok) return emitError(boot.error, args.json);
@@ -35,9 +42,11 @@ export async function run(args: InspectArgs): Promise<number> {
   const { tracker, initMs } = boot.value;
   const resStart = performance.now();
 
-  const result = mention.startsWith(SKILL_PREFIX)
-    ? await resolveSkillMention(mention, tracker)
-    : await tracker.resolveMention(mention);
+  const result = isObsUri
+    ? await resolveObsUri(mention, tracker)
+    : mention.startsWith(SKILL_PREFIX)
+      ? await resolveSkillMention(mention, tracker)
+      : await tracker.resolveMention(mention);
   const resolutionMs = performance.now() - resStart;
 
   if (!result.ok) return emitError(result.error, args.json);

@@ -4,6 +4,7 @@ import {
   classifyInput,
   normalizeWikilink,
   parseMarkdownLinks,
+  parseObsLinks,
   resolveEmbeds,
 } from "./markdown-links.js";
 import type { EmbedResolver } from "./markdown-links.js";
@@ -241,6 +242,97 @@ describe("classifyInput", () => {
 
   it("classifies empty string as wikilink", () => {
     expect(classifyInput("")).toBe("wikilink");
+  });
+});
+
+describe("parseObsLinks", () => {
+  const cases: {
+    name: string;
+    input: string;
+    expected: number;
+    check?: (links: ReturnType<typeof parseObsLinks>) => void;
+  }[] = [
+    {
+      name: "basic match",
+      input: "See [note](obs://vault/path) here",
+      expected: 1,
+      check: (links) => {
+        expect(links[0].displayText).toBe("note");
+        expect(links[0].rawUri).toBe("obs://vault/path");
+      },
+    },
+    {
+      name: "with fragment",
+      input: "[note](obs://vault/path#section)",
+      expected: 1,
+      check: (links) => {
+        expect(links[0].rawUri).toBe("obs://vault/path#section");
+      },
+    },
+    {
+      name: "URL-encoded characters preserved",
+      input: "[note](obs://vault/path%20with%20spaces)",
+      expected: 1,
+      check: (links) => {
+        expect(links[0].rawUri).toBe("obs://vault/path%20with%20spaces");
+      },
+    },
+    {
+      name: "wrong scheme ignored",
+      input: "[note](https://example.com)",
+      expected: 0,
+    },
+    {
+      name: "inside fenced code block skipped",
+      input: "```\n[note](obs://vault/path)\n```",
+      expected: 0,
+    },
+    {
+      name: "inside inline code skipped",
+      input: "Use `[note](obs://vault/path)` here",
+      expected: 0,
+    },
+    {
+      name: "multiple links",
+      input: "[note1](obs://vault/a) and [note2](obs://vault/b)",
+      expected: 2,
+    },
+    {
+      name: "empty display text",
+      input: "[](obs://vault/path)",
+      expected: 1,
+      check: (links) => {
+        expect(links[0].displayText).toBe("");
+      },
+    },
+    {
+      name: "bare obs:// URI not matched",
+      input: "obs://vault/path",
+      expected: 0,
+    },
+    {
+      name: "mixed wikilinks and obs:// links",
+      input: "[[Note]] and [link](obs://vault/path)",
+      expected: 1,
+      check: (links) => {
+        expect(links[0].rawUri).toBe("obs://vault/path");
+      },
+    },
+  ];
+
+  it.each(cases)("$name", ({ input, expected, check }) => {
+    const links = parseObsLinks(input);
+    expect(links).toHaveLength(expected);
+    if (check) check(links);
+  });
+
+  it("returns correct startIndex and endIndex", () => {
+    const input = "Before [text](obs://vault/path) after";
+    const links = parseObsLinks(input);
+    expect(links).toHaveLength(1);
+    expect(links[0].startIndex).toBe(7);
+    expect(links[0].endIndex).toBe(31);
+    expect(input.slice(links[0].startIndex, links[0].endIndex)).toBe("[text](obs://vault/path)");
   });
 });
 

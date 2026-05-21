@@ -60,6 +60,7 @@ Inspect a mention — shows resolved path, target type, and content.
 ```sh
 npx @obsidian-vfs/cli inspect "architect"
 npx @obsidian-vfs/cli inspect "10-projects/plan.md#Architecture"
+npx @obsidian-vfs/cli inspect "obs://vault/path/to/note#section"
 npx @obsidian-vfs/cli inspect "/obs:obsidian"
 ```
 

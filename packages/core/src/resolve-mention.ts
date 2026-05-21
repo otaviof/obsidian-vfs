@@ -9,7 +9,7 @@ import type { MentionResult, VFSResult } from "./types.js";
 import { processContent } from "./content-slice.js";
 import { resolveResource, resolveSkillResource } from "./resolve-resource.js";
 import { resolveWikilink } from "./resolve-wikilink.js";
-import { URI_SCHEME } from "./uri.js";
+import { URI_SCHEME, parseObsUri } from "./uri.js";
 
 /** Prefix for context mentions (`@obs:name`). */
 export const MENTION_PREFIX = `@${URI_SCHEME}:`;
@@ -249,4 +249,26 @@ export async function resolveSkillMention(
       section,
     },
   };
+}
+
+export async function resolveObsUri(
+  uri: string,
+  tracker: LocalIndexTracker,
+): Promise<VFSResult<MentionResult>> {
+  const parsed = parseObsUri(uri);
+  if (!parsed.ok) return parsed;
+
+  const components = parsed.value;
+  if (components.vaultName.toLowerCase() !== tracker.context.name.toLowerCase()) {
+    return {
+      ok: false,
+      error: {
+        code: ERR.INVALID_URI,
+        message: `Vault name mismatch: expected '${tracker.context.name}', got '${components.vaultName}'`,
+      },
+    };
+  }
+
+  const synthesized = `@${URI_SCHEME}:${components.path}${components.section ? "#" + components.section : ""}`;
+  return resolveMention(synthesized, tracker);
 }

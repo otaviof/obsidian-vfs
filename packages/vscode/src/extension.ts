@@ -13,7 +13,7 @@ import { ObsidianFileSystemProvider } from "./file-system-provider.js";
 import { StatusBarManager } from "./status-bar.js";
 import { VaultTreeDragAndDropController } from "./tree-drag-drop.js";
 import { VaultTreeDataProvider } from "./vault-tree-provider.js";
-import { WikilinkDocumentLinkProvider } from "./wikilink-provider.js";
+import { ObsidianDocumentLinkProvider } from "./document-link-provider.js";
 import {
   FOLDER_NAME_PREFIX,
   addVaultWorkspaceFolder,
@@ -392,14 +392,14 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   statusBar.setVaultMode(config.vaultMode);
   context.subscriptions.push(statusBar);
 
-  const wikilinkProvider = new WikilinkDocumentLinkProvider(tracker);
+  const linkProvider = new ObsidianDocumentLinkProvider(tracker);
   context.subscriptions.push(
     vscode.languages.registerDocumentLinkProvider(
       [
         { scheme: SCHEME, language: "markdown" },
         { scheme: "file", language: "markdown" },
       ],
-      wikilinkProvider,
+      linkProvider,
     ),
   );
 

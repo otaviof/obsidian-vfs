@@ -11,6 +11,14 @@ export interface ParsedLink {
   readonly endIndex: number;
 }
 
+/** Result of parsing a standard markdown `[text](obs://...)` link. */
+export interface ParsedObsLink {
+  readonly displayText: string;
+  readonly rawUri: string;
+  readonly startIndex: number;
+  readonly endIndex: number;
+}
+
 /** Callback to resolve an embed target to its content. */
 export type EmbedResolver = (target: string, section?: string) => Promise<VFSResult<string>>;
 
@@ -22,6 +30,9 @@ const INLINE_CODE_REGEX = /`[^`]+`/g;
 
 /** Matches `[[target#section|display]]` wikilink syntax. */
 const LINK_REGEX = /\[\[([^\]|#]+)(?:#([^\]|]*))?\|?([^\]]*)\]\]/g;
+
+/** Matches `[display text](obs://...)` standard markdown links. */
+const OBS_LINK_REGEX = /\[([^\]]*)\]\((obs:\/\/[^)]+)\)/g;
 
 /** Replace characters in a region with spaces, preserving positions. */
 function maskRegion(text: string, start: number, end: number): string {
@@ -59,6 +70,23 @@ export function parseMarkdownLinks(markdown: string): readonly ParsedLink[] {
       display,
       startIndex,
       endIndex,
+    });
+  }
+
+  return links;
+}
+
+/** Parse all standard markdown links with `obs://` scheme from text. */
+export function parseObsLinks(text: string): readonly ParsedObsLink[] {
+  const masked = maskCodeRegions(text);
+  const links: ParsedObsLink[] = [];
+
+  for (const m of masked.matchAll(OBS_LINK_REGEX)) {
+    links.push({
+      displayText: m[1],
+      rawUri: m[2],
+      startIndex: m.index,
+      endIndex: m.index + m[0].length,
     });
   }
 

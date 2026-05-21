@@ -122,11 +122,12 @@ export { sliceContent, scrubWikilinks, processContent } from "./content-slice.js
 export {
   maskCodeRegions,
   parseMarkdownLinks,
+  parseObsLinks,
   normalizeWikilink,
   classifyInput,
   resolveEmbeds,
 } from "./markdown-links.js";
-export type { ParsedLink, EmbedResolver } from "./markdown-links.js";
+export type { ParsedLink, ParsedObsLink, EmbedResolver } from "./markdown-links.js";
 export { VaultFileWatcher } from "./file-watcher.js";
 export { listFolders, listMarkdownFiles, readDirectory, statVirtualFile } from "./fs-enumeration.js";
 export {
@@ -136,6 +137,7 @@ export {
   parseSection,
   resolveMention,
   resolveSkillMention,
+  resolveObsUri,
 } from "./resolve-mention.js";
 
 /**

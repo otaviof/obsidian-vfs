@@ -54,8 +54,8 @@ vi.mock("./status-bar.js", () => ({
   }),
 }));
 
-vi.mock("./wikilink-provider.js", () => ({
-  WikilinkDocumentLinkProvider: vi.fn(),
+vi.mock("./document-link-provider.js", () => ({
+  ObsidianDocumentLinkProvider: vi.fn(),
 }));
 
 vi.mock("./workspace-folder.js", async (importOriginal) => {
@@ -90,7 +90,7 @@ import { ObsidianFileSystemProvider } from "./file-system-provider.js";
 import { StatusBarManager } from "./status-bar.js";
 import { VaultTreeDataProvider } from "./vault-tree-provider.js";
 import { VaultTreeDragAndDropController } from "./tree-drag-drop.js";
-import { WikilinkDocumentLinkProvider } from "./wikilink-provider.js";
+import { ObsidianDocumentLinkProvider } from "./document-link-provider.js";
 import {
   addVaultWorkspaceFolder,
   clearManagedExcludes,
@@ -254,7 +254,7 @@ describe("activate", () => {
       expect.anything(),
     );
     expect(StatusBarManager).toHaveBeenCalledWith(tracker);
-    expect(WikilinkDocumentLinkProvider).toHaveBeenCalledWith(tracker);
+    expect(ObsidianDocumentLinkProvider).toHaveBeenCalledWith(tracker);
     expect(vscode.languages.registerDocumentLinkProvider).toHaveBeenCalledWith(
       [
         { scheme: SCHEME, language: "markdown" },

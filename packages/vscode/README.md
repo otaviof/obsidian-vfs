@@ -12,7 +12,7 @@ Browse, search, and edit your [Obsidian](https://obsidian.md) vault directly in 
 - **Mount vault folders or individual notes** into the Explorer tree view
 - **Browse and read** Markdown files through the `obs://` virtual file system
 - **Edit existing files** with writes going directly to the vault on disk
-- **Wikilink navigation**, click `[[links]]` in Markdown to jump between notes
+- **Link navigation**, click `[[wikilinks]]` or `[text](obs://...)` links in Markdown to jump between notes
 - **Search notes** via Quick Pick across all vault Markdown files
 - **Open in Obsidian**, jump to the current file in the Obsidian app
 - **Copy path** as `obs://` URI to the clipboard (`Shift+Alt+Cmd+C` on `obs://` files)
@@ -135,7 +135,7 @@ This matches the tree view — only mounted paths appear in both views.
 **Notes:**
 
 - The Explorer tree view and the workspace folder both appear in the sidebar. The tree view provides custom UI (welcome view, context menus, drag-and-drop), while the workspace folder enables Quick Open and full-text search.
-- The `obs://` `FileSystemProvider` remains registered for the tree view sidebar, wikilink navigation, and drag-and-drop — it does not back a workspace folder.
+- The `obs://` `FileSystemProvider` remains registered for the tree view sidebar, link navigation, and drag-and-drop — it does not back a workspace folder.
 
 ### Workspace File (avoiding "Untitled Workspace")
 

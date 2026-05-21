@@ -6,6 +6,7 @@ import {
   normalizeMention,
   parseSection,
   resolveMention,
+  resolveObsUri,
   resolveSkillMention,
 } from "./resolve-mention.js";
 import { mockCLI } from "./test-helpers.js";
@@ -441,5 +442,119 @@ describe("normalizeMention", () => {
 
   it("handles empty string", () => {
     expect(normalizeMention("")).toBe("@obs:");
+  });
+});
+
+describe("resolveObsUri", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    realpathMock.mockImplementation((...args: unknown[]) => Promise.resolve(args[0]));
+    readdirMock.mockResolvedValue([]);
+  });
+
+  it("resolves valid URI successfully", async () => {
+    const tracker = stubTracker();
+    readFileMock.mockResolvedValueOnce(Buffer.from("note content"));
+
+    const result = await resolveObsUri("obs://TestVault/notes/plan.md", tracker);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.targetType).toBe("file");
+      expect(result.value.resolvedPath).toBe("notes/plan.md");
+      expect(result.value.vaultName).toBe("TestVault");
+      expect(result.value.content).toContain("note content");
+    }
+  });
+
+  it("returns INVALID_URI on vault name mismatch", async () => {
+    const tracker = stubTracker();
+
+    const result = await resolveObsUri("obs://OtherVault/notes/plan.md", tracker);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("INVALID_URI");
+      expect(result.error.message).toContain("Vault name mismatch");
+    }
+  });
+
+  it("matches vault name case-insensitively", async () => {
+    const tracker = stubTracker();
+    readFileMock.mockResolvedValueOnce(Buffer.from("note content"));
+
+    const result = await resolveObsUri("obs://testvault/notes/plan.md", tracker);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.vaultName).toBe("TestVault");
+      expect(result.value.resolvedPath).toBe("notes/plan.md");
+    }
+  });
+
+  it("decodes URL-encoded section correctly", async () => {
+    const tracker = stubTracker();
+    readFileMock.mockResolvedValueOnce(
+      Buffer.from("# Top\n\n## 4. AI Interaction\n\nSection content\n\n## Other"),
+    );
+
+    const result = await resolveObsUri(
+      "obs://TestVault/notes/plan.md#4.%20AI%20Interaction",
+      tracker,
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.section).toBe("4. AI Interaction");
+      expect(result.value.content).toContain("Section content");
+      expect(result.value.content).not.toContain("Top");
+    }
+  });
+
+  it("rejects path inside blocked folders", async () => {
+    const tracker = stubTracker({ blocked: ["private"] });
+
+    const result = await resolveObsUri("obs://TestVault/private/secret.md", tracker);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("PERMISSION_DENIED");
+  });
+
+  it("resolves extensionless path with .md fallback", async () => {
+    const enoent = new Error("ENOENT") as NodeJS.ErrnoException;
+    enoent.code = "ENOENT";
+    accessMock.mockRejectedValueOnce(enoent);
+
+    const tracker = stubTracker({
+      cliOverrides: {
+        search: vi.fn().mockResolvedValue({ ok: true, value: ["notes/plan.md"] }),
+      },
+    });
+    readFileMock.mockResolvedValueOnce(Buffer.from("note content"));
+
+    const result = await resolveObsUri("obs://TestVault/notes/plan", tracker);
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.resolvedPath).toBe("notes/plan.md");
+    }
+  });
+
+  it("returns INVALID_URI on empty path", async () => {
+    const tracker = stubTracker();
+
+    const result = await resolveObsUri("obs://TestVault/", tracker);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("INVALID_URI");
+  });
+
+  it("returns INVALID_URI on invalid URI", async () => {
+    const tracker = stubTracker();
+
+    const result = await resolveObsUri("not-a-uri", tracker);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe("INVALID_URI");
   });
 });

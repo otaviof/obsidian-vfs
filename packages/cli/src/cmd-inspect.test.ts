@@ -12,7 +12,7 @@ import {
 
 vi.mock("@obsidian-vfs/core", async () => {
   const actual = await vi.importActual("@obsidian-vfs/core");
-  return { ...actual, resolveSkillMention: vi.fn() };
+  return { ...actual, resolveSkillMention: vi.fn(), resolveObsUri: vi.fn() };
 });
 
 vi.mock("./bootstrap.js", () => ({
@@ -28,7 +28,7 @@ vi.mock("./formatters.js", () => ({
   writeStderr: vi.fn(),
 }));
 
-import { resolveSkillMention } from "@obsidian-vfs/core";
+import { resolveObsUri, resolveSkillMention } from "@obsidian-vfs/core";
 import { bootstrapTracker } from "./bootstrap.js";
 import {
   formatError,
@@ -42,6 +42,7 @@ import { run } from "./cmd-inspect.js";
 
 const mockBootstrap = vi.mocked(bootstrapTracker);
 const mockResolveSkillMention = vi.mocked(resolveSkillMention);
+const mockResolveObsUri = vi.mocked(resolveObsUri);
 const mockWriteStdout = vi.mocked(writeStdout);
 const mockWriteStderr = vi.mocked(writeStderr);
 const mockFormatInspectResult = vi.mocked(formatInspectResult);
@@ -347,5 +348,80 @@ describe("cmd-inspect", () => {
 
     expect(code).toBe(EXIT_SUCCESS);
     expect(mockWriteStdout).toHaveBeenCalledWith("");
+  });
+
+  describe("obs:// URI routing", () => {
+    it("routes obs:// URI through resolveObsUri", async () => {
+      const { tracker, resolveMention } = makeTracker({ ok: true, value: makeMentionResult() });
+      mockResolveObsUri.mockResolvedValueOnce({
+        ok: true,
+        value: makeMentionResult({
+          targetType: "file",
+          resolvedPath: "notes/plan.md",
+        }),
+      });
+      mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+      const code = await run(makeArgs({ mention: "obs://MyVault/notes/plan.md" }));
+
+      expect(code).toBe(EXIT_SUCCESS);
+      expect(mockResolveObsUri).toHaveBeenCalledWith("obs://MyVault/notes/plan.md", tracker);
+      expect(resolveMention).not.toHaveBeenCalled();
+      expect(mockResolveSkillMention).not.toHaveBeenCalled();
+    });
+
+    it("does NOT normalize obs:// URI with @obs: prefix", async () => {
+      const { tracker } = makeTracker({ ok: true, value: makeMentionResult() });
+      mockResolveObsUri.mockResolvedValueOnce({
+        ok: true,
+        value: makeMentionResult(),
+      });
+      mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+      await run(makeArgs({ mention: "obs://MyVault/path" }));
+
+      expect(mockResolveObsUri).toHaveBeenCalledWith("obs://MyVault/path", tracker);
+    });
+
+    it("includes section in output when resolveObsUri returns section", async () => {
+      const { tracker } = makeTracker({ ok: true, value: makeMentionResult() });
+      mockResolveObsUri.mockResolvedValueOnce({
+        ok: true,
+        value: makeMentionResult({
+          section: "Architecture",
+          content: "Section content only",
+        }),
+      });
+      mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+      await run(makeArgs({ mention: "obs://MyVault/plan.md#Architecture" }));
+
+      expect(mockFormatInspectResult).toHaveBeenCalledWith(
+        expect.objectContaining({
+          section: "Architecture",
+          content: "Section content only",
+        }),
+        expect.any(Object),
+      );
+    });
+
+    it("returns EXIT_ERROR when resolveObsUri returns error", async () => {
+      const { tracker } = makeTracker({ ok: true, value: makeMentionResult() });
+      mockResolveObsUri.mockResolvedValueOnce({
+        ok: false,
+        error: { code: "INVALID_URI", message: "vault mismatch" },
+      });
+      mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+      const code = await run(makeArgs({ mention: "obs://WrongVault/path" }));
+
+      expect(code).toBe(EXIT_ERROR);
+      expect(mockWriteStderr).toHaveBeenCalled();
+      expect(mockFormatError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          code: "INVALID_URI",
+        }),
+      );
+    });
   });
 });
