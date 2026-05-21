@@ -29,12 +29,6 @@
     "publish:vscode": "hack/publish-vscode.sh",
     "reset": "pnpm -r run clean && rm -rf node_modules packages/*/node_modules && pnpm install"
   },
-  "pnpm": {
-    "shamefullyHoist": false,
-    "overrides": {
-      "fast-uri": ">=3.1.2"
-    }
-  },
   "devDependencies": {
     "@eslint/js": "^10.0.0",
     "@types/node": "^22.19.0",
