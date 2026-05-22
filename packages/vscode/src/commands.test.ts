@@ -94,6 +94,12 @@ function invokeCommandWithUri(
   return { handler, tree, channel };
 }
 
+describe("COMMAND constant", () => {
+  it("defines reloadVault command identifier", () => {
+    expect(COMMAND.reloadVault).toBe("obsidianVFS.reloadVault");
+  });
+});
+
 describe("registerCommands", () => {
   beforeEach(() => {
     vi.clearAllMocks();

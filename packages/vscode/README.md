@@ -38,6 +38,7 @@ Available via the Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`):
 | `Obsidian VFS: Copy Path` | Copy the active file's `obs://` URI to the clipboard (`Shift+Alt+Cmd+C` on `obs://` files) |
 | `Obsidian VFS: Move into Vault` | Move a file from the current project into a mounted vault folder (Explorer context menu, editor title, or Command Palette) |
 | `Obsidian VFS: Duplicate into Vault` | Duplicate a file from the current project into a mounted vault folder (Explorer context menu, editor title, or Command Palette) |
+| `Obsidian VFS: Reload Vault` | Re-scan the vault root and refresh `files.exclude` patterns and Explorer tree view |
 
 ## Settings
 
@@ -107,6 +108,7 @@ Non-autoMount vault content (`.obsidian/`, `.trash/`, and any directories not in
 
 - The extension scans the vault root and adds `files.exclude` patterns for entries not in `autoMount`. Patterns are split into two tiers: vault-global patterns (dotfiles and `blocked` paths) are written to `<vault>/.vscode/settings.json` — controlled by `vault.excludeDotfiles`, `vault.excludeDotfilePattern`, and `vault.excludeBlocked`; remaining non-autoMount directories and file extension globs are written to workspace settings — controlled by `workspace.excludeUnmountedFolders`, `workspace.excludeUnmountedFiles`, and `workspace.excludeUnmountedFilePattern`. All managed patterns are tracked internally for cleanup.
 - When `autoMount` entries or any `vault.*`/`workspace.*` toggle changes, patterns are re-synced automatically — stale patterns are removed and new ones added.
+- When new dotfiles or directories are added to the vault outside VS Code, run **Obsidian VFS: Reload Vault** to manually refresh patterns and the tree view.
 - When `obsidianVFS.workspace.enabled` is disabled, all managed patterns are removed and the workspace folder is deleted.
 - The vault's `.git` repository is automatically added to `git.ignoredRepositories` (user-level setting) when `vault.gitIgnore` is true and a workspace folder is active, preventing VS Code's Git extension from listing it in Source Control. The entry is removed when `vault.gitIgnore` is disabled or the workspace folder is removed.
 

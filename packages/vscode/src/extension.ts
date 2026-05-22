@@ -5,7 +5,7 @@ import { parse as parseJsonc } from "jsonc-parser";
 import { VAULT_MODE } from "@obsidian-vfs/core";
 
 import { bootstrapFromConfig, readConfig } from "./bootstrap.js";
-import { CONFIG_KEY, CONFIG_PROP, CONFIG_SECTION } from "./types.js";
+import { COMMAND, CONFIG_KEY, CONFIG_PROP, CONFIG_SECTION } from "./types.js";
 import type { ExtensionConfig } from "./types.js";
 import { SCHEME } from "./uri-adapter.js";
 import { registerCommands } from "./commands.js";
@@ -424,6 +424,13 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   };
 
   await activateWorkspaceFolder(wsCtx, config);
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand(COMMAND.reloadVault, () => {
+      scheduleSync(wsCtx, readConfig());
+      treeProvider.refresh();
+    }),
+  );
 
   context.subscriptions.push(
     vscode.workspace.onDidChangeConfiguration((e) =>

@@ -83,7 +83,7 @@ import type { LocalIndexTracker } from "@obsidian-vfs/core";
 import { bootstrapFromConfig, readConfig } from "./bootstrap.js";
 import { registerCommands } from "./commands.js";
 import { activate, deactivate } from "./extension.js";
-import { CONFIG_KEY } from "./types.js";
+import { COMMAND, CONFIG_KEY } from "./types.js";
 import { SCHEME } from "./uri-adapter.js";
 import { FOLDER_NAME_PREFIX } from "./workspace-folder.js";
 import { ObsidianFileSystemProvider } from "./file-system-provider.js";
@@ -470,6 +470,47 @@ describe("activate", () => {
       expect.anything(),
       { isCaseSensitive: true, isReadonly: false },
     );
+  });
+
+  it("registers reloadVault command", async () => {
+    bootstrapOk();
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ workspaceEnabled: false }));
+
+    const ctx = fakeContext();
+    await activate(ctx as never);
+
+    const reloadVaultCall = vi
+      .mocked(vscode.commands.registerCommand)
+      .mock.calls.find((call) => call[0] === COMMAND.reloadVault);
+
+    expect(reloadVaultCall).toBeDefined();
+    expect(reloadVaultCall![1]).toBeTypeOf("function");
+  });
+
+  it("reloadVault command triggers tree refresh", async () => {
+    bootstrapOk();
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig({ workspaceEnabled: false }));
+    mockHasWF.mockReturnValue(true);
+
+    const ctx = fakeContext();
+    await activate(ctx as never);
+
+    const treeProviderInstance = vi.mocked(VaultTreeDataProvider).mock.results[0].value as {
+      refresh: ReturnType<typeof vi.fn>;
+    };
+
+    treeProviderInstance.refresh.mockClear();
+
+    const reloadVaultCall = vi
+      .mocked(vscode.commands.registerCommand)
+      .mock.calls.find((call) => call[0] === COMMAND.reloadVault);
+
+    expect(reloadVaultCall).toBeDefined();
+
+    const reloadHandler = reloadVaultCall![1] as () => void;
+    reloadHandler();
+
+    expect(treeProviderInstance.refresh).toHaveBeenCalled();
   });
 });
 

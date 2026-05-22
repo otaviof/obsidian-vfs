@@ -52,6 +52,7 @@ export const COMMAND = {
   copyPath: `${CONFIG_SECTION}.copyPath`,
   moveIntoVault: `${CONFIG_SECTION}.moveIntoVault`,
   duplicateIntoVault: `${CONFIG_SECTION}.duplicateIntoVault`,
+  reloadVault: `${CONFIG_SECTION}.reloadVault`,
 } as const;
 
 import type { VaultMode } from "@obsidian-vfs/core";
