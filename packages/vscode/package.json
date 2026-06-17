@@ -243,9 +243,9 @@
     "@obsidian-vfs/core": "workspace:*"
   },
   "devDependencies": {
-    "@types/vscode": "^1.100.0",
-    "@vscode/vsce": "^3.0.0",
-    "esbuild": "^0.28.0",
+    "@types/vscode": "^1.120.0",
+    "@vscode/vsce": "^3.9.2",
+    "esbuild": "^0.28.1",
     "jsonc-parser": "^3.3.1"
   }
 }
