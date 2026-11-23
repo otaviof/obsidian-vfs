@@ -68,5 +68,3 @@ jobs:
       - run: pnpm package:vscode
 
       - run: pnpm publish:vscode
-        env:
-          VSCE_PAT: ${{ secrets.VSCE_PAT }}
