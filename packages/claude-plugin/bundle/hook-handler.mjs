@@ -572,10 +572,14 @@ import path6 from "node:path";
 // ../core/dist/uri.js
 var URI_SCHEME = "obs";
 var URI_PREFIX = `${URI_SCHEME}://`;
+var ALIAS_SCHEME = "vault";
+var URI_SCHEMES = [URI_SCHEME, ALIAS_SCHEME];
+var ACCEPTED_SCHEMES = URI_SCHEMES.join("|");
 function buildObsUri(components) {
+  const scheme = components.scheme ?? URI_SCHEME;
   const vault = encodeURIComponent(components.vaultName);
   const p = components.path.split("/").map(encodeURIComponent).join("/");
-  let uri = `${URI_PREFIX}${vault}/${p}`;
+  let uri = `${scheme}://${vault}/${p}`;
   if (components.section !== void 0) {
     uri += `#${encodeURIComponent(components.section)}`;
   }
@@ -642,8 +646,16 @@ function processContent(markdown, options) {
 }
 
 // ../core/dist/resolve-mention.js
-var MENTION_PREFIX = `@${URI_SCHEME}:`;
-var SKILL_PREFIX = `/${URI_SCHEME}:`;
+var MENTION_PREFIX = `@${URI_SCHEMES[0]}:`;
+var SKILL_PREFIX = `/${URI_SCHEMES[0]}:`;
+var MENTION_PREFIXES = URI_SCHEMES.map((s) => `@${s}:`);
+var SKILL_PREFIXES = URI_SCHEMES.map((s) => `/${s}:`);
+function matchMentionPrefix(input) {
+  return MENTION_PREFIXES.find((p) => input.startsWith(p));
+}
+function matchSkillPrefix(input) {
+  return SKILL_PREFIXES.find((p) => input.startsWith(p));
+}
 function parseSection(reference) {
   const hashIndex = reference.indexOf("#");
   if (hashIndex < 0)
@@ -714,7 +726,8 @@ async function resolveNonAgent(namePart, tracker, securityOptions2) {
   };
 }
 async function resolveMention(mention, tracker) {
-  if (!mention.startsWith(MENTION_PREFIX)) {
+  const prefix = matchMentionPrefix(mention);
+  if (prefix === void 0) {
     return {
       ok: false,
       error: {
@@ -723,7 +736,7 @@ async function resolveMention(mention, tracker) {
       }
     };
   }
-  const raw = mention.slice(MENTION_PREFIX.length).trim();
+  const raw = mention.slice(prefix.length).trim();
   if (raw === "") {
     return {
       ok: false,
@@ -781,7 +794,8 @@ async function resolveMention(mention, tracker) {
   };
 }
 async function resolveSkillMention(mention, tracker) {
-  if (!mention.startsWith(SKILL_PREFIX)) {
+  const prefix = matchSkillPrefix(mention);
+  if (prefix === void 0) {
     return {
       ok: false,
       error: {
@@ -790,7 +804,7 @@ async function resolveSkillMention(mention, tracker) {
       }
     };
   }
-  const raw = mention.slice(SKILL_PREFIX.length).trim();
+  const raw = mention.slice(prefix.length).trim();
   if (raw === "") {
     return {
       ok: false,
@@ -1436,6 +1450,7 @@ async function bootstrapTracker(config) {
 // ../core/dist/markdown-links.js
 var FENCED_CODE_REGEX = /^(`{3,}|~{3,}).*$\n[\s\S]*?^(\1)[ \t]*$/gm;
 var INLINE_CODE_REGEX = /`[^`]+`/g;
+var OBS_LINK_REGEX = new RegExp(`\\[([^\\]]*)\\]\\(((?:${URI_SCHEMES.join("|")}):\\/\\/[^)]+)\\)`, "g");
 function maskRegion(text, start, end) {
   return text.slice(0, start) + " ".repeat(end - start) + text.slice(end);
 }
@@ -1457,7 +1472,7 @@ function toAbsolutePath(tracker, relativePath) {
 }
 
 // src/mention-extractor.ts
-var MENTION_PATTERN = new RegExp(`([@/])${URI_SCHEME}:([^\\s]+)`, "g");
+var MENTION_PATTERN = new RegExp(`([@/])(?:${URI_SCHEMES.join("|")}):([^\\s]+)`, "g");
 var TRAILING_PUNCT = /[,.)!?;:]+$/;
 function extractMentions(prompt) {
   const masked = maskCodeRegions(prompt);

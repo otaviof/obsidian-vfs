@@ -38,6 +38,15 @@ describe("toVscodeUri", () => {
       path: "/",
     });
   });
+
+  it("builds vault:// URI when explicit scheme given", () => {
+    const uri = toVscodeUri("10-projects/plan.md", "MyVault", "vault");
+    expect(uri).toMatchObject({
+      scheme: "vault",
+      authority: "MyVault",
+      path: "/10-projects/plan.md",
+    });
+  });
 });
 
 describe("toFileUri", () => {

@@ -120,6 +120,19 @@ describe("hasVaultWorkspaceFolder", () => {
     expect(hasVaultWorkspaceFolder("/vault")).toBe(false);
   });
 
+  it("returns true when a vault://-scheme folder with managed name exists", () => {
+    workspace.workspaceFolders = [
+      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
+      { uri: { scheme: "vault" }, name: "vault://MyVault", index: 1 },
+    ];
+    expect(hasVaultWorkspaceFolder("/vault")).toBe(true);
+  });
+
+  it("returns false when a foreign vault://-scheme folder has an unmanaged name", () => {
+    workspace.workspaceFolders = [{ uri: { scheme: "vault" }, name: "ForeignVault", index: 0 }];
+    expect(hasVaultWorkspaceFolder("/vault")).toBe(false);
+  });
+
   it("returns false when file:// folder path is a prefix collision", () => {
     workspace.workspaceFolders = [
       {
@@ -301,6 +314,23 @@ describe("removeVaultWorkspaceFolders", () => {
         index: 0,
       },
     ];
+
+    removeVaultWorkspaceFolders("/vault");
+    expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();
+  });
+
+  it("removes vault://-scheme folder with managed name", () => {
+    workspace.workspaceFolders = [
+      { uri: { scheme: "file", fsPath: "/projects/foo" }, name: "foo", index: 0 },
+      { uri: { scheme: "vault" }, name: "vault://MyVault", index: 1 },
+    ];
+
+    removeVaultWorkspaceFolders("/vault");
+    expect(workspace.updateWorkspaceFolders).toHaveBeenCalledWith(1, 1);
+  });
+
+  it("does not remove foreign vault://-scheme folder with unmanaged name", () => {
+    workspace.workspaceFolders = [{ uri: { scheme: "vault" }, name: "ForeignVault", index: 0 }];
 
     removeVaultWorkspaceFolders("/vault");
     expect(workspace.updateWorkspaceFolders).not.toHaveBeenCalled();

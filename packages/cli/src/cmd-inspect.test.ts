@@ -370,6 +370,58 @@ describe("cmd-inspect", () => {
       expect(mockResolveSkillMention).not.toHaveBeenCalled();
     });
 
+    it("routes vault:// URI through resolveObsUri", async () => {
+      const { tracker, resolveMention } = makeTracker({ ok: true, value: makeMentionResult() });
+      mockResolveObsUri.mockResolvedValueOnce({
+        ok: true,
+        value: makeMentionResult({
+          targetType: "file",
+          resolvedPath: "notes/plan.md",
+        }),
+      });
+      mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+      const code = await run(makeArgs({ mention: "vault://MyVault/path" }));
+
+      expect(code).toBe(EXIT_SUCCESS);
+      expect(mockResolveObsUri).toHaveBeenCalledWith("vault://MyVault/path", tracker);
+      expect(resolveMention).not.toHaveBeenCalled();
+      expect(mockResolveSkillMention).not.toHaveBeenCalled();
+    });
+
+    it("routes /vault: skill mention through resolveSkillMention", async () => {
+      const { tracker, resolveMention } = makeTracker({ ok: true, value: makeMentionResult() });
+      mockResolveSkillMention.mockResolvedValueOnce({
+        ok: true,
+        value: {
+          targetType: "skill",
+          resolvedPath: "skills/deploy/SKILL.md",
+          vaultName: "My Vault",
+          content: "Skill content",
+          section: undefined,
+        },
+      });
+      mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+      const code = await run(makeArgs({ mention: "/vault:deploy" }));
+
+      expect(code).toBe(EXIT_SUCCESS);
+      expect(resolveMention).not.toHaveBeenCalled();
+      expect(mockResolveSkillMention).toHaveBeenCalledWith("/vault:deploy", tracker);
+    });
+
+    it("resolves @vault: mention as mention", async () => {
+      const { tracker, resolveMention } = makeTracker({ ok: true, value: makeMentionResult() });
+      mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+      const code = await run(makeArgs({ mention: "@vault:architect" }));
+
+      expect(code).toBe(EXIT_SUCCESS);
+      expect(resolveMention).toHaveBeenCalledWith("@vault:architect");
+      expect(mockResolveObsUri).not.toHaveBeenCalled();
+      expect(mockResolveSkillMention).not.toHaveBeenCalled();
+    });
+
     it("does NOT normalize obs:// URI with @obs: prefix", async () => {
       const { tracker } = makeTracker({ ok: true, value: makeMentionResult() });
       mockResolveObsUri.mockResolvedValueOnce({

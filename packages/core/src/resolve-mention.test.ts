@@ -440,6 +440,14 @@ describe("normalizeMention", () => {
     expect(normalizeMention("/obs:my-skill")).toBe("/obs:my-skill");
   });
 
+  it("passes through @vault: prefix", () => {
+    expect(normalizeMention("@vault:notes/plan.md")).toBe("@vault:notes/plan.md");
+  });
+
+  it("passes through /vault: prefix", () => {
+    expect(normalizeMention("/vault:my-skill")).toBe("/vault:my-skill");
+  });
+
   it("handles empty string", () => {
     expect(normalizeMention("")).toBe("@obs:");
   });
@@ -556,5 +564,50 @@ describe("resolveObsUri", () => {
 
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.error.code).toBe("INVALID_URI");
+  });
+
+  it("resolves @vault: mention identically to @obs:", async () => {
+    const tracker = stubTracker();
+    readFileMock.mockResolvedValueOnce(Buffer.from("note content"));
+
+    const result = await resolveMention("@vault:notes/plan.md", tracker);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.targetType).toBe("file");
+      expect(result.value.resolvedPath).toBe("notes/plan.md");
+      expect(result.value.content).toContain("note content");
+    }
+  });
+
+  it("resolves /vault: skill mention", async () => {
+    accessMock.mockResolvedValueOnce(undefined);
+    const tracker = stubTracker({ skills: ["skills"] });
+    readFileMock.mockResolvedValueOnce(Buffer.from("skill content"));
+
+    const result = await resolveSkillMention("/vault:obsidian", tracker);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.targetType).toBe("skill");
+      expect(result.value.resolvedPath).toBe("skills/obsidian/SKILL.md");
+    }
+  });
+
+  it("resolves vault:// URI via @vault: synthesis with same result as obs://", async () => {
+    const viaAlias = stubTracker();
+    readFileMock.mockResolvedValueOnce(Buffer.from("note content"));
+    const aliasResult = await resolveObsUri("vault://TestVault/notes/plan.md", viaAlias);
+
+    const viaCanonical = stubTracker();
+    readFileMock.mockResolvedValueOnce(Buffer.from("note content"));
+    const canonicalResult = await resolveObsUri("obs://TestVault/notes/plan.md", viaCanonical);
+
+    expect(aliasResult.ok).toBe(true);
+    expect(canonicalResult.ok).toBe(true);
+    if (aliasResult.ok && canonicalResult.ok) {
+      expect(aliasResult.value.resolvedPath).toBe(canonicalResult.value.resolvedPath);
+      expect(aliasResult.value.targetType).toBe(canonicalResult.value.targetType);
+      expect(aliasResult.value.content).toBe(canonicalResult.value.content);
+      expect(aliasResult.value.vaultName).toBe(canonicalResult.value.vaultName);
+    }
   });
 });

@@ -100,6 +100,26 @@ describe("bundle execution", () => {
       expect(output.hookSpecificOutput?.additionalContext).toContain("@obs:architect");
       expect(output.hookSpecificOutput?.additionalContext).toContain("Error:");
     });
+
+    it("handles @vault: mention (bootstrap failure expected)", async () => {
+      const input = JSON.stringify({
+        hook_event_name: "UserPromptSubmit",
+        session_id: "test",
+        transcript_path: "/tmp",
+        cwd: "/tmp",
+        prompt: "Check @vault:architect",
+      });
+
+      const result = await runBin("obs-hook-handler", input);
+      const output = JSON.parse(result.stdout.trim()) as {
+        hookSpecificOutput?: { additionalContext?: string };
+      };
+
+      expect(output).toHaveProperty("hookSpecificOutput");
+      expect(output.hookSpecificOutput).toHaveProperty("additionalContext");
+      expect(output.hookSpecificOutput?.additionalContext).toContain("@vault:architect");
+      expect(output.hookSpecificOutput?.additionalContext).toContain("Error:");
+    });
   });
 
   describe("obs-expansion-handler", () => {

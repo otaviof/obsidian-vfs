@@ -5,6 +5,8 @@ Shared engine for Obsidian VFS. Provides `obs://` URI resolution, file I/O, Obsi
 ## Responsibilities
 
 - **URI resolution** — `obs://` scheme handling, `@obs:` context mentions, `/obs:` skill mentions, `[[wikilink]]` resolution.
+  `vault://` (and `@vault:` / `/vault:`) are accepted everywhere as aliases of the `obs://` forms; `obs://` remains the canonical form for generated URIs, mentions, and proxies.
+
 - **File I/O** — Direct reads via `node:fs` (bypassing the CLI for performance), directory enumeration, file watching.
 - **Obsidian CLI wrapper** — Async queue-serialized calls to the `obsidian` binary for search, backlinks, vault discovery. JSON and plain-text response parsing.
 - **Content processing** — Section slicing by `#heading`, `[[wikilink]]` scrubbing to `obs://` URIs, `![[embed]]` transclusion, Markdown link parsing.

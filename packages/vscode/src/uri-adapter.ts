@@ -4,7 +4,7 @@ import * as vscode from "vscode";
 
 import { SCHEME } from "./scheme.js";
 
-export { SCHEME };
+export { ALIAS_SCHEME, SCHEME, SCHEMES, isManagedScheme } from "./scheme.js";
 
 /** Convert a `vscode.Uri` with scheme `obs` to a vault-relative path. */
 export function toVaultPath(uri: vscode.Uri): string {
@@ -12,9 +12,13 @@ export function toVaultPath(uri: vscode.Uri): string {
 }
 
 /** Build a `vscode.Uri` from a vault-relative path and vault name. */
-export function toVscodeUri(vaultPath: string, vaultName: string): vscode.Uri {
+export function toVscodeUri(
+  vaultPath: string,
+  vaultName: string,
+  scheme: string = SCHEME,
+): vscode.Uri {
   return vscode.Uri.from({
-    scheme: SCHEME,
+    scheme,
     authority: vaultName,
     path: "/" + vaultPath,
   });

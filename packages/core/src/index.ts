@@ -24,9 +24,9 @@ export type {
 export { ERR, ERRNO, VAULT_MODE } from "./types.js";
 
 /**
- * Parsed `obs://` URI components.
+ * Parsed `obs://`/`vault://` URI components and accepted schemes.
  */
-export type { ObsUriComponents } from "./uri.js";
+export type { ObsUriComponents, UriScheme } from "./uri.js";
 
 /**
  * Parameters for path security validation.
@@ -102,7 +102,15 @@ export { AsyncQueue } from "./queue.js";
  * LRU cache, URI parsing, config validation, secure file reads, and tracker.
  */
 export { LRUCache } from "./lru-cache.js";
-export { URI_SCHEME, URI_PREFIX, parseObsUri, buildObsUri } from "./uri.js";
+export {
+  URI_SCHEME,
+  URI_PREFIX,
+  ALIAS_SCHEME,
+  URI_SCHEMES,
+  matchUriPrefix,
+  parseObsUri,
+  buildObsUri,
+} from "./uri.js";
 export { validateVFSConfig } from "./vfs-config.js";
 export { readVirtualFile } from "./read-file.js";
 export { LocalIndexTracker } from "./local-index-tracker.js";
@@ -132,7 +140,9 @@ export { VaultFileWatcher } from "./file-watcher.js";
 export { listFolders, listMarkdownFiles, readDirectory, statVirtualFile } from "./fs-enumeration.js";
 export {
   MENTION_PREFIX,
+  MENTION_PREFIXES,
   SKILL_PREFIX,
+  SKILL_PREFIXES,
   normalizeMention,
   parseSection,
   resolveMention,

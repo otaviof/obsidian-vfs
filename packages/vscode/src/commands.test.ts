@@ -674,6 +674,28 @@ describe("copyPath command", () => {
     });
   });
 
+  it("copies vault:// URI when active editor has vault:// scheme", async () => {
+    const tracker = mockLocalIndexTracker();
+
+    Object.defineProperty(vscode.window, "activeTextEditor", {
+      value: { document: { uri: { scheme: "vault", path: "/notes/todo.md" } } },
+      writable: true,
+      configurable: true,
+    });
+
+    const { handler } = invokeCommand(COMMAND.copyPath, tracker);
+    await handler();
+
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    expect(vscode.env.clipboard.writeText).toHaveBeenCalledWith("vault://TestVault/notes/todo.md");
+
+    Object.defineProperty(vscode.window, "activeTextEditor", {
+      value: undefined,
+      writable: true,
+      configurable: true,
+    });
+  });
+
   it("copies obs:// URI when active editor has file:// scheme under vault", async () => {
     const tracker = mockLocalIndexTracker();
 

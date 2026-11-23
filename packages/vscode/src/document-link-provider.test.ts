@@ -286,7 +286,7 @@ describe("ObsidianDocumentLinkProvider", () => {
       ]);
       mockParseObsUri.mockReturnValueOnce({
         ok: true,
-        value: { vaultName: "TestVault", path: "folder/Note.md", section: undefined },
+        value: { vaultName: "TestVault", path: "folder/Note.md", section: undefined, scheme: "obs" },
       });
 
       const provider = new ObsidianDocumentLinkProvider(tracker);
@@ -310,7 +310,7 @@ describe("ObsidianDocumentLinkProvider", () => {
       ]);
       mockParseObsUri.mockReturnValueOnce({
         ok: true,
-        value: { vaultName: "TestVault", path: "note.md", section: "section" },
+        value: { vaultName: "TestVault", path: "note.md", section: "section", scheme: "obs" },
       });
 
       const provider = new ObsidianDocumentLinkProvider(tracker);
@@ -330,7 +330,7 @@ describe("ObsidianDocumentLinkProvider", () => {
       ]);
       mockParseObsUri.mockReturnValueOnce({
         ok: true,
-        value: { vaultName: "OtherVault", path: "note.md", section: undefined },
+        value: { vaultName: "OtherVault", path: "note.md", section: undefined, scheme: "obs" },
       });
 
       const provider = new ObsidianDocumentLinkProvider(tracker);
@@ -374,7 +374,7 @@ describe("ObsidianDocumentLinkProvider", () => {
       ]);
       mockParseObsUri.mockReturnValueOnce({
         ok: true,
-        value: { vaultName: "TestVault", path: "other.md", section: undefined },
+        value: { vaultName: "TestVault", path: "other.md", section: undefined, scheme: "obs" },
       });
 
       const provider = new ObsidianDocumentLinkProvider(tracker);
@@ -393,7 +393,7 @@ describe("ObsidianDocumentLinkProvider", () => {
       mockParseObsLinks.mockReturnValueOnce([makeParsedObsLink({ rawUri: "obs://TestVault/note" })]);
       mockParseObsUri.mockReturnValueOnce({
         ok: true,
-        value: { vaultName: "TestVault", path: "note", section: undefined },
+        value: { vaultName: "TestVault", path: "note", section: undefined, scheme: "obs" },
       });
 
       const provider = new ObsidianDocumentLinkProvider(tracker);

@@ -7,7 +7,7 @@ import type { LocalIndexTracker, PathSecurityOptions } from "@obsidian-vfs/core"
 import { buildObsUri, VAULT_MODE, validatePathForWrite } from "@obsidian-vfs/core";
 
 import { COMMAND, CONFIG_KEY, CONFIG_PROP, CONFIG_SECTION } from "./types.js";
-import { SCHEME, toFileUri, toVaultPath, toVaultPathFromFile } from "./uri-adapter.js";
+import { isManagedScheme, toFileUri, toVaultPath, toVaultPathFromFile } from "./uri-adapter.js";
 import type { VaultTreeDataProvider } from "./vault-tree-provider.js";
 import { readAutoMount } from "./vault-tree-provider.js";
 
@@ -17,7 +17,7 @@ function readDepthLimit(): number {
 
 function resolveVaultPath(physicalPath: string): string | undefined {
   const editor = vscode.window.activeTextEditor;
-  if (editor?.document.uri.scheme === SCHEME) return toVaultPath(editor.document.uri);
+  if (editor && isManagedScheme(editor.document.uri.scheme)) return toVaultPath(editor.document.uri);
   if (editor?.document.uri.scheme === "file")
     return toVaultPathFromFile(editor.document.uri, physicalPath);
   return undefined;
@@ -133,18 +133,21 @@ async function openInObsidianCommand(
   }
 }
 
-/** Copy the active file's `obs://` URI to the clipboard. */
+/** Copy the active file's `obs://` (or `vault://`) URI to the clipboard. */
 async function copyPathCommand(tracker: LocalIndexTracker): Promise<void> {
+  const editor = vscode.window.activeTextEditor;
   const vaultPath = resolveVaultPath(tracker.context.physicalPath);
   if (!vaultPath) {
     await vscode.window.showInformationMessage("No Obsidian VFS file active");
     return;
   }
-
+  const scheme =
+    editor && isManagedScheme(editor.document.uri.scheme) ? editor.document.uri.scheme : undefined;
   const obsUri = buildObsUri({
     vaultName: tracker.context.name,
     path: vaultPath,
     section: undefined,
+    scheme,
   });
   await vscode.env.clipboard.writeText(obsUri);
 }

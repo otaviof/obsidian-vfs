@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 
-import { buildObsUri, parseObsUri } from "./uri.js";
+import { buildObsUri, matchUriPrefix, parseObsUri, URI_SCHEMES } from "./uri.js";
 
 describe("parseObsUri", () => {
   it("parses a valid URI without section", () => {
     const result = parseObsUri("obs://vault/note.md");
     expect(result).toEqual({
       ok: true,
-      value: { vaultName: "vault", path: "note.md", section: undefined },
+      value: { vaultName: "vault", path: "note.md", section: undefined, scheme: "obs" },
     });
   });
 
@@ -15,7 +15,7 @@ describe("parseObsUri", () => {
     const result = parseObsUri("obs://vault/note.md#Heading");
     expect(result).toEqual({
       ok: true,
-      value: { vaultName: "vault", path: "note.md", section: "Heading" },
+      value: { vaultName: "vault", path: "note.md", section: "Heading", scheme: "obs" },
     });
   });
 
@@ -23,7 +23,12 @@ describe("parseObsUri", () => {
     const result = parseObsUri("obs://vault/folder/sub/note.md");
     expect(result).toEqual({
       ok: true,
-      value: { vaultName: "vault", path: "folder/sub/note.md", section: undefined },
+      value: {
+        vaultName: "vault",
+        path: "folder/sub/note.md",
+        section: undefined,
+        scheme: "obs",
+      },
     });
   });
 
@@ -31,7 +36,7 @@ describe("parseObsUri", () => {
     const result = parseObsUri("obs://My%20Vault/note.md");
     expect(result).toEqual({
       ok: true,
-      value: { vaultName: "My Vault", path: "note.md", section: undefined },
+      value: { vaultName: "My Vault", path: "note.md", section: undefined, scheme: "obs" },
     });
   });
 
@@ -39,7 +44,7 @@ describe("parseObsUri", () => {
     const result = parseObsUri("obs://vault/my%20note.md");
     expect(result).toEqual({
       ok: true,
-      value: { vaultName: "vault", path: "my note.md", section: undefined },
+      value: { vaultName: "vault", path: "my note.md", section: undefined, scheme: "obs" },
     });
   });
 
@@ -47,7 +52,7 @@ describe("parseObsUri", () => {
     const result = parseObsUri("obs://vault/note.md#");
     expect(result).toEqual({
       ok: true,
-      value: { vaultName: "vault", path: "note.md", section: undefined },
+      value: { vaultName: "vault", path: "note.md", section: undefined, scheme: "obs" },
     });
   });
 
@@ -55,7 +60,7 @@ describe("parseObsUri", () => {
     const result = parseObsUri("obs://vault/note.md#My Section");
     expect(result).toEqual({
       ok: true,
-      value: { vaultName: "vault", path: "note.md", section: "My Section" },
+      value: { vaultName: "vault", path: "note.md", section: "My Section", scheme: "obs" },
     });
   });
 
@@ -64,6 +69,37 @@ describe("parseObsUri", () => {
     expect(result.ok).toBe(true);
     if (result.ok) {
       expect(result.value.vaultName).toBe("vault");
+      expect(result.value.scheme).toBe("obs");
+    }
+  });
+
+  it("parses vault:// alias URI", () => {
+    const result = parseObsUri("vault://v/p");
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.vaultName).toBe("v");
+      expect(result.value.path).toBe("p");
+      expect(result.value.scheme).toBe("vault");
+    }
+  });
+
+  it("parses VAULT:// alias URI case-insensitively with normalized scheme", () => {
+    const result = parseObsUri("VAULT://v/p");
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.vaultName).toBe("v");
+      expect(result.value.path).toBe("p");
+      expect(result.value.scheme).toBe("vault");
+    }
+  });
+
+  it("rejects vault:/ (single slash) as wrong scheme", () => {
+    const result = parseObsUri("vault:/v/p");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe("INVALID_URI");
+      expect(result.error.message).toContain("obs");
+      expect(result.error.message).toContain("vault");
     }
   });
 
@@ -72,6 +108,8 @@ describe("parseObsUri", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("INVALID_URI");
+      expect(result.error.message).toContain("obs");
+      expect(result.error.message).toContain("vault");
     }
   });
 
@@ -80,6 +118,8 @@ describe("parseObsUri", () => {
     expect(result.ok).toBe(false);
     if (!result.ok) {
       expect(result.error.code).toBe("INVALID_URI");
+      expect(result.error.message).toContain("obs");
+      expect(result.error.message).toContain("vault");
     }
   });
 
@@ -153,5 +193,49 @@ describe("buildObsUri", () => {
     if (parsed.ok) {
       expect(buildObsUri(parsed.value)).toBe(uri);
     }
+  });
+
+  it("defaults to obs:// scheme (regression pin)", () => {
+    const uri = buildObsUri({ vaultName: "v", path: "p", section: undefined });
+    expect(uri).toBe("obs://v/p");
+  });
+
+  it("builds vault:// when scheme: vault", () => {
+    const uri = buildObsUri({ vaultName: "v", path: "p", section: undefined, scheme: "vault" });
+    expect(uri).toBe("vault://v/p");
+  });
+
+  it("round-trips VAULT:// input to vault:// preserving scheme value", () => {
+    const parsed = parseObsUri("VAULT://v/p");
+    expect(parsed.ok).toBe(true);
+    if (parsed.ok) {
+      expect(parsed.value.scheme).toBe("vault");
+      const rebuilt = buildObsUri(parsed.value);
+      expect(rebuilt).toBe("vault://v/p");
+      const reparsed = parseObsUri(rebuilt);
+      expect(reparsed.ok).toBe(true);
+      if (reparsed.ok) {
+        expect(reparsed.value.scheme).toBe(parsed.value.scheme);
+      }
+    }
+  });
+});
+
+describe("matchUriPrefix", () => {
+  it.each([
+    ["obs://v/p", "obs"],
+    ["OBS://v/p", "obs"],
+    ["vault://v/p", "vault"],
+    ["VAULT://v/p", "vault"],
+    ["Vault://v/p", "vault"],
+    ["vault:/v/p", undefined],
+    ["file://v/p", undefined],
+    ["", undefined],
+  ])("matchUriPrefix(%j) === %j", (input, expected) => {
+    expect(matchUriPrefix(input)).toBe(expected);
+  });
+
+  it("covers exactly the accepted schemes", () => {
+    expect(URI_SCHEMES).toEqual(["obs", "vault"]);
   });
 });

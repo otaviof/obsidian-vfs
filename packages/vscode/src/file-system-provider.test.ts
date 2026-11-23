@@ -275,10 +275,16 @@ describe("ObsidianFileSystemProvider", () => {
 
       provider.setAutoMount(["Notes", "Projects"]);
 
-      expect(fired).toHaveLength(1);
-      const event = fired[0] as { type: number; uri: { path: string } };
-      expect(event.type).toBe(CREATED);
-      expect(event.uri.path).toBe("/Projects");
+      expect(fired).toHaveLength(2);
+      for (const event of fired as { type: number; uri: { path: string; scheme: string } }[]) {
+        expect(event.type).toBe(CREATED);
+        expect(event.uri.path).toBe("/Projects");
+        expect(["obs", "vault"]).toContain(event.uri.scheme);
+      }
+      expect((fired as { uri: { scheme: string } }[]).map((e) => e.uri.scheme).sort()).toEqual([
+        "obs",
+        "vault",
+      ]);
     });
 
     it("fires Deleted event for removed entries", () => {
@@ -290,10 +296,12 @@ describe("ObsidianFileSystemProvider", () => {
 
       provider.setAutoMount(["Notes"]);
 
-      expect(fired).toHaveLength(1);
-      const event = fired[0] as { type: number; uri: { path: string } };
-      expect(event.type).toBe(DELETED);
-      expect(event.uri.path).toBe("/Projects");
+      expect(fired).toHaveLength(2);
+      for (const event of fired as { type: number; uri: { path: string; scheme: string } }[]) {
+        expect(event.type).toBe(DELETED);
+        expect(event.uri.path).toBe("/Projects");
+        expect(["obs", "vault"]).toContain(event.uri.scheme);
+      }
     });
 
     it("fires both Created and Deleted events on replacement", () => {
@@ -305,17 +313,22 @@ describe("ObsidianFileSystemProvider", () => {
 
       provider.setAutoMount(["Projects"]);
 
-      expect(fired).toHaveLength(2);
-      const events = fired as { type: number; uri: { path: string } }[];
-      expect(events).toContainEqual(
-        expect.objectContaining({
-          type: CREATED,
-          uri: expect.objectContaining({ path: "/Projects" }),
-        }),
-      );
-      expect(events).toContainEqual(
-        expect.objectContaining({ type: DELETED, uri: expect.objectContaining({ path: "/Notes" }) }),
-      );
+      expect(fired).toHaveLength(4);
+      const events = fired as { type: number; uri: { path: string; scheme: string } }[];
+      for (const scheme of ["obs", "vault"]) {
+        expect(events).toContainEqual(
+          expect.objectContaining({
+            type: CREATED,
+            uri: expect.objectContaining({ path: "/Projects", scheme }),
+          }),
+        );
+        expect(events).toContainEqual(
+          expect.objectContaining({
+            type: DELETED,
+            uri: expect.objectContaining({ path: "/Notes", scheme }),
+          }),
+        );
+      }
     });
 
     it("does not fire events when autoMount set is unchanged", () => {
@@ -692,6 +705,29 @@ describe("ObsidianFileSystemProvider", () => {
       expect(mockWorkspaceFsCopy).toHaveBeenCalledWith(source, dest, { overwrite: false });
       expect(mockRm).not.toHaveBeenCalled();
     });
+
+    it("takes in-vault fast path for obs:// to vault:// rename with distinct paths", async () => {
+      const tracker = mockLocalIndexTracker({
+        stat: vi.fn().mockResolvedValue({
+          ok: false,
+          error: { code: "FILE_NOT_FOUND", message: "nope" },
+        }),
+      });
+      const provider = new ObsidianFileSystemProvider(tracker);
+      mockValidatePath.mockResolvedValueOnce({ ok: true, value: "/vault/old.md" });
+      mockValidatePathForWrite.mockResolvedValueOnce({ ok: true, value: "/vault/new.md" });
+
+      await provider.rename(
+        fakeUri("/old.md") as never,
+        fakeUri("/new.md", "TestVault", "vault") as never,
+        {
+          overwrite: true,
+        },
+      );
+
+      expect(mockFsRename).toHaveBeenCalledWith("/vault/old.md", "/vault/new.md");
+      expect(mockWorkspaceFsCopy).not.toHaveBeenCalled();
+    });
   });
 
   describe("watch", () => {
@@ -847,6 +883,30 @@ describe("ObsidianFileSystemProvider", () => {
       const event = fired[0] as { uri: { scheme: string; authority: string } };
       expect(event.uri.scheme).toBe("obs");
       expect(event.uri.authority).toBe("TestVault");
+    });
+
+    it("emits vault:// events when watching a vault:// URI", () => {
+      let capturedCallback: (events: readonly { type: string; path: string }[]) => void;
+      const tracker = mockLocalIndexTracker({
+        onDidChangeFile: vi.fn((cb: typeof capturedCallback) => {
+          capturedCallback = cb;
+          return { dispose: vi.fn() };
+        }),
+      });
+      const provider = new ObsidianFileSystemProvider(tracker);
+
+      const fired: unknown[] = [];
+      provider.onDidChangeFile((events) => fired.push(...events));
+
+      provider.watch(fakeUri("/", "TestVault", "vault") as never);
+
+      capturedCallback!([{ type: "changed", path: "/vault/note.md" }]);
+
+      expect(fired).toHaveLength(1);
+      const event = fired[0] as { uri: { scheme: string; authority: string; path: string } };
+      expect(event.uri.scheme).toBe("vault");
+      expect(event.uri.authority).toBe("TestVault");
+      expect(event.uri.path).toBe("/note.md");
     });
   });
 

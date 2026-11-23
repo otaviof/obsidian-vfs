@@ -7,6 +7,9 @@
 
 Browse, search, and edit your [Obsidian](https://obsidian.md) vault directly in VS Code via a virtual file system (`obs://`). Mount vault folders into the Explorer sidebar, navigate `[[wikilinks]]`, and open notes in Obsidian — all without leaving your editor.
 
+`vault://` (and `@vault:` / `/vault:`) are accepted everywhere as aliases of the `obs://` forms; `obs://` remains the canonical form for generated URIs, mentions, and proxies. Copy Path preserves the scheme of the document it is run from. Keybindings work in both schemes; the auto-mounted workspace folder keeps its canonical `obs://<vault>` name; if another extension already owns `vault://`, the extension degrades to `obs://`-only.
+
+
 ## Features
 
 - **Mount vault folders or individual notes** into the Explorer tree view

@@ -14,6 +14,9 @@
 
 Read-only virtual filesystem exposing an [Obsidian](https://obsidian.md) vault via the `obs://` protocol. Three entrypoints — a VS Code extension, a Claude Code plugin, and a CLI — built on a shared core engine.
 
+`vault://` (and `@vault:` / `/vault:`) are accepted everywhere as aliases of the `obs://` forms; `obs://` remains the canonical form for generated URIs, mentions, and proxies. Copy Path preserves the scheme of the document it is run from.
+
+
 ## Packages
 
 | Package | Description | Docs |

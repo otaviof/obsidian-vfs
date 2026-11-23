@@ -570,17 +570,28 @@ import path6 from "node:path";
 // ../core/dist/uri.js
 var URI_SCHEME = "obs";
 var URI_PREFIX = `${URI_SCHEME}://`;
+var ALIAS_SCHEME = "vault";
+var URI_SCHEMES = [URI_SCHEME, ALIAS_SCHEME];
+var ACCEPTED_SCHEMES = URI_SCHEMES.join("|");
+function matchUriPrefix(uri) {
+  for (const scheme of URI_SCHEMES) {
+    if (uri.toLowerCase().startsWith(`${scheme}://`))
+      return scheme;
+  }
+  return void 0;
+}
 function parseObsUri(uri) {
-  if (!uri.toLowerCase().startsWith(URI_PREFIX)) {
+  const scheme = matchUriPrefix(uri);
+  if (scheme === void 0) {
     return {
       ok: false,
       error: {
         code: ERR.INVALID_URI,
-        message: `Invalid ${URI_PREFIX} URI: missing or wrong scheme`
+        message: `Invalid URI: missing or wrong scheme (expected ${ACCEPTED_SCHEMES})`
       }
     };
   }
-  const rest = uri.slice(URI_PREFIX.length);
+  const rest = uri.slice(scheme.length + 3);
   const slashIndex = rest.indexOf("/");
   if (slashIndex < 0) {
     return {
@@ -619,7 +630,8 @@ function parseObsUri(uri) {
       value: {
         vaultName: decodeURIComponent(rawVault),
         path: decodeURIComponent(rawPath),
-        section: rawSection !== void 0 ? decodeURIComponent(rawSection) : void 0
+        section: rawSection !== void 0 ? decodeURIComponent(rawSection) : void 0,
+        scheme
       }
     };
   } catch {
@@ -627,15 +639,16 @@ function parseObsUri(uri) {
       ok: false,
       error: {
         code: ERR.INVALID_URI,
-        message: `Invalid ${URI_PREFIX} URI: malformed percent-encoding`
+        message: `Invalid URI: malformed percent-encoding`
       }
     };
   }
 }
 function buildObsUri(components) {
+  const scheme = components.scheme ?? URI_SCHEME;
   const vault = encodeURIComponent(components.vaultName);
   const p = components.path.split("/").map(encodeURIComponent).join("/");
-  let uri = `${URI_PREFIX}${vault}/${p}`;
+  let uri = `${scheme}://${vault}/${p}`;
   if (components.section !== void 0) {
     uri += `#${encodeURIComponent(components.section)}`;
   }
@@ -702,8 +715,16 @@ function processContent(markdown, options) {
 }
 
 // ../core/dist/resolve-mention.js
-var MENTION_PREFIX = `@${URI_SCHEME}:`;
-var SKILL_PREFIX = `/${URI_SCHEME}:`;
+var MENTION_PREFIX = `@${URI_SCHEMES[0]}:`;
+var SKILL_PREFIX = `/${URI_SCHEMES[0]}:`;
+var MENTION_PREFIXES = URI_SCHEMES.map((s) => `@${s}:`);
+var SKILL_PREFIXES = URI_SCHEMES.map((s) => `/${s}:`);
+function matchMentionPrefix(input) {
+  return MENTION_PREFIXES.find((p) => input.startsWith(p));
+}
+function matchSkillPrefix(input) {
+  return SKILL_PREFIXES.find((p) => input.startsWith(p));
+}
 function parseSection(reference) {
   const hashIndex = reference.indexOf("#");
   if (hashIndex < 0)
@@ -774,7 +795,8 @@ async function resolveNonAgent(namePart, tracker, securityOptions2) {
   };
 }
 async function resolveMention(mention, tracker) {
-  if (!mention.startsWith(MENTION_PREFIX)) {
+  const prefix = matchMentionPrefix(mention);
+  if (prefix === void 0) {
     return {
       ok: false,
       error: {
@@ -783,7 +805,7 @@ async function resolveMention(mention, tracker) {
       }
     };
   }
-  const raw = mention.slice(MENTION_PREFIX.length).trim();
+  const raw = mention.slice(prefix.length).trim();
   if (raw === "") {
     return {
       ok: false,
@@ -841,7 +863,8 @@ async function resolveMention(mention, tracker) {
   };
 }
 async function resolveSkillMention(mention, tracker) {
-  if (!mention.startsWith(SKILL_PREFIX)) {
+  const prefix = matchSkillPrefix(mention);
+  if (prefix === void 0) {
     return {
       ok: false,
       error: {
@@ -850,7 +873,7 @@ async function resolveSkillMention(mention, tracker) {
       }
     };
   }
-  const raw = mention.slice(SKILL_PREFIX.length).trim();
+  const raw = mention.slice(prefix.length).trim();
   if (raw === "") {
     return {
       ok: false,
@@ -1496,6 +1519,7 @@ async function bootstrapTracker(config) {
 // ../core/dist/markdown-links.js
 var FENCED_CODE_REGEX = /^(`{3,}|~{3,}).*$\n[\s\S]*?^(\1)[ \t]*$/gm;
 var INLINE_CODE_REGEX = /`[^`]+`/g;
+var OBS_LINK_REGEX = new RegExp(`\\[([^\\]]*)\\]\\(((?:${URI_SCHEMES.join("|")}):\\/\\/[^)]+)\\)`, "g");
 function maskRegion(text, start, end) {
   return text.slice(0, start) + " ".repeat(end - start) + text.slice(end);
 }
@@ -1542,7 +1566,9 @@ function formatContext(mentions) {
 // src/proxy-detector.ts
 import { readFile as readFile2 } from "node:fs/promises";
 import { join } from "node:path";
-var OBS_READ_PATTERN = /inspect\s+--body\s+"(\/obs:[^"]+)"/;
+var OBS_READ_PATTERN = new RegExp(
+  `inspect\\s+--body\\s+"(\\/(?:${URI_SCHEMES.join("|")}):[^"]+)"`
+);
 async function detectProxy(commandName, cwd) {
   const skillsRoot = join(cwd, ".claude", "skills");
   const relative = join(commandName, "SKILL.md");
@@ -1557,7 +1583,7 @@ async function detectProxy(commandName, cwd) {
   const match = OBS_READ_PATTERN.exec(content);
   if (match === null) return null;
   const obsMention = match[1];
-  const skillName = obsMention.slice("/obs:".length);
+  const skillName = obsMention.slice(obsMention.indexOf(":") + 1);
   return { isProxy: true, skillName, obsMention };
 }
 
@@ -1568,7 +1594,7 @@ function toAbsolutePath(tracker, relativePath) {
 }
 
 // src/uri-extractor.ts
-var OBS_URI_PATTERN = new RegExp(`${URI_PREFIX.replace("//", "\\/{2}")}[^\\s\\]>]+`, "g");
+var OBS_URI_PATTERN = new RegExp(`(?:${URI_SCHEMES.join("|")}):\\/\\/[^\\s\\]>]+`, "g");
 function trimTrailingParens(raw) {
   let uri = raw;
   while (uri.endsWith(")") && (uri.match(/\(/g) ?? []).length < (uri.match(/\)/g) ?? []).length) {

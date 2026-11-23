@@ -172,4 +172,20 @@ describe("extractMentions", () => {
     expect(result).toHaveLength(1);
     expect(result[0].kind).toBe("skill");
   });
+
+  it("extracts @vault: mention as context kind", () => {
+    const result = extractMentions("Check @vault:architect for guidance");
+    expect(result).toHaveLength(1);
+    expect(result[0].reference).toBe("architect");
+    expect(result[0].kind).toBe("context");
+    expect(result[0].raw).toBe("@vault:architect");
+  });
+
+  it("extracts /vault: mention as skill kind", () => {
+    const result = extractMentions("Run /vault:spike-skill now");
+    expect(result).toHaveLength(1);
+    expect(result[0].reference).toBe("spike-skill");
+    expect(result[0].kind).toBe("skill");
+    expect(result[0].raw).toBe("/vault:spike-skill");
+  });
 });

@@ -2,6 +2,9 @@
 
 Command-line interface for inspecting, resolving, and provisioning Obsidian vault resources. Provides diagnostics and automation for vault content, skills, and agents.
 
+`vault://` (and `@vault:` / `/vault:`) are accepted everywhere as aliases of the `obs://` forms; `obs://` remains the canonical form for generated URIs, mentions, and proxies.
+
+
 ## Installation
 
 Run directly via npx (no install required):

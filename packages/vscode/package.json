@@ -1,7 +1,7 @@
 {
   "name": "obsidian-vfs",
   "displayName": "Obsidian VFS",
-  "description": "Browse, search, and edit your Obsidian vault directly in VSCode via a virtual file system (obs://)",
+  "description": "Browse, search, and edit your Obsidian vault directly in VSCode via a virtual file system (obs://, also reachable as vault://)",
   "version": "1.2.2",
   "private": true,
   "publisher": "otaviof",
@@ -21,6 +21,7 @@
   ],
   "activationEvents": [
     "onFileSystem:obs",
+    "onFileSystem:vault",
     "onStartupFinished"
   ],
   "repository": {
@@ -73,7 +74,7 @@
       {
         "command": "obsidianVFS.copyPath",
         "key": "shift+alt+cmd+c",
-        "when": "resourceScheme == obs"
+        "when": "resourceScheme == obs || resourceScheme == vault"
       }
     ],
     "views": {
@@ -180,7 +181,7 @@
             "partial"
           ],
           "default": "rw",
-          "markdownDescription": "Vault access mode controlling write operations through the `obs://` file system.\n- `rw`: Read-write — all writes permitted (default).\n- `ro`: Read-only — no writes allowed.\n- `partial`: Only writes to `autoMount` paths are allowed; everything else is read-only.\n\nThis setting protects tree view operations, drag-and-drop, and `obs://` editor saves. The `file://` workspace folder (used for Quick Open and Search) is not affected."
+          "markdownDescription": "Vault access mode controlling write operations through the `obs://` file system (also reachable as `vault://`).\n- `rw`: Read-write — all writes permitted (default).\n- `ro`: Read-only — no writes allowed.\n- `partial`: Only writes to `autoMount` paths are allowed; everything else is read-only.\n\nThis setting protects tree view operations, drag-and-drop, and `obs://` editor saves. The `file://` workspace folder (used for Quick Open and Search) is not affected."
         },
         "obsidianVFS.statusBar.enabled": {
           "type": "boolean",
@@ -200,7 +201,7 @@
         "obsidianVFS.explorer.title": {
           "type": "string",
           "default": "",
-          "description": "Custom title for the Explorer tree view (defaults to \"obs://<vault_name>\")"
+          "description": "Custom title for the Explorer tree view (defaults to \"obs://<vault_name>\"). The vault is also reachable as vault://."
         },
         "obsidianVFS.workspace.enabled": {
           "type": "boolean",

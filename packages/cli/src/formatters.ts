@@ -284,6 +284,8 @@ Options:
   --unset <key>           Remove a frontmatter attribute from provisioned files (repeatable, provision-*)
   -h, --help              Show this help message
 
+Note: @vault:, /vault:, and vault:// are accepted as aliases of the @obs:, /obs:, and obs:// forms.
+
 Environment:
   OBSIDIAN_VFS_CLI_PATH        Path to the Obsidian CLI binary (default: "obsidian")
   OBSIDIAN_VFS_TIMEOUT_MS      CLI operation timeout in ms (default: 10000)

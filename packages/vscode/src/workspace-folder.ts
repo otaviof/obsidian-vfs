@@ -8,7 +8,7 @@ import * as vscode from "vscode";
 import type { MountNode } from "@obsidian-vfs/core";
 import { buildMountTree, canonicalizePath } from "@obsidian-vfs/core";
 
-import { SCHEME } from "./uri-adapter.js";
+import { ALIAS_SCHEME, SCHEME } from "./scheme.js";
 
 /** Find the vault's workspace folder by matching `file://` scheme + fsPath. */
 function findVaultWorkspaceFolder(physicalPath: string): vscode.WorkspaceFolder | undefined {
@@ -23,17 +23,20 @@ export type AddWorkspaceFolderResult =
   | { readonly status: "already-present" }
   | { readonly status: "skipped"; readonly reason: string };
 
-/** Name prefix for Obsidian-managed workspace folders. */
+/** Name prefix for Obsidian-managed workspace folders (canonical). */
 export const FOLDER_NAME_PREFIX = `${SCHEME}://`;
+export const FOLDER_NAME_PREFIXES = [`${SCHEME}://`, `${ALIAS_SCHEME}://`] as const;
 
 /** Check whether a workspace folder is managed by this extension. */
 function isObsidianManagedFolder(folder: vscode.WorkspaceFolder, physicalPath: string): boolean {
   if (folder.uri.scheme === SCHEME) return true;
+  if (folder.uri.scheme === ALIAS_SCHEME)
+    return FOLDER_NAME_PREFIXES.some((p) => folder.name.startsWith(p));
   if (folder.uri.scheme !== "file") return false;
   const fsPath = folder.uri.fsPath;
   const relative = path.relative(physicalPath, fsPath);
   const isUnderVault = canonicalizePath(relative, physicalPath).ok;
-  return folder.name.startsWith(FOLDER_NAME_PREFIX) && isUnderVault;
+  return FOLDER_NAME_PREFIXES.some((p) => folder.name.startsWith(p)) && isUnderVault;
 }
 
 /** Check whether a vault workspace folder is already present. */

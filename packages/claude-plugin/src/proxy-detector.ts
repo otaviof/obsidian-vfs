@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { canonicalizePath } from "@obsidian-vfs/core";
+import { URI_SCHEMES, canonicalizePath } from "@obsidian-vfs/core";
 
 /** Result of detecting a vault-sourced proxy skill. */
 export interface ProxyDetection {
@@ -10,8 +10,10 @@ export interface ProxyDetection {
   readonly obsMention: string;
 }
 
-/** Pattern matching the obs-read command in a proxy SKILL.md. */
-const OBS_READ_PATTERN = /inspect\s+--body\s+"(\/obs:[^"]+)"/;
+/** Pattern matching the obs-read command in a proxy SKILL.md (any accepted scheme). */
+const OBS_READ_PATTERN = new RegExp(
+  `inspect\\s+--body\\s+"(\\/(?:${URI_SCHEMES.join("|")}):[^"]+)"`,
+);
 
 /** Check if command_name maps to a vault proxy SKILL.md under cwd. */
 export async function detectProxy(commandName: string, cwd: string): Promise<ProxyDetection | null> {
@@ -31,7 +33,7 @@ export async function detectProxy(commandName: string, cwd: string): Promise<Pro
   if (match === null) return null;
 
   const obsMention = match[1];
-  const skillName = obsMention.slice("/obs:".length);
+  const skillName = obsMention.slice(obsMention.indexOf(":") + 1);
 
   return { isProxy: true, skillName, obsMention };
 }

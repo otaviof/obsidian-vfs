@@ -18,7 +18,7 @@ import type {
 } from "@obsidian-vfs/core";
 
 import { throwFileExists, throwVFSError } from "./error-mapper.js";
-import { SCHEME, toVaultPath, toVscodeUri } from "./uri-adapter.js";
+import { SCHEMES, isManagedScheme, toVaultPath, toVscodeUri } from "./uri-adapter.js";
 
 /** Map core `VFSFileType` to `vscode.FileType`. */
 function mapFileType(type: VFSFileType): vscode.FileType {
@@ -74,12 +74,22 @@ export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
     const events: vscode.FileChangeEvent[] = [];
     for (const entry of updated) {
       if (!previous.has(entry)) {
-        events.push({ type: vscode.FileChangeType.Created, uri: toVscodeUri(entry, vaultName) });
+        for (const scheme of SCHEMES) {
+          events.push({
+            type: vscode.FileChangeType.Created,
+            uri: toVscodeUri(entry, vaultName, scheme),
+          });
+        }
       }
     }
     for (const entry of previous) {
       if (!updated.has(entry)) {
-        events.push({ type: vscode.FileChangeType.Deleted, uri: toVscodeUri(entry, vaultName) });
+        for (const scheme of SCHEMES) {
+          events.push({
+            type: vscode.FileChangeType.Deleted,
+            uri: toVscodeUri(entry, vaultName, scheme),
+          });
+        }
       }
     }
     if (events.length > 0) {
@@ -183,7 +193,7 @@ export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
     newUri: vscode.Uri,
     options: { readonly overwrite: boolean },
   ): Promise<void> {
-    if (oldUri.scheme === SCHEME && newUri.scheme === SCHEME) {
+    if (isManagedScheme(oldUri.scheme) && isManagedScheme(newUri.scheme)) {
       const oldVaultPath = toVaultPath(oldUri);
       this.#guardWrite(oldVaultPath, oldUri);
       const oldPathResult = await validatePath(oldVaultPath, this.#securityOptions);
@@ -205,7 +215,7 @@ export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
     }
 
     await vscode.workspace.fs.copy(oldUri, newUri, { overwrite: options.overwrite });
-    if (oldUri.scheme === SCHEME) {
+    if (isManagedScheme(oldUri.scheme)) {
       await this.delete(oldUri, { recursive: false });
     }
   }
@@ -214,13 +224,13 @@ export class ObsidianFileSystemProvider implements vscode.FileSystemProvider {
   watch(uri: vscode.Uri): vscode.Disposable {
     const prefix = toVaultPath(uri);
     const vaultName = this.#tracker.context.name;
-
+    const scheme = uri.scheme;
     const disposable = this.#tracker.onDidChangeFile((events: readonly FileChangeEvent[]) => {
       const mapped = events
         .filter((e) => this.#isUnderPrefix(e.path, prefix))
         .map((e) => ({
           type: mapChangeType(e.type),
-          uri: toVscodeUri(this.#toVaultRelative(e.path), vaultName),
+          uri: toVscodeUri(this.#toVaultRelative(e.path), vaultName, scheme),
         }));
 
       if (mapped.length > 0) {

@@ -1,4 +1,4 @@
-import { URI_PREFIX, maskCodeRegions, parseObsUri } from "@obsidian-vfs/core";
+import { URI_SCHEMES, maskCodeRegions, parseObsUri } from "@obsidian-vfs/core";
 
 /** A single obs:// URI extracted from text. */
 export interface ExtractedUri {
@@ -8,8 +8,8 @@ export interface ExtractedUri {
   readonly section: string | undefined;
 }
 
-/** Pattern matching obs:// URIs — allows parens since encodeURIComponent preserves them. */
-const OBS_URI_PATTERN = new RegExp(`${URI_PREFIX.replace("//", "\\/{2}")}[^\\s\\]>]+`, "g");
+/** Pattern matching obs:// and vault:// URIs — allows parens since encodeURIComponent preserves them. */
+const OBS_URI_PATTERN = new RegExp(`(?:${URI_SCHEMES.join("|")}):\\/\\/[^\\s\\]>]+`, "g");
 
 /** Trim unbalanced trailing parens (markdown link closers like `[text](obs://...)`). */
 function trimTrailingParens(raw: string): string {

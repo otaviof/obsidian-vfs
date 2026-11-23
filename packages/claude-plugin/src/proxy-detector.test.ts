@@ -79,4 +79,19 @@ describe("detectProxy", () => {
     expect(result).not.toBeNull();
     expect(result!.skillName).toBe("ws-skill");
   });
+
+  it("detects a /vault: proxy and slices the skill name by matched prefix", async () => {
+    const skillDir = join(cwd, ".claude", "skills", "vault-skill");
+    mkdirSync(skillDir, { recursive: true });
+    writeFileSync(
+      join(skillDir, "SKILL.md"),
+      '!`npx --yes @obsidian-vfs/cli inspect --body "/vault:vault-skill"`\n',
+    );
+
+    const result = await detectProxy("vault-skill", cwd);
+    expect(result).not.toBeNull();
+    expect(result!.isProxy).toBe(true);
+    expect(result!.skillName).toBe("vault-skill");
+    expect(result!.obsMention).toBe("/vault:vault-skill");
+  });
 });

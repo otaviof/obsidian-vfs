@@ -258,6 +258,7 @@ describe("activate", () => {
     expect(vscode.languages.registerDocumentLinkProvider).toHaveBeenCalledWith(
       [
         { scheme: SCHEME, language: "markdown" },
+        { scheme: "vault", language: "markdown" },
         { scheme: "file", language: "markdown" },
       ],
       expect.anything(),
@@ -469,6 +470,38 @@ describe("activate", () => {
       SCHEME,
       expect.anything(),
       { isCaseSensitive: true, isReadonly: false },
+    );
+  });
+
+  it("registers provider under both obs and vault schemes at activation", async () => {
+    bootstrapOk();
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig());
+
+    await activate(fakeContext() as never);
+
+    const calls = vi.mocked(vscode.workspace.registerFileSystemProvider).mock.calls.map((c) => c[0]);
+    expect(calls).toContain(SCHEME);
+    expect(calls).toContain("vault");
+  });
+
+  it("degrades to obs-only and logs when vault registration collides", async () => {
+    bootstrapOk();
+    mockReadConfig.mockReturnValueOnce(fakeExtensionConfig());
+    vi.mocked(vscode.workspace.registerFileSystemProvider).mockImplementation((scheme: string) => {
+      if (scheme === "vault") throw new Error("scheme already registered");
+      return { dispose: vi.fn() };
+    });
+
+    await activate(fakeContext() as never);
+
+    const calls = vi.mocked(vscode.workspace.registerFileSystemProvider).mock.calls.map((c) => c[0]);
+    expect(calls).toContain(SCHEME);
+    expect(calls).toContain("vault");
+    const channel = vi.mocked(vscode.window.createOutputChannel).mock.results[0].value as {
+      appendLine: (line: string) => void;
+    };
+    expect(channel.appendLine).toHaveBeenCalledWith(
+      expect.stringContaining("vault:// registration failed"),
     );
   });
 
@@ -1185,6 +1218,21 @@ describe("configuration change listener", () => {
       expect.anything(),
       { isCaseSensitive: true, isReadonly: true },
     );
+  });
+
+  it("re-registers provider under both schemes after vault-mode change", async () => {
+    const setup = await setupConfigListener();
+    mockReadConfig.mockReturnValueOnce(
+      fakeExtensionConfig({ vaultMode: "ro", workspaceEnabled: false }),
+    );
+
+    const callsBefore = vi.mocked(vscode.workspace.registerFileSystemProvider).mock.calls.length;
+    fireConfigChange(setup, CONFIG_KEY.vaultMode);
+
+    const newCalls = vi
+      .mocked(vscode.workspace.registerFileSystemProvider)
+      .mock.calls.slice(callsBefore);
+    expect(newCalls.map((c) => c[0]).sort()).toEqual(["obs", "vault"]);
   });
 });
 

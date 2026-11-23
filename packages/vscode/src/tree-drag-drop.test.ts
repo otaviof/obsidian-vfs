@@ -69,6 +69,18 @@ describe("VaultTreeDragAndDropController", () => {
     expect(destUri.path).toBe("/notes/doc.md");
   });
 
+  it("always drops to canonical obs:// destination scheme", async () => {
+    const controller = new VaultTreeDragAndDropController("MyVault");
+    const dt = fakeDataTransfer("file:///local/doc.md");
+
+    await controller.handleDrop(undefined, dt, token);
+
+    expect(mockWorkspaceFsCopy).toHaveBeenCalledTimes(1);
+    const destUri = mockWorkspaceFsCopy.mock.calls[0][1] as { scheme: string; authority: string };
+    expect(destUri.scheme).toBe("obs");
+    expect(destUri.authority).toBe("MyVault");
+  });
+
   it("copies file into parent folder when target is a file", async () => {
     const controller = new VaultTreeDragAndDropController("MyVault");
     const target = new VaultTreeItem("readme.md", "docs/readme.md", "file", "/vault");

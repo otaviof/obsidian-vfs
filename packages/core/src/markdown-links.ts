@@ -1,4 +1,5 @@
-import { MENTION_PREFIX, SKILL_PREFIX } from "./resolve-mention.js";
+import { MENTION_PREFIXES, SKILL_PREFIXES } from "./resolve-mention.js";
+import { URI_SCHEMES } from "./uri.js";
 import type { VFSResult } from "./types.js";
 
 /** Result of parsing a single `[[wikilink]]` or `![[embed]]` in markdown text. */
@@ -32,7 +33,10 @@ const INLINE_CODE_REGEX = /`[^`]+`/g;
 const LINK_REGEX = /\[\[([^\]|#]+)(?:#([^\]|]*))?\|?([^\]]*)\]\]/g;
 
 /** Matches `[display text](obs://...)` standard markdown links. */
-const OBS_LINK_REGEX = /\[([^\]]*)\]\((obs:\/\/[^)]+)\)/g;
+const OBS_LINK_REGEX = new RegExp(
+  `\\[([^\\]]*)\\]\\(((?:${URI_SCHEMES.join("|")}):\\/\\/[^)]+)\\)`,
+  "g",
+);
 
 /** Replace characters in a region with spaces, preserving positions. */
 function maskRegion(text: string, start: number, end: number): string {
@@ -108,8 +112,8 @@ export function normalizeWikilink(input: string): string {
 
 /** Classify a raw reference string as mention, skill, or wikilink. */
 export function classifyInput(raw: string): "mention" | "skill" | "wikilink" {
-  if (raw.startsWith(MENTION_PREFIX)) return "mention";
-  if (raw.startsWith(SKILL_PREFIX)) return "skill";
+  if (MENTION_PREFIXES.some((p) => raw.startsWith(p))) return "mention";
+  if (SKILL_PREFIXES.some((p) => raw.startsWith(p))) return "skill";
   return "wikilink";
 }
 

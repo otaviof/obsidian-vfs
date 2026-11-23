@@ -408,6 +408,19 @@ describe("cmd-resolve", () => {
     expect(resolveSkill).toHaveBeenCalledWith("my-skill");
   });
 
+  it("resolves /vault: skill same as /obs: skill via matched-prefix slice", async () => {
+    const { tracker, resolveSkill } = makeSkillTracker({
+      ok: true,
+      value: "30-resources/ai/skills/obsidian.md",
+    });
+    mockBootstrap.mockResolvedValueOnce({ ok: true, value: { tracker, initMs: 5 } });
+
+    const code = await run(makeArgs({ wikilink: "/vault:obsidian" }));
+
+    expect(code).toBe(EXIT_SUCCESS);
+    expect(resolveSkill).toHaveBeenCalledWith("obsidian");
+  });
+
   it("returns EXIT_ERROR when /obs: skill resolution fails", async () => {
     const { tracker } = makeSkillTracker({
       ok: false,

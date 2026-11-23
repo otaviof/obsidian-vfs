@@ -1,6 +1,6 @@
 import path from "node:path";
 
-import { classifyInput, normalizeWikilink, SKILL_PREFIX } from "@obsidian-vfs/core";
+import { classifyInput, normalizeWikilink } from "@obsidian-vfs/core";
 import type { VFSError } from "@obsidian-vfs/core";
 
 import type { ResolveArgs, ResolveOutput } from "./types.js";
@@ -81,7 +81,7 @@ export async function run(args: ResolveArgs): Promise<number> {
   }
 
   if (kind === "skill") {
-    const skillName = input.slice(SKILL_PREFIX.length);
+    const skillName = input.slice(input.indexOf(":") + 1);
     const result = await tracker.resolveSkill(skillName);
     const resolutionMs = performance.now() - resStart;
 

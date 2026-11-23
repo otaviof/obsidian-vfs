@@ -243,6 +243,22 @@ describe("classifyInput", () => {
   it("classifies empty string as wikilink", () => {
     expect(classifyInput("")).toBe("wikilink");
   });
+
+  it("identifies @vault: alias as mention", () => {
+    expect(classifyInput("@vault:note")).toBe("mention");
+  });
+
+  it("identifies /vault: alias as skill", () => {
+    expect(classifyInput("/vault:skill")).toBe("skill");
+  });
+
+  it("classifies @vault://vault: as mention", () => {
+    expect(classifyInput("@vault://vault:x")).toBe("mention");
+  });
+
+  it("classifies @obs://vault: as mention", () => {
+    expect(classifyInput("@obs://vault:x")).toBe("mention");
+  });
 });
 
 describe("parseObsLinks", () => {
@@ -317,6 +333,39 @@ describe("parseObsLinks", () => {
       check: (links) => {
         expect(links[0].rawUri).toBe("obs://vault/path");
       },
+    },
+    {
+      name: "vault:// alias match with rawUri preserved",
+      input: "See [x](vault://v/p) here",
+      expected: 1,
+      check: (links) => {
+        expect(links[0].displayText).toBe("x");
+        expect(links[0].rawUri).toBe("vault://v/p");
+      },
+    },
+    {
+      name: "vault:// link inside fenced code block skipped",
+      input: "```\n[x](vault://v/p)\n```",
+      expected: 0,
+    },
+    {
+      name: "vault:// link inside inline code skipped",
+      input: "Use `[x](vault://v/p)` here",
+      expected: 0,
+    },
+    {
+      name: "mixed obs:// and vault:// links",
+      input: "[a](obs://v/x) and [b](vault://v/y)",
+      expected: 2,
+      check: (links) => {
+        expect(links[0].rawUri).toBe("obs://v/x");
+        expect(links[1].rawUri).toBe("vault://v/y");
+      },
+    },
+    {
+      name: "bare vault:// URI not matched",
+      input: "vault://v/p",
+      expected: 0,
     },
   ];
 

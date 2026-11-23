@@ -5,7 +5,7 @@ import type { LocalIndexTracker } from "@obsidian-vfs/core";
 import { makeLocalIndexTrackerWith } from "@obsidian-vfs/core/testing";
 
 import packageJson from "../package.json";
-import { SCHEME } from "./scheme.js";
+import { SCHEME, isManagedScheme } from "./scheme.js";
 import { CONFIG_PROP, CONFIG_SECTION } from "./types.js";
 import type { ExtensionConfig } from "./types.js";
 import type { SyncFilesExcludeOptions } from "./workspace-folder.js";
@@ -158,6 +158,13 @@ export function createVscodeMock(
 ): Record<string, unknown> {
   const mock: Record<string, unknown> = {};
 
+  mock.Disposable = {
+    from: (...disposables: { dispose(): void }[]) => ({
+      dispose: () => {
+        for (const d of disposables) d.dispose();
+      },
+    }),
+  };
   if (parts.fileSystemError) {
     mock.FileSystemError = createMockFileSystemError();
   }
@@ -299,10 +306,11 @@ export function fakeUri(
 ): { scheme: string; authority: string; path: string; fsPath: string; toString: () => string } {
   return {
     scheme,
-    authority: scheme === SCHEME ? vaultName : "",
+    authority: isManagedScheme(scheme) ? vaultName : "",
     path: uriPath,
     fsPath: uriPath,
-    toString: () => (scheme === SCHEME ? `${SCHEME}://${vaultName}${uriPath}` : `file://${uriPath}`),
+    toString: () =>
+      isManagedScheme(scheme) ? `${scheme}://${vaultName}${uriPath}` : `file://${uriPath}`,
   };
 }
 

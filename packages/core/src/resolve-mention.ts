@@ -9,19 +9,34 @@ import type { MentionResult, VFSResult } from "./types.js";
 import { processContent } from "./content-slice.js";
 import { resolveResource, resolveSkillResource } from "./resolve-resource.js";
 import { resolveWikilink } from "./resolve-wikilink.js";
-import { URI_SCHEME, parseObsUri } from "./uri.js";
+import { URI_SCHEMES, parseObsUri } from "./uri.js";
 
 /** Prefix for context mentions (`@obs:name`). */
-export const MENTION_PREFIX = `@${URI_SCHEME}:`;
+export const MENTION_PREFIX = `@${URI_SCHEMES[0]}:`;
 
 /** Prefix for skill-only mentions (`/obs:name`). */
-export const SKILL_PREFIX = `/${URI_SCHEME}:`;
+export const SKILL_PREFIX = `/${URI_SCHEMES[0]}:`;
+
+/** All accepted context-mention prefixes (`@obs:`, `@vault:`). */
+export const MENTION_PREFIXES: readonly string[] = URI_SCHEMES.map((s) => `@${s}:`);
+
+/** All accepted skill-mention prefixes (`/obs:`, `/vault:`). */
+export const SKILL_PREFIXES: readonly string[] = URI_SCHEMES.map((s) => `/${s}:`);
+
+/** Find the accepted context-mention prefix at the start of the input. */
+function matchMentionPrefix(input: string): string | undefined {
+  return MENTION_PREFIXES.find((p) => input.startsWith(p));
+}
+
+/** Find the accepted skill-mention prefix at the start of the input. */
+function matchSkillPrefix(input: string): string | undefined {
+  return SKILL_PREFIXES.find((p) => input.startsWith(p));
+}
 
 /** Add the `@obs:` prefix if the user omitted it; preserve existing prefixes. */
 export function normalizeMention(input: string): string {
-  if (input.startsWith(MENTION_PREFIX) || input.startsWith(SKILL_PREFIX)) {
-    return input;
-  }
+  if (matchMentionPrefix(input) !== undefined) return input;
+  if (matchSkillPrefix(input) !== undefined) return input;
   return MENTION_PREFIX + input;
 }
 
@@ -122,7 +137,8 @@ export async function resolveMention(
   mention: string,
   tracker: LocalIndexTracker,
 ): Promise<VFSResult<MentionResult>> {
-  if (!mention.startsWith(MENTION_PREFIX)) {
+  const prefix = matchMentionPrefix(mention);
+  if (prefix === undefined) {
     return {
       ok: false,
       error: {
@@ -132,7 +148,7 @@ export async function resolveMention(
     };
   }
 
-  const raw = mention.slice(MENTION_PREFIX.length).trim();
+  const raw = mention.slice(prefix.length).trim();
   if (raw === "") {
     return {
       ok: false,
@@ -204,7 +220,8 @@ export async function resolveSkillMention(
   mention: string,
   tracker: LocalIndexTracker,
 ): Promise<VFSResult<MentionResult>> {
-  if (!mention.startsWith(SKILL_PREFIX)) {
+  const prefix = matchSkillPrefix(mention);
+  if (prefix === undefined) {
     return {
       ok: false,
       error: {
@@ -214,7 +231,7 @@ export async function resolveSkillMention(
     };
   }
 
-  const raw = mention.slice(SKILL_PREFIX.length).trim();
+  const raw = mention.slice(prefix.length).trim();
   if (raw === "") {
     return {
       ok: false,
@@ -269,6 +286,6 @@ export async function resolveObsUri(
     };
   }
 
-  const synthesized = `@${URI_SCHEME}:${components.path}${components.section ? "#" + components.section : ""}`;
+  const synthesized = `@${components.scheme}:${components.path}${components.section ? "#" + components.section : ""}`;
   return resolveMention(synthesized, tracker);
 }

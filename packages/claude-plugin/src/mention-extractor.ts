@@ -1,11 +1,9 @@
-import { URI_SCHEME } from "@obsidian-vfs/core";
-
-import { maskCodeRegions } from "@obsidian-vfs/core";
+import { URI_SCHEMES, maskCodeRegions } from "@obsidian-vfs/core";
 
 import type { ExtractedMention } from "./types.js";
 
-/** Pattern matching `@obs:` and `/obs:` mentions — captures prefix and reference. */
-const MENTION_PATTERN = new RegExp(`([@/])${URI_SCHEME}:([^\\s]+)`, "g");
+/** Pattern matching `@obs:`/`@vault:` and `/obs:`/`/vault:` mentions — captures prefix and reference. */
+const MENTION_PATTERN = new RegExp(`([@/])(?:${URI_SCHEMES.join("|")}):([^\\s]+)`, "g");
 
 /** Trailing punctuation to strip from mention references. */
 const TRAILING_PUNCT = /[,.)!?;:]+$/;

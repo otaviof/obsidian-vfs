@@ -1,8 +1,8 @@
 import path from "node:path";
 
 import {
-  SKILL_PREFIX,
-  URI_PREFIX,
+  SKILL_PREFIXES,
+  matchUriPrefix,
   normalizeMention,
   resolveObsUri,
   resolveSkillMention,
@@ -33,7 +33,7 @@ function emitError(error: VFSError, json: boolean): number {
 
 /** Execute the inspect command. */
 export async function run(args: InspectArgs): Promise<number> {
-  const isObsUri = args.mention.startsWith(URI_PREFIX);
+  const isObsUri = matchUriPrefix(args.mention) !== undefined;
   const mention = isObsUri ? args.mention : normalizeMention(args.mention);
 
   const boot = await bootstrapTracker();
@@ -44,7 +44,7 @@ export async function run(args: InspectArgs): Promise<number> {
 
   const result = isObsUri
     ? await resolveObsUri(mention, tracker)
-    : mention.startsWith(SKILL_PREFIX)
+    : SKILL_PREFIXES.some((p) => mention.startsWith(p))
       ? await resolveSkillMention(mention, tracker)
       : await tracker.resolveMention(mention);
   const resolutionMs = performance.now() - resStart;

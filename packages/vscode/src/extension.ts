@@ -2,6 +2,7 @@ import path from "node:path";
 
 import * as vscode from "vscode";
 import { parse as parseJsonc } from "jsonc-parser";
+import type { VaultMode } from "@obsidian-vfs/core";
 import { VAULT_MODE } from "@obsidian-vfs/core";
 
 import { bootstrapFromConfig, readConfig } from "./bootstrap.js";
@@ -9,6 +10,7 @@ import { COMMAND, CONFIG_KEY, CONFIG_PROP, CONFIG_SECTION } from "./types.js";
 import type { ExtensionConfig } from "./types.js";
 import { SCHEME } from "./uri-adapter.js";
 import { registerCommands } from "./commands.js";
+import { ALIAS_SCHEME } from "./scheme.js";
 import { ObsidianFileSystemProvider } from "./file-system-provider.js";
 import { StatusBarManager } from "./status-bar.js";
 import { VaultTreeDragAndDropController } from "./tree-drag-drop.js";
@@ -40,6 +42,30 @@ interface ExcludeState {
 /** Wrapper for the file system provider registration to allow re-registration on mode change. */
 interface ProviderRegistration {
   current: vscode.Disposable;
+}
+
+/** Register the provider under both managed schemes, degrading to obs-only on collision. */
+function registerProviders(
+  provider: ObsidianFileSystemProvider,
+  vaultMode: VaultMode,
+  outputChannel: vscode.OutputChannel,
+): vscode.Disposable {
+  const options = {
+    isCaseSensitive: true,
+    isReadonly: vaultMode === VAULT_MODE.RO,
+  };
+  const disposables: vscode.Disposable[] = [
+    vscode.workspace.registerFileSystemProvider(SCHEME, provider, options),
+  ];
+  try {
+    disposables.push(vscode.workspace.registerFileSystemProvider(ALIAS_SCHEME, provider, options));
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    outputChannel.appendLine(
+      `Obsidian VFS: vault:// registration failed (${msg}) — degrading to obs:// only`,
+    );
+  }
+  return vscode.Disposable.from(...disposables);
 }
 
 /** Shared context passed to workspace activation and config change helpers. */
@@ -268,10 +294,7 @@ function handleConfigChange(
     provider.setVaultMode(updated.vaultMode);
     statusBar.setVaultMode(updated.vaultMode);
     providerReg.current.dispose();
-    providerReg.current = vscode.workspace.registerFileSystemProvider(SCHEME, provider, {
-      isCaseSensitive: true,
-      isReadonly: updated.vaultMode === VAULT_MODE.RO,
-    });
+    providerReg.current = registerProviders(provider, updated.vaultMode, ctx.outputChannel);
     ctx.extensionContext.subscriptions.push(providerReg.current);
   }
   if (e.affectsConfiguration(CONFIG_KEY.vaultGitIgnore)) {
@@ -361,10 +384,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
   const provider = new ObsidianFileSystemProvider(tracker, config.autoMount, config.vaultMode);
   context.subscriptions.push(provider);
   const providerReg: ProviderRegistration = {
-    current: vscode.workspace.registerFileSystemProvider(SCHEME, provider, {
-      isCaseSensitive: true,
-      isReadonly: config.vaultMode === VAULT_MODE.RO,
-    }),
+    current: registerProviders(provider, config.vaultMode, outputChannel),
   };
   context.subscriptions.push(providerReg.current);
   context.subscriptions.push(provider.watch(vscode.Uri.from({ scheme: SCHEME, path: "/" })));
@@ -397,6 +417,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     vscode.languages.registerDocumentLinkProvider(
       [
         { scheme: SCHEME, language: "markdown" },
+        { scheme: ALIAS_SCHEME, language: "markdown" },
         { scheme: "file", language: "markdown" },
       ],
       linkProvider,

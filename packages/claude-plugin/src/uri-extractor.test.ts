@@ -103,4 +103,19 @@ describe("extractObsUris", () => {
     expect(result).toHaveLength(1);
     expect(result[0].path).toBe("simple-note");
   });
+
+  it("extracts a bare vault:// URI", () => {
+    const result = extractObsUris("See vault://drafts/my-note for details");
+    expect(result).toHaveLength(1);
+    expect(result[0].uri).toBe("vault://drafts/my-note");
+    expect(result[0].vaultName).toBe("drafts");
+    expect(result[0].path).toBe("my-note");
+  });
+
+  it("deduplicates obs:// and vault:// URIs with the same components", () => {
+    const result = extractObsUris("See obs://drafts/my-note and vault://drafts/my-note");
+    expect(result).toHaveLength(1);
+    expect(result[0].vaultName).toBe("drafts");
+    expect(result[0].path).toBe("my-note");
+  });
 });
