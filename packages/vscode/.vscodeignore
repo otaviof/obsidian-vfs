@@ -3,5 +3,5 @@
 !dist/extension.js.map
 !package.json
 !resources/obsidian-vfs.png
-!resources/obsidian-vfs.svg
 !README.md
+!CHANGELOG.md
