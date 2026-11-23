@@ -9,7 +9,7 @@ set -euo pipefail
 (
     cd packages/vscode
 
-    if output=$(pnpm exec vsce publish --packagePath obsidian-vfs.vsix 2>&1); then
+    if output=$(pnpm exec vsce publish --oidc --packagePath obsidian-vfs.vsix 2>&1); then
         exit 0
     fi
 
